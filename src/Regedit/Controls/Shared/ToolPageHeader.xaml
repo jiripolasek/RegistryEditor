@@ -1,0 +1,49 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Controls.Shared.ToolPageHeader"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid ColumnSpacing="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Spacing="4">
+            <TextBlock
+                x:Name="Heading"
+                AutomationProperties.HeadingLevel="Level1"
+                MaxLines="2"
+                Style="{StaticResource TitleTextBlockStyle}"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="Wrap" />
+            <TextBlock
+                x:Name="DescriptionText"
+                AutomationProperties.LiveSetting="Polite"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                IsTextSelectionEnabled="True"
+                MaxLines="2"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="Wrap"
+                Visibility="Collapsed" />
+        </StackPanel>
+        <StackPanel
+            Grid.Column="1"
+            VerticalAlignment="Top"
+            Orientation="Horizontal"
+            Spacing="4">
+            <Button
+                x:Name="PageAction"
+                VerticalAlignment="Top"
+                Style="{StaticResource SubtleButtonStyle}"
+                Visibility="Collapsed" />
+            <Button
+                x:Name="GlobalMenuButton"
+                AccessKey="F"
+                AutomationProperties.AcceleratorKey="Alt+F"
+                AutomationProperties.Name="Application menu"
+                Style="{StaticResource NavigationButton}"
+                ToolTipService.ToolTip="Application menu (Alt+F)">
+                <FontIcon FontSize="16" Glyph="&#xE700;" />
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

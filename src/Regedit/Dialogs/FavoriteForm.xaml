@@ -1,0 +1,48 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.FavoriteForm"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:JPSoftworks.Regedit.Models.Tools">
+    <StackPanel Style="{StaticResource DialogFieldsPanelStyle}">
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            IsTextSelectionEnabled="True"
+            MaxLines="2"
+            Text="{x:Bind Address}"
+            TextTrimming="CharacterEllipsis"
+            TextWrapping="Wrap"
+            ToolTipService.ToolTip="{x:Bind Address}"
+            Visibility="{x:Bind HasFixedLocation}" />
+        <TextBox
+            x:Name="AddressInput"
+            Header="Registry location"
+            PlaceholderText="HKEY_CURRENT_USER\Software"
+            Text="{x:Bind Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            Visibility="{x:Bind CanEditLocation}" />
+        <TextBox
+            x:Name="NameInput"
+            Header="Name"
+            Text="{x:Bind FavoriteName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            Visibility="{x:Bind CanEditName}" />
+        <RadioButtons
+            Header="Registry view"
+            MaxColumns="2"
+            SelectedIndex="{x:Bind ViewIndex, Mode=TwoWay}"
+            Visibility="{x:Bind CanEditLocation}">
+            <x:String>64-bit</x:String>
+            <x:String>32-bit</x:String>
+        </RadioButtons>
+        <ComboBox
+            x:Name="FolderInput"
+            HorizontalAlignment="Stretch"
+            AutomationProperties.Name="Folder"
+            Header="Folder"
+            MaxDropDownHeight="320">
+            <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="models:FavoriteFolder">
+                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+    </StackPanel>
+</UserControl>

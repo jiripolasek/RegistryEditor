@@ -1,0 +1,21 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.WatchProposalView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel MaxWidth="420" Style="{StaticResource DialogFieldsPanelStyle}">
+        <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Start a local watch" />
+        <TextBlock
+            x:Name="TargetText"
+            AutomationProperties.AutomationId="WatchProposalTarget"
+            IsTextSelectionEnabled="True"
+            TextWrapping="Wrap" />
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Text="Local keys only. Intermediate values may coalesce. Observations are retained in this window until cleared or removed."
+            TextWrapping="Wrap" />
+        <Button
+            x:Name="StartButton"
+            AutomationProperties.AutomationId="WatchProposalStart"
+            Content="Start watch" />
+    </StackPanel>
+</UserControl>

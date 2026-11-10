@@ -1,0 +1,41 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.RegistryTargetForm"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Style="{StaticResource DialogFieldsPanelStyle}">
+        <TextBox
+            x:Name="AddressInput"
+            AutomationProperties.AutomationId="RegistryTargetAddress"
+            Header="Registry key"
+            PlaceholderText="HKCU\Software\Example"
+            Text="{x:Bind ViewModel.Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <ComboBox
+            HorizontalAlignment="Stretch"
+            AutomationProperties.AutomationId="RegistryTargetView"
+            Header="Registry view"
+            SelectedIndex="{x:Bind ViewModel.ViewIndex, Mode=TwoWay}">
+            <ComboBoxItem Content="64-bit" />
+            <ComboBoxItem Content="32-bit" />
+        </ComboBox>
+        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.IsWatch}">
+            <CheckBox
+                AutomationProperties.AutomationId="WatchOneValue"
+                Content="Watch one value instead of the entire branch"
+                IsChecked="{x:Bind ViewModel.WatchValue, Mode=TwoWay}" />
+            <CheckBox
+                AutomationProperties.AutomationId="WatchDefaultValue"
+                Content="Watch the (Default) value"
+                IsChecked="{x:Bind ViewModel.DefaultValue, Mode=TwoWay}"
+                Visibility="{x:Bind ViewModel.WatchValue, Mode=OneWay}" />
+            <TextBox
+                AutomationProperties.AutomationId="WatchValueName"
+                Header="Value name"
+                Text="{x:Bind ViewModel.ValueName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                Visibility="{x:Bind ViewModel.ShowValueName, Mode=OneWay}" />
+            <TextBlock
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="Local keys only. Rapid writes may coalesce; the writer is not identified. Up to 10,000 observations per capture are retained in this window."
+                TextWrapping="Wrap" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

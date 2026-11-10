@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Test bench for the reusable column list. The control lives in src/Regedit/Controls/Lists and its model in
+    src/Regedit/Models/Lists; they are linked (not referenced) so the self-test can reach internal members.
+  -->
+  <PropertyGroup>
+    <RootNamespace>JPSoftworks.ColumnList.Sample</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
+    <Compile Include="..\..\src\Regedit\Controls\Shared\ResizeThumb.cs" Link="Controls\Shared\ResizeThumb.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Shared\CommandIcon.cs" Link="Controls\Shared\CommandIcon.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Shared\ListDensity.cs" Link="Controls\Shared\ListDensity.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Shared\ColumnLayoutPersistence.cs" Link="Controls\Shared\ColumnLayoutPersistence.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Shared\ListContextMenu.cs" Link="Controls\Shared\ListContextMenu.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Shared\SymbolGlyphs.cs" Link="Controls\Shared\SymbolGlyphs.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Lists\*.cs" Link="Controls\Lists\%(Filename)%(Extension)" />
+    <Page Include="..\..\src\Regedit\Controls\Lists\ColumnListView.xaml" Link="Controls\Lists\ColumnListView.xaml" />
+    <Compile Include="..\..\src\Regedit\Models\Lists\*.cs" Link="Models\Lists\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Collections\IRangeList.cs" Link="Infrastructure\Collections\IRangeList.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Collections\RangeObservableCollection.cs" Link="Infrastructure\Collections\RangeObservableCollection.cs" />
+  </ItemGroup>
+</Project>

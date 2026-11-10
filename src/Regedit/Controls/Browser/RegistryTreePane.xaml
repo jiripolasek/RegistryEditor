@@ -1,0 +1,43 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Controls.Browser.RegistryTreePane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:JPSoftworks.Regedit.Controls.Browser"
+    xmlns:core="using:JPSoftworks.Regedit.Core.Registry">
+    <TreeView
+        x:Name="RegistryTree"
+        Margin="6,0,0,8"
+        AllowDrop="False"
+        AutomationProperties.Name="Registry keys"
+        CanDragItems="False"
+        CanReorderItems="False"
+        Expanding="Tree_Expanding"
+        ItemInvoked="Tree_ItemInvoked"
+        PreviewKeyDown="Tree_KeyDown"
+        SelectionMode="Single">
+        <TreeView.ItemTemplate>
+            <DataTemplate x:DataType="TreeViewNode">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        FontSize="15"
+                        Glyph="{x:Bind controls:RegistryTreePane.TreeGlyph((core:RegistryLocation)Content), Mode=OneWay}"
+                        Visibility="{x:Bind ((core:RegistryLocation)Content).IsComputer, Mode=OneWay}" />
+                    <FontIcon
+                        FontSize="15"
+                        Glyph="{x:Bind controls:RegistryTreePane.TreeGlyph((core:RegistryLocation)Content), Mode=OneWay}"
+                        Style="{ThemeResource RegistryNavigationIconStyle}"
+                        Visibility="{x:Bind ((core:RegistryLocation)Content).Hive.HasValue, Mode=OneWay, FallbackValue=Collapsed}" />
+                    <TextBlock
+                        Grid.Column="1"
+                        Text="{x:Bind ((core:RegistryLocation)Content).Name, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        ToolTipService.ToolTip="{x:Bind ((core:RegistryLocation)Content).Name, Mode=OneWay}" />
+                </Grid>
+            </DataTemplate>
+        </TreeView.ItemTemplate>
+    </TreeView>
+</UserControl>

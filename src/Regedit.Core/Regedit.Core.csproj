@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyTitle>Modern Registry Editor Core</AssemblyTitle>
+    <Description>Registry access and investigation services for Modern Registry Editor.</Description>
+    <RootNamespace>JPSoftworks.Regedit.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Regedit.Tests" />
+  </ItemGroup>
+</Project>

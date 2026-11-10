@@ -1,0 +1,504 @@
+﻿<Page
+    x:Class="JPSoftworks.Regedit.Views.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:JPSoftworks.Regedit.Controls.Shared"
+    xmlns:services="using:JPSoftworks.Regedit.Services"
+    xmlns:settings="using:JPSoftworks.Regedit.Models.Settings"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls">
+    <Grid
+        x:Name="Layout"
+        Padding="24"
+        RowSpacing="24"
+        SizeChanged="Layout_SizeChanged"
+        Style="{StaticResource ToolPageSurfaceStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="ShortcutsBackButton"
+                Margin="0,0,12,0"
+                VerticalAlignment="Top"
+                AutomationProperties.Name="Back to settings"
+                Click="ShortcutsBack_Click"
+                Style="{StaticResource NavigationButton}"
+                ToolTipService.ToolTip="Back to settings"
+                Visibility="Collapsed">
+                <SymbolIcon Symbol="Back" />
+            </Button>
+            <local:ToolPageHeader
+                x:Name="PageHeader"
+                Title="Settings"
+                Grid.Column="1" />
+        </Grid>
+        <ScrollViewer
+            x:Name="SettingsScroll"
+            Grid.Row="1"
+            HorizontalContentAlignment="Stretch"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <Grid
+                MaxWidth="960"
+                Padding="0,0,0,24"
+                HorizontalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="960" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="4">
+                    <InfoBar
+                        x:Name="SaveError"
+                        Title="Settings could not be saved"
+                        Margin="0,0,0,12"
+                        IsOpen="{x:Bind ViewModel.IsSaveErrorOpen, Mode=TwoWay}"
+                        Message="{x:Bind ViewModel.SaveError, Mode=OneWay}"
+                        Severity="Error" />
+                    <TextBlock
+                        Margin="0,0,0,8"
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="Appearance" />
+                    <toolkit:SettingsCard Description="Choose a theme or follow Windows." Header="App theme">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE790;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ComboBox
+                            x:Name="ThemeSelector"
+                            Width="200"
+                            AutomationProperties.Name="App theme"
+                            SelectedIndex="{x:Bind ViewModel.ThemeIndex, Mode=TwoWay}">
+                            <ComboBoxItem Content="Use Windows setting" />
+                            <ComboBoxItem Content="Light" />
+                            <ComboBoxItem Content="Dark" />
+                        </ComboBox>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Description="Choose the material behind the tabs. Registry data stays on a solid surface." Header="Window backdrop">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <SymbolIcon Symbol="Pictures" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ComboBox
+                            x:Name="BackdropSelector"
+                            Width="200"
+                            AutomationProperties.AutomationId="BackdropSelector"
+                            AutomationProperties.Name="Window backdrop"
+                            SelectedIndex="{x:Bind ViewModel.BackdropIndex, Mode=TwoWay}">
+                            <ComboBoxItem Content="Mica" />
+                            <ComboBoxItem Content="Acrylic" />
+                        </ComboBox>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsExpander
+                        x:Name="ToolbarButtonsExpander"
+                        Description="Choose which navigation buttons and tool shortcuts appear in the main toolbar."
+                        Header="Toolbar buttons">
+                        <toolkit:SettingsExpander.HeaderIcon>
+                            <PathIcon Data="F0 M3,0 H11 A3,3 0 0 1 14,3 V11 A3,3 0 0 1 11,14 H3 A3,3 0 0 1 0,11 V3 A3,3 0 0 1 3,0 Z M3,1 A2,2 0 0 0 1,3 V11 A2,2 0 0 0 3,13 H11 A2,2 0 0 0 13,11 V3 A2,2 0 0 0 11,1 Z M3.5,3 H10.5 A0.5,0.5 0 0 1 10.5,4 H3.5 A0.5,0.5 0 0 1 3.5,3 Z" />
+                        </toolkit:SettingsExpander.HeaderIcon>
+                        <toolkit:SettingsExpander.Items>
+                            <toolkit:SettingsCard Header="Back">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE72B;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    x:Name="ToolbarBackOption"
+                                    AutomationProperties.AutomationId="ToolbarBackOption"
+                                    AutomationProperties.Name="Back toolbar button"
+                                    IsOn="{x:Bind ViewModel.ShowBackButton, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Forward">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE72A;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarForwardOption"
+                                    AutomationProperties.Name="Forward toolbar button"
+                                    IsOn="{x:Bind ViewModel.ShowForwardButton, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Up">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE74A;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarUpOption"
+                                    AutomationProperties.Name="Up toolbar button"
+                                    IsOn="{x:Bind ViewModel.ShowUpButton, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Refresh">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE72C;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarRefreshOption"
+                                    AutomationProperties.Name="Refresh toolbar button"
+                                    IsOn="{x:Bind ViewModel.ShowRefreshButton, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Favorites">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE728;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    x:Name="ToolbarFavoritesOption"
+                                    AutomationProperties.AutomationId="ToolbarFavoritesOption"
+                                    AutomationProperties.Name="Favorites toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Favorites), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.Favorites}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Notes">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon FontFamily="/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular" Glyph="&#xF56B;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarNotesOption"
+                                    AutomationProperties.Name="Notes toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Notes), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.Notes}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Watches">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE7B3;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarWatchesOption"
+                                    AutomationProperties.Name="Watches toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Watches), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.Watches}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Change journal">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE81C;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarJournalOption"
+                                    AutomationProperties.Name="Change journal toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Journal), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.Journal}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Saved searches">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE721;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarSavedSearchesOption"
+                                    AutomationProperties.Name="Saved searches toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.SavedSearches), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.SavedSearches}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Workspaces">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE8B7;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarWorkspacesOption"
+                                    AutomationProperties.Name="Workspaces toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Workspaces), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.Workspaces}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Right sidebar">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE90D;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarSidebarOption"
+                                    AutomationProperties.Name="Right sidebar toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Sidebar), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.Sidebar}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Bottom panel">
+                                <toolkit:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE90E;" />
+                                </toolkit:SettingsCard.HeaderIcon>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="ToolbarBottomPanelOption"
+                                    AutomationProperties.Name="Bottom panel toolbar button"
+                                    IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.BottomPanel), Mode=OneWay}"
+                                    Tag="{x:Bind settings:ToolbarButtons.BottomPanel}"
+                                    Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                        </toolkit:SettingsExpander.Items>
+                    </toolkit:SettingsExpander>
+                    <TextBlock
+                        Margin="0,24,0,8"
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="Registry text" />
+                    <toolkit:SettingsExpander
+                        x:Name="DataFontExpander"
+                        Description="Choose the typeface and size for value contents in the registry list."
+                        Expanded="DataFontExpander_Expanded"
+                        Header="Data column font">
+                        <toolkit:SettingsExpander.HeaderIcon>
+                            <FontIcon Glyph="&#xE8D2;" />
+                        </toolkit:SettingsExpander.HeaderIcon>
+                        <toolkit:SettingsExpander.Items>
+                            <toolkit:SettingsCard Description="Override the automatic monospace font for value data." Header="Use a custom font">
+                                <ToggleSwitch
+                                    x:Name="CustomDataFontSwitch"
+                                    AutomationProperties.Name="Use a custom Data column font"
+                                    IsOn="{x:Bind ViewModel.UseCustomDataFont, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Description="{x:Bind ViewModel.FontFamiliesError, Mode=OneWay}" Header="Font family">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ProgressRing
+                                        Width="16"
+                                        Height="16"
+                                        MinWidth="0"
+                                        MinHeight="0"
+                                        AutomationProperties.Name="Loading installed fonts"
+                                        IsActive="{x:Bind ViewModel.IsLoadingFontFamilies, Mode=OneWay}"
+                                        Visibility="{x:Bind ViewModel.IsLoadingFontFamilies, Mode=OneWay}" />
+                                    <ComboBox
+                                        x:Name="DataFontSelector"
+                                        Width="240"
+                                        AutomationProperties.Name="Data column font family"
+                                        IsEditable="True"
+                                        IsEnabled="{x:Bind ViewModel.UseCustomDataFont, Mode=OneWay}"
+                                        ItemsSource="{x:Bind ViewModel.FontFamilies, Mode=OneWay}"
+                                        LostFocus="FontFamily_LostFocus"
+                                        SelectionChanged="FontFamily_Changed"
+                                        Text="{x:Bind ViewModel.DataFontFamily, Mode=OneWay}"
+                                        TextSubmitted="FontFamily_Submitted" />
+                                </StackPanel>
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Font size">
+                                <NumberBox
+                                    x:Name="DataFontSizeBox"
+                                    Width="160"
+                                    AutomationProperties.Name="Data column font size"
+                                    IsEnabled="{x:Bind ViewModel.UseCustomDataFont, Mode=OneWay}"
+                                    LargeChange="2"
+                                    Maximum="32"
+                                    Minimum="8"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Inline"
+                                    Value="{x:Bind ViewModel.DataFontSize, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                        </toolkit:SettingsExpander.Items>
+                    </toolkit:SettingsExpander>
+                    <TextBlock
+                        Margin="0,24,0,8"
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="Registry view" />
+                    <toolkit:SettingsCard Description="Adjust spacing in registry and tool lists without changing text size." Header="List spacing">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE8FD;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <StackPanel Width="220" Spacing="4">
+                            <Slider
+                                x:Name="ListSpacingSlider"
+                                AutomationProperties.AutomationId="ListSpacingSlider"
+                                AutomationProperties.Name="List spacing"
+                                Maximum="10"
+                                Minimum="0"
+                                StepFrequency="1"
+                                Value="{x:Bind ViewModel.ListRowPadding, Mode=TwoWay}" />
+                            <Grid>
+                                <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="Compact" />
+                                <TextBlock
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="Comfortable" />
+                            </Grid>
+                        </StackPanel>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Description="Expand and select the current key in the navigation tree as you browse. Turn this off to keep the tree in place; sync it manually from View." Header="Automatically sync tree">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE8B7;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch
+                            x:Name="AutoSyncTreeSwitch"
+                            AutomationProperties.Name="Automatically sync tree"
+                            IsOn="{x:Bind ViewModel.AutoSyncTree, Mode=TwoWay}" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Description="Display the full registry path instead of breadcrumbs. Click the address or press Ctrl+L to edit it." Header="Always show address as text">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE70F;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch
+                            x:Name="AddressTextSwitch"
+                            AutomationProperties.Name="Always show address as text"
+                            IsOn="{x:Bind ViewModel.AlwaysShowAddressAsText, Mode=TwoWay}" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Description="Show key and value counts at the bottom of registry tabs." Header="Status bar">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE9D9;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch
+                            x:Name="StatusBarSwitch"
+                            AutomationProperties.Name="Show status bar"
+                            IsOn="{x:Bind ViewModel.ShowStatusBar, Mode=TwoWay}" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Description="Show the bottom panel's tabs and actions below its content instead of above it." Header="Panel tabs at bottom">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE90E;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch
+                            x:Name="PanelTabsAtBottomSwitch"
+                            AutomationProperties.Name="Show panel tabs at bottom"
+                            IsOn="{x:Bind ViewModel.PanelTabsAtBottom, Mode=TwoWay}" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsExpander
+                        Description="Choose which entries and details appear in registry tabs."
+                        Header="Registry list"
+                        IsExpanded="True">
+                        <toolkit:SettingsExpander.HeaderIcon>
+                            <FontIcon Glyph="&#xE8FD;" />
+                        </toolkit:SettingsExpander.HeaderIcon>
+                        <toolkit:SettingsExpander.Items>
+                            <toolkit:SettingsCard Description="Show commands above the column headers. The list filter also opens with Ctrl+Alt+F." Header="List toolbar">
+                                <ToggleSwitch
+                                    x:Name="ListToolbarSwitch"
+                                    AutomationProperties.Name="Show list toolbar"
+                                    IsOn="{x:Bind ViewModel.ShowListToolbar, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Description="Include subkeys alongside values. Hives always appear in Computer." Header="Show keys in list">
+                                <ToggleSwitch
+                                    x:Name="ShowKeysSwitch"
+                                    AutomationProperties.Name="Show keys in list"
+                                    IsOn="{x:Bind ViewModel.ShowKeysInList, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Description="Add a first row that goes up one level. Requires keys to be visible." Header="Show parent key ..">
+                                <ToggleSwitch
+                                    x:Name="ParentKeySwitch"
+                                    AutomationProperties.Name="Show parent key .."
+                                    IsEnabled="{x:Bind ViewModel.ShowKeysInList, Mode=OneWay}"
+                                    IsOn="{x:Bind ViewModel.ShowParentKeyInList, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Description="Show details for the selected value below the list." Header="Value preview">
+                                <ToggleSwitch
+                                    x:Name="ValuePreviewSwitch"
+                                    AutomationProperties.Name="Show value preview"
+                                    IsOn="{x:Bind ViewModel.ShowValuePreview, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                        </toolkit:SettingsExpander.Items>
+                    </toolkit:SettingsExpander>
+                    <toolkit:SettingsExpander Description="Open selected key or value paths in your default browser. Value data is never sent." Header="Web search">
+                        <toolkit:SettingsExpander.HeaderIcon>
+                            <FontIcon Glyph="&#xE774;" />
+                        </toolkit:SettingsExpander.HeaderIcon>
+                        <DropDownButton Content="Use preset">
+                            <DropDownButton.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                    <MenuFlyoutItem
+                                        Command="{x:Bind ViewModel.SetWebSearchUrlCommand}"
+                                        CommandParameter="{x:Bind services:RegistryWebSearch.Bing}"
+                                        Text="Bing (default)" />
+                                    <MenuFlyoutItem
+                                        Command="{x:Bind ViewModel.SetWebSearchUrlCommand}"
+                                        CommandParameter="{x:Bind services:RegistryWebSearch.Google}"
+                                        Text="Google" />
+                                    <MenuFlyoutItem
+                                        Command="{x:Bind ViewModel.SetWebSearchUrlCommand}"
+                                        CommandParameter="{x:Bind services:RegistryWebSearch.DuckDuckGo}"
+                                        Text="DuckDuckGo" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                        <toolkit:SettingsExpander.Items>
+                            <toolkit:SettingsCard Description="Use {query} for the selected path. Press Enter or leave the field to save." Header="Search URL">
+                                <TextBox
+                                    Width="360"
+                                    AutomationProperties.AutomationId="WebSearchUrlBox"
+                                    AutomationProperties.Name="Web search URL"
+                                    KeyDown="WebSearchUrl_KeyDown"
+                                    LostFocus="WebSearchUrl_LostFocus"
+                                    Text="{x:Bind ViewModel.WebSearchUrl, Mode=OneWay}" />
+                            </toolkit:SettingsCard>
+                        </toolkit:SettingsExpander.Items>
+                    </toolkit:SettingsExpander>
+                    <TextBlock
+                        Margin="0,12,0,0"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Changes are saved automatically and apply to all registry tabs."
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Margin="0,24,0,8"
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="Help" />
+                    <toolkit:SettingsCard Description="Navigation, editing, tool panels, and mouse actions." Header="Keyboard shortcuts">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <SymbolIcon Symbol="Keyboard" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <Button
+                            x:Name="KeyboardShortcutsButton"
+                            AutomationProperties.Name="Keyboard shortcuts"
+                            Click="KeyboardShortcuts_Click"
+                            Content="View shortcuts" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Description="Open the folder containing application diagnostic logs." Header="Logs">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <SymbolIcon Symbol="Folder" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <Button
+                            x:Name="OpenLogsFolderButton"
+                            AutomationProperties.Name="Open logs folder"
+                            Command="{x:Bind ViewModel.OpenLogsFolderCommand}"
+                            Content="Open logs folder" />
+                    </toolkit:SettingsCard>
+                    <InfoBar
+                        Title="Could not open logs folder"
+                        IsOpen="{x:Bind ViewModel.IsLogsErrorOpen, Mode=TwoWay}"
+                        Message="{x:Bind ViewModel.LogsError, Mode=OneWay}"
+                        Severity="Error" />
+                    <toolkit:SettingsCard Description="Each edit can capture up to 64 MiB of value data, names and key permissions. If the edit exceeds the limit before it starts, the registry stays untouched. If recording fails after a change, open Change journal to inspect the saved before-state." Header="Journal recovery">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE81C;" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsExpander
+                        x:Name="AboutExpander"
+                        Margin="0,24,0,0"
+                        Description="Copyright © Jiří Polášek. All rights reserved."
+                        Header="Modern Registry Editor"
+                        IsExpanded="True">
+                        <toolkit:SettingsExpander.HeaderIcon>
+                            <ImageIcon Source="ms-appx:///Assets/Square44x44Logo.scale-200.png" />
+                        </toolkit:SettingsExpander.HeaderIcon>
+                        <TextBlock IsTextSelectionEnabled="True" Text="{x:Bind AppVersion}" />
+                        <toolkit:SettingsExpander.Items>
+                            <toolkit:SettingsCard Header="GitHub">
+                                <HyperlinkButton Content="github.com/jiripolasek/RegistryEditor" NavigateUri="https://github.com/jiripolasek/RegistryEditor" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Header="Homepage">
+                                <HyperlinkButton Content="jiripolasek.com" NavigateUri="https://jiripolasek.com" />
+                            </toolkit:SettingsCard>
+                        </toolkit:SettingsExpander.Items>
+                    </toolkit:SettingsExpander>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+        <ScrollViewer
+            x:Name="ShortcutsScroll"
+            Grid.Row="1"
+            HorizontalContentAlignment="Stretch"
+            AutomationProperties.Name="Keyboard shortcut reference"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            Visibility="Collapsed">
+            <Grid
+                Width="{x:Bind ShortcutsScroll.ViewportWidth, Mode=OneWay}"
+                MaxWidth="960"
+                Padding="0,0,0,24"
+                HorizontalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="960" />
+                </Grid.ColumnDefinitions>
+                <StackPanel x:Name="ShortcutGroups" Spacing="12" />
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -1,0 +1,22 @@
+<Project>
+  <Target Name="PublishXamlResources" AfterTargets="ComputeFilesToPublish" DependsOnTargets="GetCopyToOutputDirectoryItems" Condition="'$(UseWinUI)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="@(AllItemsFullPathWithTargetPath)" Condition="'%(AllItemsFullPathWithTargetPath.Extension)' == '.xbf'" RelativePath="%(AllItemsFullPathWithTargetPath.TargetPath)" CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)" RelativePath="$(ProjectPriFileName)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+  <Target Name="SeparateReleaseSymbols" AfterTargets="ComputeFilesToPublish" Condition="'$(MSBuildProjectName)' == 'Regedit' and '$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <_ReleaseSymbols Include="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Extension)' == '.pdb'" />
+      <_ReleaseSymbols Include="$(NativeOutputPath)$(TargetName)$(NativeSymbolExt)" Condition="'$(PublishAot)' == 'true' and Exists('$(NativeOutputPath)$(TargetName)$(NativeSymbolExt)')" />
+      <ResolvedFileToPublish Remove="@(_ReleaseSymbols)" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ReleaseSymbols)" DestinationFiles="@(_ReleaseSymbols->'$(PublishDir)..\symbols\%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="LimitPublishResourceLanguages" AfterTargets="ComputeFilesToPublish" Condition="'$(MSBuildProjectName)' == 'Regedit'">
+    <ItemGroup>
+      <!-- Windows App SDK MUI files bypass SatelliteResourceLanguages. -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Extension)' == '.mui' and $([System.IO.Path]::GetDirectoryName('%(ResolvedFileToPublish.RelativePath)')) != 'en-US'" />
+    </ItemGroup>
+  </Target>
+</Project>

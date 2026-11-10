@@ -1,0 +1,2 @@
+GetTokenInformation
+TOKEN_STATISTICS

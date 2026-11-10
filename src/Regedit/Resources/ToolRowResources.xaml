@@ -1,0 +1,196 @@
+<ResourceDictionary
+    x:Class="JPSoftworks.Regedit.Resources.ToolRowResources"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:JPSoftworks.Regedit.Resources"
+    xmlns:models="using:JPSoftworks.Regedit.Models.Tools">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="JournalCreatedIconBrush" Color="#0F7B0F" />
+            <SolidColorBrush x:Key="JournalEditedIconBrush" Color="#9D5D00" />
+            <SolidColorBrush x:Key="JournalRenamedIconBrush" Color="#0067C0" />
+            <SolidColorBrush x:Key="JournalFailedIconBrush" Color="#C42B1C" />
+            <SolidColorBrush x:Key="JournalRevertedIconBrush" Color="#744DA9" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="JournalCreatedIconBrush" Color="#6CCB5F" />
+            <SolidColorBrush x:Key="JournalEditedIconBrush" Color="#FCE100" />
+            <SolidColorBrush x:Key="JournalRenamedIconBrush" Color="#60CDFF" />
+            <SolidColorBrush x:Key="JournalFailedIconBrush" Color="#FF99A4" />
+            <SolidColorBrush x:Key="JournalRevertedIconBrush" Color="#C6A7ED" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="JournalCreatedIconBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="JournalEditedIconBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="JournalRenamedIconBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="JournalFailedIconBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="JournalRevertedIconBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+    <Style x:Key="ToolIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="JournalCreatedIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource JournalCreatedIconBrush}" />
+    </Style>
+    <Style x:Key="JournalEditedIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource JournalEditedIconBrush}" />
+    </Style>
+    <Style x:Key="JournalRenamedIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource JournalRenamedIconBrush}" />
+    </Style>
+    <Style x:Key="JournalFailedIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource JournalFailedIconBrush}" />
+    </Style>
+    <Style x:Key="JournalRevertedIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource JournalRevertedIconBrush}" />
+    </Style>
+    <DataTemplate x:Key="ToolRowTemplate" x:DataType="models:InvestigationRow">
+        <Grid
+            MinHeight="{ThemeResource ListRowMinHeight}"
+            Padding="{ThemeResource ListRowPadding}"
+            AutomationProperties.Name="{x:Bind AccessibleName}"
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid Margin="0,3,0,0" VerticalAlignment="Top">
+                <FontIcon
+                    FontFamily="{x:Bind IconFontFamily}"
+                    FontSize="16"
+                    Glyph="{x:Bind Glyph}"
+                    Style="{x:Bind local:ToolRowResources.IconStyle(IconStyleKey)}"
+                    Visibility="{x:Bind HasToolIcon}" />
+                <FontIcon
+                    FontSize="16"
+                    Glyph="{x:Bind Glyph}"
+                    Style="{ThemeResource RegistryNavigationIconStyle}"
+                    Visibility="{x:Bind HasNavigationIcon}" />
+                <FontIcon
+                    FontFamily="{x:Bind IconFontFamily}"
+                    FontSize="16"
+                    Glyph="{x:Bind Glyph}"
+                    Style="{ThemeResource RegistryStringIconStyle}"
+                    Visibility="{x:Bind HasStringIcon}" />
+                <FontIcon
+                    FontSize="16"
+                    Glyph="{x:Bind Glyph}"
+                    Style="{ThemeResource RegistryLinkIconStyle}"
+                    Visibility="{x:Bind HasLinkIcon}" />
+                <IconSourceElement
+                    Width="16"
+                    Height="16"
+                    IconSource="{x:Bind local:ToolRowResources.BinaryIcon}"
+                    Style="{ThemeResource RegistryDataIconStyle}"
+                    Visibility="{x:Bind HasBinaryIcon}" />
+                <FontIcon
+                    FontFamily="{x:Bind IconFontFamily}"
+                    FontSize="16"
+                    Glyph="{x:Bind Glyph}"
+                    Style="{ThemeResource RegistryDataIconStyle}"
+                    Visibility="{x:Bind HasDataIcon}" />
+            </Grid>
+            <StackPanel Grid.Column="1" Spacing="3">
+                <TextBlock
+                    AutomationProperties.HelpText="{x:Bind PrimaryToolTip}"
+                    MaxLines="2"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Text="{x:Bind PrimaryText}"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    ToolTipService.ToolTip="{x:Bind PrimaryToolTip}" />
+                <TextBlock
+                    AutomationProperties.HelpText="{x:Bind SecondaryToolTip}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    MaxLines="2"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind SecondaryText}"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    ToolTipService.ToolTip="{x:Bind SecondaryToolTip}" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind Subtitle}"
+                    TextWrapping="Wrap"
+                    Visibility="{x:Bind HasSubtitle}" />
+            </StackPanel>
+            <TextBlock
+                Grid.Column="2"
+                AutomationProperties.HelpText="{x:Bind TimeToolTip}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{x:Bind Time}"
+                ToolTipService.ToolTip="{x:Bind TimeToolTip}" />
+        </Grid>
+    </DataTemplate>
+    <DataTemplate x:Key="ToolTimeCell" x:DataType="models:InvestigationRow">
+        <TextBlock
+            VerticalAlignment="Center"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Text="{x:Bind Time}"
+            ToolTipService.ToolTip="{x:Bind TimeToolTip}" />
+    </DataTemplate>
+    <!--  Cells shared by tool tabs and docked panels.  -->
+    <DataTemplate x:Key="ToolIconCell" x:DataType="models:InvestigationRow">
+        <Grid VerticalAlignment="Center">
+            <FontIcon
+                FontFamily="{x:Bind IconFontFamily}"
+                FontSize="16"
+                Glyph="{x:Bind Glyph}"
+                Style="{x:Bind local:ToolRowResources.IconStyle(IconStyleKey)}"
+                Visibility="{x:Bind HasToolIcon}" />
+            <FontIcon
+                FontSize="16"
+                Glyph="{x:Bind Glyph}"
+                Style="{ThemeResource RegistryNavigationIconStyle}"
+                Visibility="{x:Bind HasNavigationIcon}" />
+            <FontIcon
+                FontFamily="{x:Bind IconFontFamily}"
+                FontSize="16"
+                Glyph="{x:Bind Glyph}"
+                Style="{ThemeResource RegistryStringIconStyle}"
+                Visibility="{x:Bind HasStringIcon}" />
+            <FontIcon
+                FontSize="16"
+                Glyph="{x:Bind Glyph}"
+                Style="{ThemeResource RegistryLinkIconStyle}"
+                Visibility="{x:Bind HasLinkIcon}" />
+            <IconSourceElement
+                Width="16"
+                Height="16"
+                IconSource="{x:Bind local:ToolRowResources.BinaryIcon}"
+                Style="{ThemeResource RegistryDataIconStyle}"
+                Visibility="{x:Bind HasBinaryIcon}" />
+            <FontIcon
+                FontFamily="{x:Bind IconFontFamily}"
+                FontSize="16"
+                Glyph="{x:Bind Glyph}"
+                Style="{ThemeResource RegistryDataIconStyle}"
+                Visibility="{x:Bind HasDataIcon}" />
+        </Grid>
+    </DataTemplate>
+    <DataTemplate x:Key="ToolSubjectCell" x:DataType="models:InvestigationRow">
+        <TextBlock
+            VerticalAlignment="Center"
+            Text="{x:Bind TableSubject}"
+            TextTrimming="CharacterEllipsis"
+            ToolTipService.ToolTip="{x:Bind PrimaryToolTip}" />
+    </DataTemplate>
+    <DataTemplate x:Key="ToolPathCell" x:DataType="models:InvestigationRow">
+        <TextBlock
+            VerticalAlignment="Center"
+            Text="{x:Bind Path}"
+            TextTrimming="CharacterEllipsis"
+            ToolTipService.ToolTip="{x:Bind Path}" />
+    </DataTemplate>
+    <DataTemplate x:Key="ToolSummaryCell" x:DataType="models:InvestigationRow">
+        <TextBlock
+            VerticalAlignment="Center"
+            Text="{x:Bind TableSummary}"
+            TextTrimming="CharacterEllipsis"
+            ToolTipService.ToolTip="{x:Bind TableSummary}" />
+    </DataTemplate>
+</ResourceDictionary>

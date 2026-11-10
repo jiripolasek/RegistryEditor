@@ -1,0 +1,553 @@
+﻿<UserControl
+    x:Class="JPSoftworks.Regedit.Views.Tools.ToolView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:lists="using:JPSoftworks.Regedit.Controls.Lists"
+    xmlns:local="using:JPSoftworks.Regedit.Controls.Shared"
+    xmlns:tools="using:JPSoftworks.Regedit.Models.Tools"
+    xmlns:tools1="using:JPSoftworks.Regedit.Views.Tools">
+    <UserControl.Resources>
+        <DataTemplate x:Key="ToolGroupHeader" x:DataType="tools:ToolRowGroup">
+            <TextBlock
+                Margin="0,12,0,4"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="{x:Bind Title}" />
+        </DataTemplate>
+    </UserControl.Resources>
+    <UserControl.KeyboardAccelerators>
+        <KeyboardAccelerator
+            Key="S"
+            Invoked="SaveNote_Invoked"
+            Modifiers="Control" />
+        <KeyboardAccelerator
+            Key="P"
+            Invoked="InspectDetails_Invoked"
+            Modifiers="Menu" />
+    </UserControl.KeyboardAccelerators>
+    <Grid
+        x:Name="Layout"
+        Padding="24"
+        Loaded="View_Loaded"
+        SizeChanged="Layout_SizeChanged"
+        Unloaded="View_Unloaded">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="60" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <local:ToolPageHeader x:Name="PageHeader" Margin="0,0,0,24" />
+        <local:ToolToolbar
+            x:Name="LocalControls"
+            Grid.Row="1"
+            Margin="0,0,0,12"
+            SearchChanged="Search_Changed">
+            <FlyoutBase.AttachedFlyout>
+                <Flyout x:Name="PanelFilterFlyout" Placement="BottomEdgeAlignedRight">
+                    <StackPanel
+                        MinWidth="300"
+                        MaxWidth="420"
+                        Spacing="12">
+                        <StackPanel x:Name="PanelJournalFilters" Spacing="12">
+                            <ComboBox
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.Name="Journal scope"
+                                Header="Scope"
+                                SelectedIndex="{x:Bind JournalSurface.ScopeIndex, Mode=TwoWay}">
+                                <ComboBoxItem Content="All locations and views" />
+                                <ComboBoxItem Content="{x:Bind JournalSurface.BranchScopeLabel, Mode=OneWay}" />
+                            </ComboBox>
+                            <ComboBox
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="JournalArchiveFilter"
+                                Header="History"
+                                ItemsSource="{x:Bind JournalSurface.ArchiveChoices}"
+                                SelectedItem="{x:Bind JournalSurface.ArchiveFilter, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="tools:JournalArchiveChoice">
+                                        <TextBlock Text="{x:Bind Label}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <ComboBox
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="JournalOperationFilter"
+                                Header="Operation"
+                                ItemsSource="{x:Bind JournalSurface.OperationChoices}"
+                                SelectedItem="{x:Bind JournalSurface.OperationFilter, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="tools:JournalOperationChoice">
+                                        <TextBlock Text="{x:Bind Label}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        <ComboBox
+                            x:Name="PanelWatchPicker"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Choose capture"
+                            Header="Capture"
+                            SelectionChanged="Watch_Changed">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="tools:WatchSession">
+                                    <TextBlock
+                                        Text="{x:Bind DisplayTitle, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTipService.ToolTip="{x:Bind Target}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock
+                            x:Name="PanelContext"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsTextSelectionEnabled="True"
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                        <Grid
+                            x:Name="PanelWatchViewing"
+                            ColumnSpacing="8"
+                            Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="WatchViewingStatus"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind WatchSurface.PendingText, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                            <HyperlinkButton
+                                Grid.Column="1"
+                                Padding="0"
+                                AutomationProperties.AutomationId="WatchFollowLatest"
+                                Command="{x:Bind WatchSurface.FollowLatestCommand}"
+                                Content="Follow latest" />
+                        </Grid>
+                    </StackPanel>
+                </Flyout>
+            </FlyoutBase.AttachedFlyout>
+            <local:ToolToolbar.FiltersContent>
+                <StackPanel x:Name="ScopePanel" Visibility="Collapsed">
+                    <DropDownButton
+                        x:Name="JournalFilters"
+                        MinHeight="32"
+                        Padding="8,5"
+                        VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="JournalFilters"
+                        AutomationProperties.HelpText="{x:Bind JournalSurface.FilterSummary, Mode=OneWay}"
+                        AutomationProperties.Name="Journal history filters"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="{x:Bind JournalSurface.FilterSummary, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon
+                                FontSize="16"
+                                Glyph="&#xE71C;"
+                                IsTextScaleFactorEnabled="False" />
+                            <FontIcon
+                                FontSize="8"
+                                Glyph="&#xE70D;"
+                                IsTextScaleFactorEnabled="False" />
+                        </StackPanel>
+                        <DropDownButton.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft">
+                                <StackPanel MinWidth="220" Spacing="12">
+                                    <ComboBox
+                                        HorizontalAlignment="Stretch"
+                                        AutomationProperties.AutomationId="JournalArchiveFilter"
+                                        Header="History"
+                                        ItemsSource="{x:Bind JournalSurface.ArchiveChoices}"
+                                        SelectedItem="{x:Bind JournalSurface.ArchiveFilter, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="tools:JournalArchiveChoice">
+                                                <TextBlock Text="{x:Bind Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <ComboBox
+                                        HorizontalAlignment="Stretch"
+                                        AutomationProperties.AutomationId="JournalOperationFilter"
+                                        Header="Operation"
+                                        ItemsSource="{x:Bind JournalSurface.OperationChoices}"
+                                        SelectedItem="{x:Bind JournalSurface.OperationFilter, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="tools:JournalOperationChoice">
+                                                <TextBlock Text="{x:Bind Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Flyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                </StackPanel>
+            </local:ToolToolbar.FiltersContent>
+            <local:ToolToolbar.CommandsContent>
+                <local:ListCommandBar
+                    x:Name="Commands"
+                    HorizontalAlignment="Stretch"
+                    Background="Transparent"
+                    DefaultLabelPosition="Right"
+                    IsDynamicOverflowEnabled="True" />
+            </local:ToolToolbar.CommandsContent>
+        </local:ToolToolbar>
+        <local:ToolContextRow
+            x:Name="WatchContext"
+            Grid.Row="2"
+            Margin="0,0,0,8"
+            AutomationProperties.AutomationId="ToolContextRow"
+            Visibility="Collapsed">
+            <local:ToolContextRow.PrimaryContent>
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        x:Name="WatchTarget"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        ColumnSpacing="8"
+                        Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            AutomationProperties.AutomationId="WatchCaptureLabel"
+                            Text="Capture" />
+                        <ComboBox
+                            x:Name="WatchPicker"
+                            Grid.Column="1"
+                            MinWidth="120"
+                            MaxWidth="360"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Choose capture"
+                            PlaceholderText="Choose capture"
+                            SelectionChanged="Watch_Changed">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="tools:WatchSession">
+                                    <TextBlock
+                                        Text="{x:Bind CaptureLabel, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTipService.ToolTip="{x:Bind Target}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button
+                            Grid.Column="2"
+                            MinHeight="28"
+                            Padding="4"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AutomationId="WatchCaptureDetails"
+                            AutomationProperties.Name="Capture details"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            ToolTipService.ToolTip="Capture details">
+                            <FontIcon FontSize="14" Glyph="&#xE946;" />
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                    <StackPanel MaxWidth="480" Spacing="8">
+                                        <TextBlock FontWeight="SemiBold" Text="Capture details" />
+                                        <TextBlock Style="{StaticResource ToolSelectableTextStyle}" Text="{x:Bind WatchSurface.Target, Mode=OneWay}" />
+                                        <TextBlock Style="{StaticResource ToolSelectableTextStyle}" Text="{x:Bind WatchSurface.Context, Mode=OneWay}" />
+                                        <TextBlock
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="Observations are retained until this window closes."
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </Grid>
+                    <Grid
+                        x:Name="CaptureStatus"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            x:Name="CaptureIcon"
+                            FontSize="12"
+                            Glyph="&#xE768;"
+                            Visibility="Collapsed" />
+                        <TextBlock
+                            x:Name="Context"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AutomationId="Context"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsTextSelectionEnabled="True"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
+            </local:ToolContextRow.PrimaryContent>
+            <local:ToolContextRow.SecondaryContent>
+                <Grid
+                    x:Name="WatchViewing"
+                    ColumnSpacing="8"
+                    Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="WatchViewingStatus"
+                        AutomationProperties.LiveSetting="Polite"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind WatchSurface.PendingText, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                    <HyperlinkButton
+                        Grid.Column="1"
+                        MinHeight="24"
+                        Padding="4,0"
+                        AutomationProperties.AutomationId="WatchFollowLatest"
+                        Command="{x:Bind WatchSurface.FollowLatestCommand}"
+                        Content="Follow latest" />
+                </Grid>
+            </local:ToolContextRow.SecondaryContent>
+        </local:ToolContextRow>
+        <Grid
+            x:Name="Workspace"
+            Grid.Row="3"
+            ColumnSpacing="16"
+            RowSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ListWidth" Width="*" />
+                <ColumnDefinition x:Name="InspectorWidth" Width="0" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="ListHeight" Height="*" />
+                <RowDefinition x:Name="InspectorHeight" Height="0" />
+            </Grid.RowDefinitions>
+            <Grid x:Name="Collection">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="1" Style="{StaticResource ToolListSurfaceStyle}">
+                    <!--  Both presentations share selection and the virtualized list.  -->
+                    <lists:ColumnListView
+                        x:Name="ResultColumns"
+                        ColumnSpacing="12"
+                        CompactItemTemplate="{StaticResource ToolRowTemplate}"
+                        ShowColumns="True">
+                        <lists:ColumnListView.LeadingColumn>
+                            <lists:ListColumn
+                                CellTemplate="{StaticResource ToolIconCell}"
+                                DefaultWidth="20"
+                                Id="Icon" />
+                        </lists:ColumnListView.LeadingColumn>
+                        <lists:ColumnListView.Columns>
+                            <lists:ListColumn
+                                MinWidth="64"
+                                CellTemplate="{StaticResource ToolTimeCell}"
+                                DefaultWidth="80"
+                                Header="Time"
+                                Id="Time" />
+                            <lists:ListColumn
+                                MinWidth="100"
+                                CanHide="False"
+                                CellTemplate="{StaticResource ToolSubjectCell}"
+                                FillWeight="2"
+                                Header="Item"
+                                Id="Subject" />
+                            <lists:ListColumn
+                                MinWidth="64"
+                                CellTemplate="{StaticResource ToolPathCell}"
+                                FillWeight="3"
+                                Header="Registry path"
+                                Id="Path" />
+                            <lists:ListColumn
+                                MinWidth="64"
+                                CellTemplate="{StaticResource ToolSummaryCell}"
+                                FillWeight="2"
+                                Header="Change"
+                                Id="Summary" />
+                        </lists:ColumnListView.Columns>
+                    </lists:ColumnListView>
+                    <StackPanel
+                        x:Name="Empty"
+                        MaxWidth="320"
+                        Margin="12"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsHitTestVisible="False"
+                        Spacing="8">
+                        <TextBlock
+                            x:Name="EmptyTitle"
+                            FontWeight="SemiBold"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="EmptyDescription"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock
+                    x:Name="Count"
+                    Grid.Row="2"
+                    Margin="0,8,0,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}" />
+            </Grid>
+            <local:ToolDetails
+                x:Name="Details"
+                Grid.Column="1"
+                Visibility="Collapsed">
+                <local:ToolDetails.RelatedContent>
+                    <ItemsControl ItemsSource="{x:Bind JournalSurface.Links, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="tools:JournalLink">
+                                <HyperlinkButton
+                                    Padding="0,2"
+                                    HorizontalAlignment="Left"
+                                    AutomationProperties.HelpText="{x:Bind Description}"
+                                    Command="{x:Bind Command}"
+                                    CommandParameter="{x:Bind EntryId}"
+                                    Content="{x:Bind Label}"
+                                    ToolTipService.ToolTip="{x:Bind Description}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </local:ToolDetails.RelatedContent>
+            </local:ToolDetails>
+            <Border
+                x:Name="NotePanel"
+                Grid.Column="1"
+                Style="{StaticResource ToolInspectorStyle}"
+                Visibility="Collapsed">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                x:Name="NoteTitle"
+                                AutomationProperties.AutomationId="NoteTitle"
+                                AutomationProperties.HelpText="{x:Bind Notes.Title, Mode=OneWay}"
+                                MaxLines="2"
+                                Style="{StaticResource SubtitleTextBlockStyle}"
+                                Text="{x:Bind Notes.Title, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="Wrap"
+                                ToolTipService.ToolTip="{x:Bind Notes.Title, Mode=OneWay}" />
+                            <TextBlock
+                                x:Name="NotePath"
+                                AutomationProperties.AutomationId="NotePath"
+                                AutomationProperties.HelpText="{x:Bind Notes.Path, Mode=OneWay}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                IsTextSelectionEnabled="True"
+                                MaxLines="2"
+                                Text="{x:Bind Notes.Path, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="Wrap"
+                                ToolTipService.ToolTip="{x:Bind Notes.Path, Mode=OneWay}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind Notes.Scope, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock
+                                    x:Name="NoteStatus"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.LiveSetting="Polite"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind Notes.Status, Mode=OneWay}"
+                                    Visibility="{x:Bind tools1:ToolView.TextVisibility(Notes.Status), Mode=OneWay}" />
+                                <HyperlinkButton
+                                    Padding="0"
+                                    AutomationProperties.AutomationId="UndoNoteDelete"
+                                    AutomationProperties.Name="Undo note deletion"
+                                    Command="{x:Bind Notes.UndoDeleteCommand}"
+                                    Content="Undo"
+                                    Visibility="{x:Bind Notes.CanUndoDelete, Mode=OneWay}" />
+                                <HyperlinkButton
+                                    Padding="0"
+                                    AutomationProperties.AutomationId="RetryNoteSave"
+                                    AutomationProperties.Name="Retry saving note"
+                                    Command="{x:Bind Notes.SaveCommand}"
+                                    Content="Retry"
+                                    Visibility="{x:Bind Notes.HasSaveError, Mode=OneWay}" />
+                            </StackPanel>
+                        </StackPanel>
+                        <local:ListCommandBar
+                            x:Name="NoteCommands"
+                            Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Background="Transparent"
+                            DefaultLabelPosition="Collapsed">
+                            <local:ListCommandBar.SecondaryCommands>
+                                <AppBarButton
+                                    Command="{x:Bind Notes.SaveCommand}"
+                                    KeyboardAcceleratorTextOverride="Ctrl+S"
+                                    Label="Save now">
+                                    <AppBarButton.Icon>
+                                        <local:CommandIcon Symbol="Save" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    AutomationProperties.AutomationId="DeleteNote"
+                                    Command="{x:Bind Notes.DeleteCommand}"
+                                    Label="Delete note">
+                                    <AppBarButton.Icon>
+                                        <local:CommandIcon Symbol="Delete" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                            </local:ListCommandBar.SecondaryCommands>
+                            <AppBarButton
+                                x:Name="OpenNoteButton"
+                                Command="{x:Bind Notes.OpenCommand}"
+                                Label="Open key"
+                                Visibility="{x:Bind Notes.ShowOpenKey, Mode=OneWay}">
+                                <AppBarButton.Icon>
+                                    <local:CommandIcon Symbol="OpenFile" />
+                                </AppBarButton.Icon>
+                            </AppBarButton>
+                        </local:ListCommandBar>
+                    </Grid>
+                    <TextBox
+                        x:Name="NoteEditor"
+                        Grid.Row="1"
+                        MinHeight="60"
+                        VerticalAlignment="Stretch"
+                        AcceptsReturn="True"
+                        AutomationProperties.Name="Local note"
+                        IsEnabled="{x:Bind Notes.HasNote, Mode=OneWay}"
+                        MaxLength="100000"
+                        PlaceholderText="Write what this key controls or why you changed it."
+                        Text="{x:Bind Notes.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind Notes.HasNote, Mode=OneWay}" />
+                </Grid>
+            </Border>
+            <local:ToolPaneSplitter x:Name="DetailsSplitter" Visibility="Collapsed" />
+        </Grid>
+        <InfoBar
+            x:Name="Notice"
+            Grid.Row="4"
+            Margin="0,12,0,0"
+            AutomationProperties.AutomationId="ToolNotice"
+            IsOpen="False"
+            Visibility="{x:Bind Notice.IsOpen, Mode=OneWay}" />
+    </Grid>
+</UserControl>

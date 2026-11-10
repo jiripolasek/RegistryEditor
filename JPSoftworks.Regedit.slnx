@@ -1,0 +1,55 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="CHANGELOG.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="dotnet-tools.json" />
+    <File Path="global.json" />
+    <File Path="LICENSE.txt" />
+    <File Path="NOTICE.md" />
+    <File Path="NuGet.Config" />
+    <File Path="README.md" />
+    <File Path="Run.ps1" />
+    <File Path="Settings.XamlStyler" />
+  </Folder>
+  <Folder Name="/art/">
+    <File Path="art/logo.svg" />
+    <File Path="art/logo.png" />
+    <File Path="art/logo.ico" />
+    <File Path="art/screenshot_03.png" />
+  </Folder>
+  <Folder Name="/docs/" />
+  <Folder Name="/docs/user/">
+    <File Path="docs/user/Guide.md" />
+  </Folder>
+  <Folder Name="/eng/">
+    <File Path="eng/Format.DotSettings" />
+    <File Path="eng/Format.ps1" />
+    <File Path="eng/Run.ps1" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Regedit/Regedit.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="src/Regedit.Core/Regedit.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ColumnList.Sample/ColumnList.Sample.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="tests/Omnibox.Sample/Omnibox.Sample.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
+    <Project Path="tests/Regedit.Tests/Regedit.Tests.csproj" />
+  </Folder>
+</Solution>

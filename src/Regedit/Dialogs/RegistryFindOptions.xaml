@@ -1,0 +1,29 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.RegistryFindOptions"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Style="{StaticResource DialogFieldsPanelStyle}">
+        <TextBox
+            x:Name="QueryInput"
+            Header="Find what"
+            Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <ComboBox
+            HorizontalAlignment="Stretch"
+            AutomationProperties.AutomationId="SearchScope"
+            Header="Search in"
+            IsEnabled="{x:Bind ViewModel.CanChooseScope}"
+            SelectedIndex="{x:Bind ViewModel.ScopeIndex, Mode=TwoWay}">
+            <ComboBoxItem Content="Current key and subkeys" />
+            <ComboBoxItem Content="{x:Bind ViewModel.AllHivesLabel}" />
+        </ComboBox>
+        <CheckBox Content="Key names" IsChecked="{x:Bind ViewModel.Keys, Mode=TwoWay}" />
+        <CheckBox Content="Value names" IsChecked="{x:Bind ViewModel.Values, Mode=TwoWay}" />
+        <CheckBox Content="Value data" IsChecked="{x:Bind ViewModel.Data, Mode=TwoWay}" />
+        <TextBox
+            Header="Value types (blank for all)"
+            PlaceholderText="REG_SZ, REG_DWORD, 99"
+            Text="{x:Bind ViewModel.Types, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <CheckBox Content="Match whole string only" IsChecked="{x:Bind ViewModel.Whole, Mode=TwoWay}" />
+        <CheckBox Content="Match case" IsChecked="{x:Bind ViewModel.MatchCase, Mode=TwoWay}" />
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,4 @@
+CoTaskMemFree
+CredUIPromptForWindowsCredentials
+CredUnPackAuthenticationBuffer
+LogonUser

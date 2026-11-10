@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+_ReSharper*/
+artifacts/
+TestResults/
+*.log
+*.user
+*.suo

@@ -1,0 +1,169 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Controls.Omnibox.Omnibox"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:JPSoftworks.Regedit.Controls.Omnibox">
+    <UserControl.Resources>
+        <DataTemplate x:Key="ChildLocationTemplate" x:DataType="local:OmniboxItem">
+            <TextBlock
+                Text="{x:Bind Label}"
+                TextTrimming="CharacterEllipsis"
+                ToolTipService.ToolTip="{x:Bind Address}" />
+        </DataTemplate>
+        <Style x:Key="ChildLocationContainerStyle" TargetType="ListViewItem">
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+        <Style x:Key="ChildLocationsFlyoutStyle" TargetType="FlyoutPresenter">
+            <Setter Property="Padding" Value="4" />
+        </Style>
+    </UserControl.Resources>
+    <Grid MinHeight="36">
+        <Grid.ContextFlyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <MenuFlyoutItem
+                    Click="CopyAddress_Click"
+                    Icon="Copy"
+                    Text="Copy address" />
+                <MenuFlyoutItem
+                    Click="EditAddress_Click"
+                    Icon="Edit"
+                    Text="Edit address" />
+            </MenuFlyout>
+        </Grid.ContextFlyout>
+        <Grid
+            x:Name="DisplayPath"
+            Background="{ThemeResource ControlFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="4"
+            PreviewKeyDown="DisplayPath_PreviewKeyDown"
+            Tapped="DisplayPath_Tapped">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ContentPresenter
+                x:Name="LocationIcon"
+                Width="16"
+                Height="16"
+                Margin="10,0,6,0"
+                VerticalAlignment="Center"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center"
+                AutomationProperties.AccessibilityView="Raw"
+                IsHitTestVisible="False"
+                Visibility="Collapsed" />
+            <Button
+                x:Name="RootButton"
+                Grid.Column="1"
+                Height="32"
+                Padding="8,4"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Choose location"
+                Style="{StaticResource SubtleButtonStyle}"
+                ToolTipService.ToolTip="Choose location"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon FontSize="14" Glyph="&#xE8B7;" />
+                    <FontIcon FontSize="10" Glyph="&#xE76C;" />
+                </StackPanel>
+            </Button>
+            <Grid
+                x:Name="TrailViewport"
+                Grid.Column="2"
+                SizeChanged="TrailViewport_SizeChanged">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button
+                    x:Name="OverflowButton"
+                    Width="32"
+                    Height="32"
+                    Padding="4"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Show ancestors"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    ToolTipService.ToolTip="Show ancestors"
+                    Visibility="Collapsed">
+                    <Button.Flyout>
+                        <MenuFlyout
+                            x:Name="OverflowMenu"
+                            Opening="OverflowMenu_Opening"
+                            Placement="BottomEdgeAlignedLeft" />
+                    </Button.Flyout>
+                    <FontIcon FontSize="14" Glyph="&#xE712;" />
+                </Button>
+                <StackPanel
+                    x:Name="Trail"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    AutomationProperties.Name="Address breadcrumbs"
+                    Orientation="Horizontal" />
+            </Grid>
+            <TextBlock
+                x:Name="AddressText"
+                Grid.Column="2"
+                Margin="6,0"
+                VerticalAlignment="Center"
+                Text="{x:Bind Address, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis"
+                ToolTipService.ToolTip="{x:Bind Address, Mode=OneWay}"
+                Visibility="Collapsed" />
+            <Button
+                x:Name="EditAddressButton"
+                Grid.Column="3"
+                Width="32"
+                Height="32"
+                Padding="7"
+                VerticalAlignment="Center"
+                AccessKey="E"
+                AutomationProperties.Name="Edit address"
+                Click="EditAddress_Click"
+                Style="{StaticResource SubtleButtonStyle}"
+                ToolTipService.ToolTip="Edit address (Ctrl+L)">
+                <FontIcon
+                    FontSize="14"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE70F;" />
+            </Button>
+            <ContentPresenter
+                x:Name="TrailingPresenter"
+                Grid.Column="4"
+                VerticalContentAlignment="Center" />
+        </Grid>
+        <AutoSuggestBox
+            x:Name="Editor"
+            MinHeight="36"
+            VerticalAlignment="Stretch"
+            VerticalContentAlignment="Center"
+            AutomationProperties.Name="Address"
+            LostFocus="Editor_LostFocus"
+            MaxSuggestionListHeight="320"
+            PlaceholderText="Enter an address"
+            PreviewKeyDown="Editor_PreviewKeyDown"
+            QueryIcon="Forward"
+            QuerySubmitted="Editor_QuerySubmitted"
+            SuggestionChosen="Editor_SuggestionChosen"
+            TextChanged="Editor_TextChanged"
+            Visibility="Collapsed">
+            <AutoSuggestBox.ItemTemplate>
+                <DataTemplate x:DataType="local:OmniboxItem">
+                    <StackPanel Padding="0,4" Spacing="2">
+                        <TextBlock Text="{x:Bind Label}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind Address}"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{x:Bind local:Omnibox.DescriptionVisibility(Label, Address)}" />
+                    </StackPanel>
+                </DataTemplate>
+            </AutoSuggestBox.ItemTemplate>
+        </AutoSuggestBox>
+    </Grid>
+</UserControl>

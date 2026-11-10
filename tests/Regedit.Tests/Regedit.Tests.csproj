@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JPSoftworks.Regedit.Tests</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Regedit.Core\Regedit.Core.csproj" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.371" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <Compile Include="..\..\src\Regedit\Dialogs\IFavoriteDialogs.cs" Link="Dialogs\IFavoriteDialogs.cs" />
+    <Compile Include="..\..\src\Regedit\Dialogs\IRegistryBranchDialogs.cs" Link="Dialogs\IRegistryBranchDialogs.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\AppLogging.cs" Link="Infrastructure\AppLogging.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\AppServices.cs" Link="Infrastructure\AppServices.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\JumpListEntries.cs" Link="Infrastructure\JumpListEntries.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\IJumpListBackend.cs" Link="Infrastructure\IJumpListBackend.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\JumpListService.cs" Link="Infrastructure\JumpListService.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Interop\JumpListNative.cs" Link="Infrastructure\Interop\JumpListNative.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Interop\NetworkRegistryConnection.cs" Link="Infrastructure\Interop\NetworkRegistryConnection.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Collections\BulkObservableCollection.cs" Link="Infrastructure\Collections\BulkObservableCollection.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Input\MiddleClickGesture.cs" Link="Infrastructure\Input\MiddleClickGesture.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Input\PaneResize.cs" Link="Infrastructure\Input\PaneResize.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxLayout.cs" Link="Controls\Omnibox\OmniboxLayout.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxItem.cs" Link="Controls\Omnibox\OmniboxItem.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Collections\IRangeList.cs" Link="Infrastructure\Collections\IRangeList.cs" />
+    <Compile Include="..\..\src\Regedit\Infrastructure\Collections\RangeObservableCollection.cs" Link="Infrastructure\Collections\RangeObservableCollection.cs" />
+    <Compile Include="..\..\src\Regedit\Models\**\*.cs" Exclude="..\..\src\Regedit\Models\Tools\ToolRowGroup.cs" Link="Models\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Regedit\Persistence\*.cs" Link="Persistence\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Regedit\Services\*.cs" Link="Services\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Regedit\ViewModels\**\*.cs" Link="ViewModels\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Regedit\Printing\RegistryPrintPagination.cs" Link="Printing\RegistryPrintPagination.cs" />
+    <Compile Include="..\..\src\Regedit\Printing\RegistryPrintPageSlice.cs" Link="Printing\RegistryPrintPageSlice.cs" />
+    <Compile Include="..\..\src\Regedit\Printing\RegistryPrintLayoutGeneration.cs" Link="Printing\RegistryPrintLayoutGeneration.cs" />
+    <Compile Include="..\..\src\Regedit\Views\Shell\CaptionLayout.cs" Link="Views\Shell\CaptionLayout.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="..\..\src\Regedit\NativeMethods.txt" Link="NativeMethods.txt" />
+    <AdditionalFiles Include="..\..\src\Regedit\NativeMethods.json" Link="NativeMethods.json" />
+  </ItemGroup>
+</Project>

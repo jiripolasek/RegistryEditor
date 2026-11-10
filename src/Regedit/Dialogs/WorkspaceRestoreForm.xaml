@@ -1,0 +1,42 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.WorkspaceRestoreForm"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Style="{StaticResource DialogFieldsPanelStyle}">
+        <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
+            <StackPanel AutomationProperties.AutomationId="WorkspacePreviewTargets" Spacing="12">
+                <TextBlock
+                    x:Name="SummaryText"
+                    IsTextSelectionEnabled="True"
+                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                    TextWrapping="Wrap" />
+                <ItemsControl x:Name="Targets">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock
+                                Margin="0,0,0,8"
+                                IsTextSelectionEnabled="True"
+                                Text="{x:Bind}"
+                                TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+        <TextBlock Text="Add keeps your current tabs. Replace closes only browser and search tabs after successful preparation. Tool tabs, note drafts and existing watch sessions are kept. Failed targets keep your usable tabs." TextWrapping="Wrap" />
+        <CheckBox
+            x:Name="ReplaceInput"
+            AutomationProperties.AutomationId="WorkspaceReplaceTabs"
+            Content="Replace browser and search tabs"
+            IsChecked="False" />
+        <CheckBox
+            x:Name="StartInput"
+            AutomationProperties.AutomationId="WorkspaceStartInvestigations"
+            Content="Start saved searches and watches"
+            IsChecked="False" />
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Text="Without Start, saved search tabs are ready to run and watches remain saved in the workspace."
+            TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

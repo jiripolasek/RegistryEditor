@@ -1,0 +1,1218 @@
+﻿<Page
+    x:Class="JPSoftworks.Regedit.Views.Pages.BrowserPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:browser="using:JPSoftworks.Regedit.Controls.Browser"
+    xmlns:controls="using:JPSoftworks.Regedit.Controls.Omnibox"
+    xmlns:shared="using:JPSoftworks.Regedit.Controls.Shared"
+    NavigationCacheMode="Enabled">
+    <Page.Resources>
+        <Style
+            x:Key="StatusButtonStyle"
+            BasedOn="{StaticResource SubtleButtonStyle}"
+            TargetType="Button">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style
+            x:Key="ToolbarShortcutToggleStyle"
+            BasedOn="{StaticResource DefaultToggleButtonStyle}"
+            TargetType="ToggleButton">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
+        </Style>
+        <MenuFlyout x:Key="ListToolbarMenu" Placement="BottomEdgeAlignedLeft">
+            <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.ShowListToolbar, Mode=TwoWay}" Text="List toolbar" />
+        </MenuFlyout>
+        <MenuFlyout
+            x:Key="RegistryEntryMenu"
+            Opening="RegistryEntryMenu_Opening"
+            Placement="BottomEdgeAlignedLeft">
+            <MenuFlyoutItem
+                x:Name="EntryOpenMenu"
+                Command="{x:Bind ViewModel.ActivateEntryCommand, Mode=OneWay}"
+                Icon="OpenFile"
+                KeyboardAcceleratorTextOverride="Enter"
+                Text="Open" />
+            <MenuFlyoutItem
+                x:Name="EntryBinaryMenu"
+                Command="{x:Bind ViewModel.EditBinaryCommand, Mode=OneWay}"
+                Icon="Edit"
+                Text="Modify binary data…" />
+            <MenuFlyoutItem
+                x:Name="EntryNewTabMenu"
+                Click="EntryNewTab_Click"
+                Text="Open key in new tab">
+                <MenuFlyoutItem.Icon>
+                    <IconSourceElement IconSource="{StaticResource OpenInNewTabIcon}" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
+                x:Name="EntrySwitchHiveMenu"
+                AutomationProperties.AutomationId="EntrySwitchHive"
+                Command="{x:Bind ViewModel.SwitchHiveCommand}"
+                KeyboardAcceleratorTextOverride="Ctrl+Shift+H"
+                Text="Go to HKLM"
+                Visibility="Collapsed" />
+            <MenuFlyoutSeparator x:Name="EntryOpenSeparator" />
+            <MenuFlyoutItem
+                x:Name="EntryOpenTargetMenu"
+                AutomationProperties.AutomationId="EntryOpenTarget"
+                Command="{x:Bind ViewModel.OpenLinkTargetCommand}"
+                Text="Open target">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE71B;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
+                x:Name="EntryCopyMenu"
+                Command="{x:Bind ViewModel.CopyCommand, Mode=OneWay}"
+                Icon="Copy"
+                KeyboardAcceleratorTextOverride="Ctrl+C"
+                Text="Copy" />
+            <MenuFlyoutItem
+                x:Name="EntryDuplicateMenu"
+                AutomationProperties.AutomationId="DuplicateValue"
+                Command="{x:Bind ViewModel.DuplicateValueCommand}"
+                Icon="Copy"
+                Text="Duplicate value…" />
+            <MenuFlyoutItem
+                x:Name="EntryCopyPathMenu"
+                Click="CopyPath_Click"
+                KeyboardAcceleratorTextOverride="Ctrl+Shift+C"
+                Text="Copy key path">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE62F;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSubItem x:Name="EntryCopyPathAsMenu" Text="Copy path as…">
+                <MenuFlyoutSubItem.Icon>
+                    <FontIcon Glyph="&#xE62F;" />
+                </MenuFlyoutSubItem.Icon>
+            </MenuFlyoutSubItem>
+            <MenuFlyoutItem
+                x:Name="EntryWebSearchMenu"
+                AutomationProperties.AutomationId="EntryWebSearch"
+                Click="EntryWebSearch_Click"
+                Text="Search the web">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE774;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSeparator x:Name="EntryCopySeparator" />
+            <MenuFlyoutItem
+                x:Name="EntryFavoriteMenu"
+                Click="EntryFavorite_Click"
+                Icon="Favorite"
+                KeyboardAcceleratorTextOverride="Ctrl+D"
+                Text="Add to favorites…" />
+            <MenuFlyoutItem
+                x:Name="EntryInspectMenu"
+                Command="{x:Bind ViewModel.InspectCommand}"
+                Icon="View"
+                KeyboardAcceleratorTextOverride="Ctrl+I"
+                Text="Inspect value…" />
+            <MenuFlyoutItem
+                x:Name="EntryRevealMenu"
+                Command="{x:Bind ViewModel.RevealFileCommand}"
+                Icon="Folder"
+                Text="Reveal in File Explorer" />
+            <MenuFlyoutItem
+                x:Name="EntryWatchMenu"
+                Command="{x:Bind ViewModel.WatchValueCommand}"
+                Text="Watch value">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE7B3;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
+                x:Name="EntryExportMenu"
+                Command="{x:Bind ViewModel.Branches.ExportCommand}"
+                CommandParameter="{x:Bind ViewModel.SelectedEntry.Key, Mode=OneWay}"
+                Icon="Save"
+                Text="Export…" />
+            <MenuFlyoutItem
+                x:Name="EntryPermissionsMenu"
+                Command="{x:Bind ViewModel.Branches.PermissionsCommand}"
+                CommandParameter="{x:Bind ViewModel.SelectedEntry.Key, Mode=OneWay}"
+                Icon="Permissions"
+                Text="Permissions…" />
+            <MenuFlyoutSeparator x:Name="EntryToolsSeparator" />
+            <MenuFlyoutItem
+                x:Name="EntryRenameMenu"
+                Command="{x:Bind ViewModel.RenameCommand, Mode=OneWay}"
+                Icon="Rename"
+                KeyboardAcceleratorTextOverride="F2"
+                Text="Rename…" />
+            <MenuFlyoutItem
+                x:Name="EntryDeleteMenu"
+                Command="{x:Bind ViewModel.DeleteCommand, Mode=OneWay}"
+                Icon="Delete"
+                KeyboardAcceleratorTextOverride="Del"
+                Text="Delete" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.UndoCommand}"
+                Icon="Undo"
+                KeyboardAcceleratorTextOverride="Ctrl+Z"
+                Text="{x:Bind ViewModel.UndoLabel, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind ViewModel.UndoHelp, Mode=OneWay}" />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.RedoCommand}"
+                Icon="Redo"
+                KeyboardAcceleratorTextOverride="Ctrl+Y"
+                Text="{x:Bind ViewModel.RedoLabel, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind ViewModel.RedoHelp, Mode=OneWay}" />
+        </MenuFlyout>
+        <MenuFlyout
+            x:Key="RegistryTreeMenu"
+            Opening="RegistryTreeMenu_Opening"
+            Placement="BottomEdgeAlignedLeft">
+            <MenuFlyoutItem Click="TreeNewTab_Click" Text="Open in new tab">
+                <MenuFlyoutItem.Icon>
+                    <IconSourceElement IconSource="{StaticResource OpenInNewTabIcon}" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
+                x:Name="TreeSwitchHiveMenu"
+                AutomationProperties.AutomationId="TreeSwitchHive"
+                Command="{x:Bind ViewModel.SwitchHiveCommand}"
+                KeyboardAcceleratorTextOverride="Ctrl+Shift+H"
+                Text="Go to HKLM"
+                Visibility="Collapsed" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                Click="TreeCopyPath_Click"
+                KeyboardAcceleratorTextOverride="Ctrl+Shift+C"
+                Text="Copy key path">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE62F;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSubItem x:Name="TreeCopyPathAsMenu" Text="Copy path as…">
+                <MenuFlyoutSubItem.Icon>
+                    <FontIcon Glyph="&#xE62F;" />
+                </MenuFlyoutSubItem.Icon>
+            </MenuFlyoutSubItem>
+            <MenuFlyoutItem
+                x:Name="TreeWebSearchMenu"
+                AutomationProperties.AutomationId="TreeWebSearch"
+                Click="TreeWebSearch_Click"
+                Text="Search the web">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE774;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                x:Name="TreeFavoriteMenu"
+                Click="TreeFavorite_Click"
+                Icon="Favorite"
+                KeyboardAcceleratorTextOverride="Ctrl+D"
+                Text="Add to favorites…" />
+            <MenuFlyoutItem
+                x:Name="TreeExportMenu"
+                Command="{x:Bind ViewModel.Branches.ExportCommand}"
+                Icon="Save"
+                Text="Export…" />
+            <MenuFlyoutItem
+                x:Name="TreePermissionsMenu"
+                Command="{x:Bind ViewModel.Branches.PermissionsCommand}"
+                Icon="Permissions"
+                Text="Permissions…" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                x:Name="TreeRenameMenu"
+                Command="{x:Bind ViewModel.RenameTreeKeyCommand}"
+                Icon="Rename"
+                KeyboardAcceleratorTextOverride="F2"
+                Text="Rename…" />
+            <MenuFlyoutItem
+                x:Name="TreeDeleteMenu"
+                Command="{x:Bind ViewModel.DeleteTreeKeyCommand}"
+                Icon="Delete"
+                KeyboardAcceleratorTextOverride="Del"
+                Text="Delete" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.UndoCommand}"
+                Icon="Undo"
+                KeyboardAcceleratorTextOverride="Ctrl+Z"
+                Text="{x:Bind ViewModel.UndoLabel, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind ViewModel.UndoHelp, Mode=OneWay}" />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.RedoCommand}"
+                Icon="Redo"
+                KeyboardAcceleratorTextOverride="Ctrl+Y"
+                Text="{x:Bind ViewModel.RedoLabel, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind ViewModel.RedoHelp, Mode=OneWay}" />
+        </MenuFlyout>
+        <MenuFlyout
+            x:Key="RegistryListMenu"
+            Opening="RegistryListMenu_Opening"
+            Placement="BottomEdgeAlignedLeft">
+            <MenuFlyoutSubItem
+                Icon="Add"
+                IsEnabled="{x:Bind ViewModel.IsKeyLocation, Mode=OneWay}"
+                Text="New"
+                ToolTipService.ToolTip="Create a key or value (Ctrl+N)">
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateKeyCommand, Mode=OneWay}"
+                    Icon="Folder"
+                    Text="Key" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                    CommandParameter="1"
+                    Text="String value" />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                    CommandParameter="3"
+                    Text="Binary value" />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                    CommandParameter="4"
+                    Text="DWORD (32-bit) value" />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                    CommandParameter="11"
+                    Text="QWORD (64-bit) value" />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                    CommandParameter="7"
+                    Text="Multi-string value" />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                    CommandParameter="2"
+                    Text="Expandable string value" />
+            </MenuFlyoutSubItem>
+            <MenuFlyoutItem
+                x:Name="ListPasteMenu"
+                Command="{x:Bind ViewModel.PasteCommand, Mode=OneWay}"
+                Icon="Paste"
+                KeyboardAcceleratorTextOverride="Ctrl+V"
+                Text="Paste" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.RefreshCommand}"
+                Icon="Refresh"
+                KeyboardAcceleratorTextOverride="F5"
+                Text="Refresh" />
+            <MenuFlyoutItem
+                Click="CopyCurrentPath_Click"
+                KeyboardAcceleratorTextOverride="Ctrl+Shift+C"
+                Text="Copy current key path">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE62F;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSubItem x:Name="ListCopyPathAsMenu" Text="Copy path as…">
+                <MenuFlyoutSubItem.Icon>
+                    <FontIcon Glyph="&#xE62F;" />
+                </MenuFlyoutSubItem.Icon>
+            </MenuFlyoutSubItem>
+            <MenuFlyoutItem
+                x:Name="ListSwitchHiveMenu"
+                AutomationProperties.AutomationId="ListSwitchHive"
+                Command="{x:Bind ViewModel.SwitchHiveCommand}"
+                KeyboardAcceleratorTextOverride="Ctrl+Shift+H"
+                Text="Go to HKLM"
+                Visibility="Collapsed" />
+            <MenuFlyoutItem
+                Click="CurrentWebSearch_Click"
+                IsEnabled="{x:Bind ViewModel.IsKeyLocation, Mode=OneWay}"
+                Text="Search the web">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE774;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.UndoCommand}"
+                Icon="Undo"
+                KeyboardAcceleratorTextOverride="Ctrl+Z"
+                Text="{x:Bind ViewModel.UndoLabel, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind ViewModel.UndoHelp, Mode=OneWay}" />
+            <MenuFlyoutItem
+                Command="{x:Bind ViewModel.RedoCommand}"
+                Icon="Redo"
+                KeyboardAcceleratorTextOverride="Ctrl+Y"
+                Text="{x:Bind ViewModel.RedoLabel, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind ViewModel.RedoHelp, Mode=OneWay}" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutSubItem Text="View">
+                <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.ShowKeysInList, Mode=TwoWay}" Text="Show keys in list" />
+                <ToggleMenuFlyoutItem
+                    IsChecked="{x:Bind Preferences.ShowParentKeyInList, Mode=TwoWay}"
+                    IsEnabled="{x:Bind Preferences.ShowKeysInList, Mode=OneWay}"
+                    Text="Show parent key .." />
+                <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.ShowValuePreview, Mode=TwoWay}" Text="Value preview" />
+                <MenuFlyoutItem Click="ListSpacing_Click" Text="List spacing…" />
+                <MenuFlyoutSeparator />
+                <ToggleMenuFlyoutItem
+                    x:Name="ListNavigationPaneMenu"
+                    Click="TogglePane_Click"
+                    Text="Navigation pane" />
+                <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.ShowListToolbar, Mode=TwoWay}" Text="List toolbar" />
+                <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.AutoSyncTree, Mode=TwoWay}" Text="Automatically sync tree" />
+                <MenuFlyoutItem
+                    Click="SyncTree_Click"
+                    Icon="Sync"
+                    KeyboardAcceleratorTextOverride="Alt+Shift+L"
+                    Text="Sync tree to current key" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutSubItem Text="Registry view">
+                    <ToggleMenuFlyoutItem
+                        x:Name="ListRegistry64Menu"
+                        Command="{x:Bind ViewModel.Use64BitViewCommand}"
+                        Text="64-bit registry" />
+                    <ToggleMenuFlyoutItem
+                        x:Name="ListRegistry32Menu"
+                        Command="{x:Bind ViewModel.Use32BitViewCommand}"
+                        Text="32-bit registry" />
+                </MenuFlyoutSubItem>
+            </MenuFlyoutSubItem>
+        </MenuFlyout>
+    </Page.Resources>
+    <Grid
+        x:Name="LayoutRoot"
+        Loaded="Page_Loaded"
+        PreviewKeyDown="Browser_PreviewKeyDown"
+        SizeChanged="Page_SizeChanged"
+        Style="{StaticResource TabSurfaceStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid
+            x:Name="PathRow"
+            Padding="8"
+            Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition
+                    x:Name="AddressColumn"
+                    Width="3*"
+                    MinWidth="180" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition
+                    x:Name="SearchColumn"
+                    Width="*"
+                    MinWidth="180" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel
+                x:Name="NavigationButtons"
+                Margin="0,0,8,0"
+                Orientation="Horizontal"
+                Spacing="2">
+                <Button
+                    x:Name="BackButton"
+                    AccessKey="B"
+                    AutomationProperties.Name="Back"
+                    Command="{x:Bind ViewModel.BackCommand}"
+                    Style="{StaticResource NavigationButton}"
+                    ToolTipService.ToolTip="Back (Backspace in the list, Alt+Left or mouse Back button). Right-click for history.">
+                    <Button.ContextFlyout>
+                        <MenuFlyout Opening="HistoryMenu_Opening" Placement="BottomEdgeAlignedLeft" />
+                    </Button.ContextFlyout>
+                    <FontIcon FontSize="14" Glyph="&#xE72B;" />
+                </Button>
+                <Button
+                    x:Name="ForwardButton"
+                    AccessKey="O"
+                    AutomationProperties.Name="Forward"
+                    Command="{x:Bind ViewModel.ForwardCommand}"
+                    Style="{StaticResource NavigationButton}"
+                    ToolTipService.ToolTip="Forward (Alt+Right or mouse Forward button). Right-click for history.">
+                    <Button.ContextFlyout>
+                        <MenuFlyout Opening="HistoryMenu_Opening" Placement="BottomEdgeAlignedLeft" />
+                    </Button.ContextFlyout>
+                    <FontIcon FontSize="14" Glyph="&#xE72A;" />
+                </Button>
+                <Button
+                    x:Name="UpButton"
+                    AccessKey="U"
+                    AutomationProperties.Name="Up"
+                    Command="{x:Bind ViewModel.UpCommand}"
+                    Style="{StaticResource NavigationButton}"
+                    ToolTipService.ToolTip="Up (Alt+Up)">
+                    <FontIcon FontSize="14" Glyph="&#xE74A;" />
+                </Button>
+                <Button
+                    x:Name="RefreshButton"
+                    AccessKey="R"
+                    AutomationProperties.Name="Refresh"
+                    Command="{x:Bind ViewModel.RefreshCommand}"
+                    Style="{StaticResource NavigationButton}"
+                    ToolTipService.ToolTip="Refresh (F5)">
+                    <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                </Button>
+            </StackPanel>
+            <controls:Omnibox
+                x:Name="AddressBar"
+                Grid.Column="1"
+                AutomationProperties.Name="Registry omnibox"
+                IsRootSelectorVisible="False"
+                NavigationRequested="Address_NavigationRequested">
+                <controls:Omnibox.TrailingContent>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock
+                            x:Name="Registry32Indicator"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="32-bit registry view"
+                            Text="32-bit"
+                            Visibility="{x:Bind ViewModel.Is32Bit, Mode=OneWay}" />
+                        <Button
+                            x:Name="FavoriteButton"
+                            AccessKey="K"
+                            AutomationProperties.Name="{x:Bind ViewModel.FavoriteAction, Mode=OneWay}"
+                            Command="{x:Bind ViewModel.ToggleFavoriteCommand}"
+                            Style="{StaticResource NavigationButton}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.FavoriteHelp, Mode=OneWay}">
+                            <FontIcon FontSize="14" Glyph="{x:Bind ViewModel.FavoriteGlyph, Mode=OneWay}" />
+                        </Button>
+                    </StackPanel>
+                </controls:Omnibox.TrailingContent>
+            </controls:Omnibox>
+            <shared:ResizeThumb
+                x:Name="SearchSplitter"
+                Grid.Column="2"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                AutomationProperties.AutomationId="SearchSplitter"
+                AutomationProperties.Name="Resize omnibox and search box"
+                PreviewKeyDown="Splitter_KeyDown"
+                ToolTipService.ToolTip="Resize omnibox and search box" />
+            <Border
+                x:Name="SearchArea"
+                Grid.Column="3"
+                MinHeight="36"
+                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                GotFocus="SearchArea_FocusChanged"
+                LostFocus="SearchArea_FocusChanged">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button
+                        x:Name="QuickSearchButton"
+                        Width="32"
+                        Height="32"
+                        Margin="1,0,0,0"
+                        Padding="8"
+                        AccessKey="S"
+                        AutomationProperties.Name="Start search"
+                        Command="{x:Bind ViewModel.Search.QuickSearchCommand}"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="Start search">
+                        <FontIcon FontSize="14" Glyph="&#xE721;" />
+                    </Button>
+                    <AutoSuggestBox
+                        x:Name="QuickSearch"
+                        Grid.Column="1"
+                        AutomationProperties.Name="Search registry"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        PlaceholderText="Search this branch"
+                        QuerySubmitted="QuickSearch_Submitted"
+                        Text="{x:Bind ViewModel.Search.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                        <AutoSuggestBox.TextBoxStyle>
+                            <Style BasedOn="{StaticResource AutoSuggestBoxTextBoxStyle}" TargetType="TextBox">
+                                <Setter Property="Padding" Value="2,9,2,4" />
+                            </Style>
+                        </AutoSuggestBox.TextBoxStyle>
+                        <AutoSuggestBox.Resources>
+                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                            <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+                        </AutoSuggestBox.Resources>
+                    </AutoSuggestBox>
+                    <Button
+                        x:Name="AdvancedSearchButton"
+                        Grid.Column="2"
+                        Width="32"
+                        Height="32"
+                        Margin="0,0,1,0"
+                        Padding="8"
+                        AccessKey="A"
+                        AutomationProperties.Name="Advanced search"
+                        Command="{x:Bind ViewModel.Search.FindCommand}"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="Advanced search (Ctrl+Shift+F)">
+                        <FontIcon FontSize="12" Glyph="&#xE70D;" />
+                    </Button>
+                </Grid>
+            </Border>
+            <StackPanel
+                x:Name="GlobalActions"
+                Grid.Column="4"
+                Margin="8,0,0,0"
+                Orientation="Horizontal"
+                Spacing="4">
+                <shared:PanelCommandStrip
+                    x:Name="ToolbarShortcuts"
+                    Height="36"
+                    MinHeight="36"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    ButtonStyle="{StaticResource NavigationButton}"
+                    ToggleButtonStyle="{StaticResource ToolbarShortcutToggleStyle}"
+                    Visibility="Collapsed">
+                    <shared:PanelCommandStrip.Resources>
+                        <ResourceDictionary>
+                            <ResourceDictionary.ThemeDictionaries>
+                                <ResourceDictionary x:Key="Light">
+                                    <StaticResource x:Key="ToggleButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushPressed" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushChecked" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushCheckedPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushCheckedPressed" ResourceKey="SubtleFillColorTransparentBrush" />
+                                </ResourceDictionary>
+                                <ResourceDictionary x:Key="Dark">
+                                    <StaticResource x:Key="ToggleButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushPressed" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushChecked" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushCheckedPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="ToggleButtonBorderBrushCheckedPressed" ResourceKey="SubtleFillColorTransparentBrush" />
+                                </ResourceDictionary>
+                                <ResourceDictionary x:Key="HighContrast" />
+                            </ResourceDictionary.ThemeDictionaries>
+                        </ResourceDictionary>
+                    </shared:PanelCommandStrip.Resources>
+                </shared:PanelCommandStrip>
+                <Button
+                    x:Name="ToolsButton"
+                    AccessKey="T"
+                    AutomationProperties.Name="Tools"
+                    Style="{StaticResource ToolbarButtonStyle}"
+                    ToolTipService.ToolTip="Tools and panel visibility">
+                    <Button.Flyout>
+                        <MenuFlyout Opening="ToolsMenu_Opening" Placement="BottomEdgeAlignedLeft" />
+                    </Button.Flyout>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon
+                            FontFamily="/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"
+                            FontSize="16"
+                            Glyph="&#xEE7F;" />
+                        <TextBlock Text="Tools" />
+                        <FontIcon FontSize="10" Glyph="&#xE70D;" />
+                    </StackPanel>
+                </Button>
+                <Button
+                    x:Name="GlobalMenuButton"
+                    AccessKey="F"
+                    AutomationProperties.AcceleratorKey="Alt+F"
+                    AutomationProperties.Name="Application menu"
+                    Style="{StaticResource NavigationButton}"
+                    ToolTipService.ToolTip="Application menu (Alt+F)">
+                    <FontIcon FontSize="16" Glyph="&#xE700;" />
+                </Button>
+            </StackPanel>
+        </Grid>
+        <Grid x:Name="ContentGrid" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition
+                    x:Name="TreeColumn"
+                    Width="290"
+                    MinWidth="0"
+                    MaxWidth="600" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="6" />
+                <ColumnDefinition Width="*" MinWidth="240" />
+            </Grid.ColumnDefinitions>
+            <Grid
+                x:Name="NavigationPane"
+                Margin="0,8,0,0"
+                Background="Transparent">
+                <browser:RegistryTreePane x:Name="TreePane" />
+            </Grid>
+            <shared:ResizeThumb
+                x:Name="PaneSplitter"
+                Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                AutomationProperties.AutomationId="PaneSplitter"
+                AutomationProperties.Name="Resize navigation pane"
+                PreviewKeyDown="Splitter_KeyDown" />
+            <Border
+                x:Name="Workspace"
+                Grid.Column="2"
+                Margin="0"
+                Background="{ThemeResource WorkspaceBackgroundBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1,1,0,0"
+                CornerRadius="8,0,0,0">
+                <Grid x:Name="WorkspaceLayout">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid
+                        x:Name="CommandRow"
+                        Padding="6,4"
+                        Background="Transparent"
+                        ContextFlyout="{StaticResource ListToolbarMenu}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+
+                        </Grid.ColumnDefinitions>
+                        <shared:ListCommandBar
+                            x:Name="Commands"
+                            Margin="0"
+                            HorizontalAlignment="Stretch"
+                            AccessKey="M"
+                            AccessKeyInvoked="Commands_AccessKeyInvoked"
+                            Background="Transparent"
+                            ContextFlyout="{StaticResource ListToolbarMenu}"
+                            DefaultLabelPosition="Right"
+                            IsDynamicOverflowEnabled="True">
+                            <shared:ListCommandBar.TrailingContent>
+                                <Button
+                                    x:Name="ToggleValueInspector"
+                                    AccessKey="P"
+                                    AutomationProperties.AutomationId="ToggleValueInspector"
+                                    Click="ToggleValueInspector_Click"
+                                    Style="{StaticResource NavigationButton}">
+                                    <FontIcon x:Name="ValueInspectorButtonIcon" FontSize="16" />
+                                </Button>
+                            </shared:ListCommandBar.TrailingContent>
+                            <AppBarButton
+                                AccessKey="N"
+                                IsEnabled="{x:Bind ViewModel.IsKeyLocation, Mode=OneWay}"
+                                KeyboardAcceleratorTextOverride="Ctrl+N"
+                                Label="New"
+                                ToolTipService.ToolTip="Create a key or value (Ctrl+N)">
+                                <AppBarButton.Icon>
+                                    <shared:CommandIcon Symbol="Add" />
+                                </AppBarButton.Icon>
+                                <AppBarButton.Flyout>
+                                    <MenuFlyout x:Name="NewItemMenu" Placement="BottomEdgeAlignedLeft">
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateKeyCommand, Mode=OneWay}"
+                                            Icon="Folder"
+                                            Text="Key" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                                            CommandParameter="1"
+                                            Text="String value" />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                                            CommandParameter="3"
+                                            Text="Binary value" />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                                            CommandParameter="4"
+                                            Text="DWORD (32-bit) value" />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                                            CommandParameter="11"
+                                            Text="QWORD (64-bit) value" />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                                            CommandParameter="7"
+                                            Text="Multi-string value" />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CreateValueCommand, Mode=OneWay}"
+                                            CommandParameter="2"
+                                            Text="Expandable string value" />
+                                    </MenuFlyout>
+                                </AppBarButton.Flyout>
+                            </AppBarButton>
+                            <AppBarSeparator />
+                            <AppBarButton
+                                x:Name="UndoButton"
+                                AutomationProperties.AutomationId="UndoButton"
+                                AutomationProperties.HelpText="{x:Bind ViewModel.UndoHelp, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.UndoCommand}"
+                                KeyboardAcceleratorTextOverride="Ctrl+Z"
+                                Label="Undo"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.UndoHelp, Mode=OneWay}">
+                                <AppBarButton.Icon>
+                                    <shared:CommandIcon Symbol="Undo" />
+                                </AppBarButton.Icon>
+                            </AppBarButton>
+                            <AppBarButton
+                                x:Name="RedoButton"
+                                AutomationProperties.AutomationId="RedoButton"
+                                AutomationProperties.HelpText="{x:Bind ViewModel.RedoHelp, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.RedoCommand}"
+                                KeyboardAcceleratorTextOverride="Ctrl+Y"
+                                Label="Redo"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.RedoHelp, Mode=OneWay}"
+                                Visibility="{x:Bind RedoButton.IsEnabled, Mode=OneWay}">
+                                <AppBarButton.Icon>
+                                    <shared:CommandIcon Symbol="Redo" />
+                                </AppBarButton.Icon>
+                            </AppBarButton>
+                            <AppBarSeparator />
+                            <AppBarButton
+                                AccessKey="I"
+                                Click="Filter_Click"
+                                KeyboardAcceleratorTextOverride="Ctrl+Alt+F"
+                                Label="Filter"
+                                ToolTipService.ToolTip="Filter this key (Ctrl+Alt+F)">
+                                <AppBarButton.Icon>
+                                    <shared:CommandIcon Symbol="Filter" />
+                                </AppBarButton.Icon>
+                            </AppBarButton>
+                            <AppBarButton AccessKey="V" Label="View">
+                                <AppBarButton.Icon>
+                                    <shared:CommandIcon Symbol="View" />
+                                </AppBarButton.Icon>
+                                <AppBarButton.Flyout>
+                                    <MenuFlyout Opening="ViewMenu_Opening" Placement="BottomEdgeAlignedLeft">
+                                        <ToggleMenuFlyoutItem
+                                            x:Name="ShowKeysMenu"
+                                            IsChecked="{x:Bind Preferences.ShowKeysInList, Mode=TwoWay}"
+                                            Text="Show keys in list" />
+                                        <ToggleMenuFlyoutItem
+                                            x:Name="ShowParentKeyMenu"
+                                            IsChecked="{x:Bind Preferences.ShowParentKeyInList, Mode=TwoWay}"
+                                            IsEnabled="{x:Bind Preferences.ShowKeysInList, Mode=OneWay}"
+                                            Text="Show parent key .." />
+                                        <ToggleMenuFlyoutItem
+                                            x:Name="ShowPreviewMenu"
+                                            IsChecked="{x:Bind Preferences.ShowValuePreview, Mode=TwoWay}"
+                                            Text="Value preview" />
+                                        <MenuFlyoutItem Click="ListSpacing_Click" Text="List spacing…" />
+                                        <MenuFlyoutSeparator />
+                                        <ToggleMenuFlyoutItem
+                                            x:Name="NavigationPaneMenu"
+                                            Click="TogglePane_Click"
+                                            Text="Navigation pane" />
+                                        <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.ShowListToolbar, Mode=TwoWay}" Text="List toolbar" />
+                                        <ToggleMenuFlyoutItem
+                                            x:Name="AutoSyncTreeMenu"
+                                            IsChecked="{x:Bind Preferences.AutoSyncTree, Mode=TwoWay}"
+                                            Text="Automatically sync tree" />
+                                        <MenuFlyoutItem
+                                            Click="SyncTree_Click"
+                                            Icon="Sync"
+                                            KeyboardAcceleratorTextOverride="Alt+Shift+L"
+                                            Text="Sync tree to current key" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutSubItem Text="Registry view">
+                                            <ToggleMenuFlyoutItem
+                                                x:Name="Registry64Menu"
+                                                Command="{x:Bind ViewModel.Use64BitViewCommand}"
+                                                Text="64-bit registry" />
+                                            <ToggleMenuFlyoutItem
+                                                x:Name="Registry32Menu"
+                                                Command="{x:Bind ViewModel.Use32BitViewCommand}"
+                                                Text="32-bit registry" />
+                                        </MenuFlyoutSubItem>
+                                    </MenuFlyout>
+                                </AppBarButton.Flyout>
+                            </AppBarButton>
+                            <AppBarButton
+                                x:Name="PermissionsButton"
+                                Command="{x:Bind ViewModel.Branches.PermissionsCommand}"
+                                CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                Label="Permissions…"
+                                ToolTipService.ToolTip="Permissions for the current key">
+                                <AppBarButton.Icon>
+                                    <shared:CommandIcon Symbol="Permissions" />
+                                </AppBarButton.Icon>
+                            </AppBarButton>
+                            <CommandBar.SecondaryCommands>
+                                <AppBarButton
+                                    x:Name="SelectionActionsButton"
+                                    Flyout="{StaticResource RegistryEntryMenu}"
+                                    IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}"
+                                    Label="Selection">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Edit" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    x:Name="PasteButton"
+                                    Command="{x:Bind ViewModel.PasteCommand, Mode=OneWay}"
+                                    KeyboardAcceleratorTextOverride="Ctrl+V"
+                                    Label="Paste">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Paste" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarSeparator />
+                                <AppBarButton Label="Search">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Find" />
+                                    </AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                            <MenuFlyoutItem
+                                                Command="{x:Bind ViewModel.Search.FindCommand}"
+                                                Icon="Find"
+                                                KeyboardAcceleratorTextOverride="Ctrl+Shift+F"
+                                                Text="Advanced search…" />
+                                            <MenuFlyoutItem
+                                                Command="{x:Bind _window.ViewModel.FindNextResultCommand}"
+                                                Icon="Forward"
+                                                KeyboardAcceleratorTextOverride="F3"
+                                                Text="Next search result" />
+                                        </MenuFlyout>
+                                    </AppBarButton.Flyout>
+                                </AppBarButton>
+                                <AppBarButton
+                                    x:Name="WatchBranchButton"
+                                    Command="{x:Bind ViewModel.WatchBranchCommand}"
+                                    Label="Watch this branch">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Glyph="&#xE7B3;" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    Command="{x:Bind ViewModel.OpenNotesCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsKeyLocation, Mode=OneWay}"
+                                    Label="Notes for this key">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon>
+                                            <shared:CommandIcon.IconSource>
+                                                <FontIconSource FontFamily="/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular" Glyph="&#xF56D;" />
+                                            </shared:CommandIcon.IconSource>
+                                        </shared:CommandIcon>
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    x:Name="SnapshotsButton"
+                                    Label="Snapshots"
+                                    ToolTipService.ToolTip="Capture and compare the current registry branch">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Camera" />
+                                    </AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                            <MenuFlyoutItem
+                                                x:Name="CaptureSnapshotMenu"
+                                                Command="{x:Bind ViewModel.Snapshots.CaptureCommand}"
+                                                CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                                Icon="Camera"
+                                                Text="Capture branch snapshot…" />
+                                            <MenuFlyoutItem
+                                                x:Name="CompareLastSnapshotMenu"
+                                                Command="{x:Bind ViewModel.Snapshots.CompareLastCommand}"
+                                                Icon="Switch"
+                                                Text="Compare last capture with registry" />
+                                            <MenuFlyoutItem
+                                                x:Name="CompareSnapshotMenu"
+                                                Command="{x:Bind ViewModel.Snapshots.CompareFileCommand}"
+                                                Icon="Switch"
+                                                Text="Compare saved snapshot with registry…" />
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutItem
+                                                x:Name="LastComparisonMenu"
+                                                Command="{x:Bind ViewModel.Snapshots.ShowComparisonCommand}"
+                                                Icon="OpenFile"
+                                                Text="Reopen last comparison" />
+                                        </MenuFlyout>
+                                    </AppBarButton.Flyout>
+                                </AppBarButton>
+                                <AppBarSeparator />
+                                <AppBarButton
+                                    Command="{x:Bind ViewModel.Branches.ExportCommand}"
+                                    CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                    Label="Export…"
+                                    ToolTipService.ToolTip="Export the current key and subkeys to a .reg file">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Save" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    Command="{x:Bind ViewModel.Branches.PrintCommand}"
+                                    CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                    Label="Print…">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Print" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
+                                    Click="CopyCurrentPath_Click"
+                                    KeyboardAcceleratorTextOverride="Ctrl+Shift+C"
+                                    Label="Copy current key path">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Glyph="&#xE62F;" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton Label="Copy path as…">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Glyph="&#xE62F;" />
+                                    </AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout Opening="CurrentCopyPathMenu_Opening" Placement="BottomEdgeAlignedLeft" />
+                                    </AppBarButton.Flyout>
+                                </AppBarButton>
+                                <AppBarSeparator />
+                                <AppBarButton Label="Hive">
+                                    <AppBarButton.Icon>
+                                        <shared:CommandIcon Symbol="Folder" />
+                                    </AppBarButton.Icon>
+                                    <AppBarButton.Flyout>
+                                        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                            <MenuFlyoutItem
+                                                x:Name="SaveHiveMenu"
+                                                Command="{x:Bind ViewModel.Branches.SaveHiveCommand}"
+                                                CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                                Icon="Save"
+                                                Text="Save hive…" />
+                                            <MenuFlyoutItem
+                                                x:Name="LoadHiveMenu"
+                                                Command="{x:Bind ViewModel.Branches.LoadHiveCommand}"
+                                                CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                                Icon="OpenFile"
+                                                Text="Load hive…" />
+                                            <MenuFlyoutItem
+                                                x:Name="UnloadHiveMenu"
+                                                Command="{x:Bind ViewModel.Branches.UnloadHiveCommand}"
+                                                CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                                                Icon="DisconnectDrive"
+                                                Text="Unload hive…" />
+                                        </MenuFlyout>
+                                    </AppBarButton.Flyout>
+                                </AppBarButton>
+                            </CommandBar.SecondaryCommands>
+                        </shared:ListCommandBar>
+                        <Grid
+                            x:Name="FilterArea"
+                            Grid.Row="1"
+                            Margin="6,4,6,4"
+                            Padding="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            ColumnSpacing="8"
+                            CornerRadius="8"
+                            Visibility="Collapsed">
+                            <Grid.Resources>
+                                <ResourceDictionary Source="/Resources/ToolbarSearchResources.xaml" />
+                            </Grid.Resources>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox
+                                x:Name="FilterBox"
+                                AutomationProperties.Name="Filter this key"
+                                KeyDown="Filter_KeyDown"
+                                PlaceholderText="Filter this key"
+                                Text="{x:Bind ViewModel.Filter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                x:Name="FilterCount"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.LiveSetting="Polite"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Button
+                                Grid.Column="2"
+                                Width="32"
+                                Height="32"
+                                Padding="8"
+                                VerticalAlignment="Center"
+                                AccessKey="C"
+                                AutomationProperties.Name="Clear filter"
+                                Click="ClearFilter_Click"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                ToolTipService.ToolTip="Clear and close filter (Esc)">
+                                <FontIcon FontSize="12" Glyph="&#xE711;" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+                    <InfoBar
+                        x:Name="Notification"
+                        Grid.Row="1"
+                        Margin="12,0"
+                        IsClosable="True"
+                        IsOpen="False"
+                        Severity="Error" />
+                    <Grid
+                        x:Name="ValueWorkspace"
+                        Grid.Row="2"
+                        SizeChanged="ValueWorkspace_SizeChanged">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition x:Name="ValueInspectorWidth" Width="0" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition x:Name="ValueInspectorHeight" Height="0" />
+                        </Grid.RowDefinitions>
+                        <browser:RegistryEntryList x:Name="EntryList">
+                            <browser:RegistryEntryList.KeyboardAccelerators>
+                                <KeyboardAccelerator
+                                    Key="N"
+                                    Invoked="NewItem_Invoked"
+                                    IsEnabled="{x:Bind ViewModel.IsKeyLocation, Mode=OneWay}"
+                                    Modifiers="Control"
+                                    ScopeOwner="{x:Bind EntryList}" />
+                            </browser:RegistryEntryList.KeyboardAccelerators>
+                        </browser:RegistryEntryList>
+                        <Border
+                            x:Name="ValueInspectorPane"
+                            Grid.Column="1"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1,1,0,1"
+                            Visibility="Collapsed">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid
+                                    x:Name="ValueInspectorHeader"
+                                    Padding="12,8"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="0,0,0,1">
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        FontWeight="SemiBold"
+                                        Text="Value inspector" />
+                                    <Button
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.AutomationId="CloseValueInspector"
+                                        AutomationProperties.Name="Close value inspector"
+                                        Click="CloseValueInspector_Click"
+                                        Style="{StaticResource SubtleButtonStyle}">
+                                        <FontIcon FontSize="12" Glyph="&#xE711;" />
+                                    </Button>
+                                </Grid>
+                                <ScrollViewer
+                                    x:Name="ValueInspectorScroll"
+                                    Grid.Row="1"
+                                    Padding="16,16,8,16"
+                                    AutomationProperties.Name="Value inspector"
+                                    VerticalScrollBarVisibility="Auto">
+                                    <ContentControl
+                                        x:Name="ValueInspectorContent"
+                                        HorizontalContentAlignment="Stretch"
+                                        AutomationProperties.AutomationId="ValueInspectorContent"
+                                        IsEnabled="{x:Bind ViewModel.IsPreviewCurrent, Mode=OneWay}" />
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                        <shared:ToolPaneSplitter x:Name="ValueInspectorSplitter" />
+                    </Grid>
+                    <Grid
+                        x:Name="StatusBar"
+                        Grid.Row="3"
+                        Padding="8,2"
+                        Background="Transparent"
+                        ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Margin="8,0"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AutomationId="BrowserStatusText"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.Status, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
+                        <Button
+                            x:Name="RegistryViewStatus"
+                            Grid.Column="1"
+                            AutomationProperties.AutomationId="RegistryViewStatus"
+                            Content="{x:Bind RegistryViewLabel(ViewModel.Is32Bit), Mode=OneWay}"
+                            Style="{StaticResource StatusButtonStyle}"
+                            ToolTipService.ToolTip="Switch registry view">
+                            <Button.Flyout>
+                                <MenuFlyout Opening="RegistryViewMenu_Opening" Placement="BottomEdgeAlignedLeft">
+                                    <ToggleMenuFlyoutItem
+                                        x:Name="StatusRegistry64Menu"
+                                        Command="{x:Bind ViewModel.Use64BitViewCommand}"
+                                        Text="64-bit registry" />
+                                    <ToggleMenuFlyoutItem
+                                        x:Name="StatusRegistry32Menu"
+                                        Command="{x:Bind ViewModel.Use32BitViewCommand}"
+                                        Text="32-bit registry" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button
+                            x:Name="AccessStatus"
+                            Grid.Column="2"
+                            AutomationProperties.AutomationId="AccessStatus"
+                            Content="Standard access"
+                            Style="{StaticResource StatusButtonStyle}"
+                            ToolTipService.ToolTip="Open this location in the other access mode">
+                            <Button.Flyout>
+                                <Flyout x:Name="AccessModeFlyout" Placement="BottomEdgeAlignedLeft">
+                                    <StackPanel MaxWidth="300" Spacing="12">
+                                        <TextBlock x:Name="AccessModePrompt" TextWrapping="Wrap" />
+                                        <Button
+                                            x:Name="AccessModeLaunchButton"
+                                            AutomationProperties.AutomationId="AccessModeLaunchButton"
+                                            Click="AccessModeLaunch_Click" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button
+                            x:Name="ConnectionStatus"
+                            Grid.Column="3"
+                            AutomationProperties.AutomationId="ConnectionStatus"
+                            Command="{x:Bind _window.RegistryMenu.ConnectCommand}"
+                            Content="{x:Bind ViewModel.Location.Machine, Mode=OneWay, TargetNullValue='This computer'}"
+                            Style="{StaticResource StatusButtonStyle}"
+                            ToolTipService.ToolTip="Connect to a network registry" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="SearchFocusStates">
+                <VisualState x:Name="SearchUnfocused" />
+                <VisualState x:Name="SearchFocused">
+                    <VisualState.Setters>
+                        <Setter Target="SearchArea.Background" Value="{ThemeResource ControlFillColorInputActiveBrush}" />
+                        <Setter Target="SearchArea.BorderBrush" Value="{ThemeResource TextControlBorderBrushFocused}" />
+                        <Setter Target="SearchArea.BorderThickness" Value="{ThemeResource TextControlBorderThemeThicknessFocused}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+    </Grid>
+</Page>

@@ -1,0 +1,13 @@
+<ContentDialog
+    x:Class="JPSoftworks.Regedit.Dialogs.SnapshotComparisonDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Snapshot comparison"
+    CloseButtonText="Close"
+    DefaultButton="Close"
+    Style="{StaticResource AppDialogStyle}">
+    <ContentDialog.Resources>
+        <x:Double x:Key="ContentDialogMaxWidth">1000</x:Double>
+    </ContentDialog.Resources>
+    <ContentPresenter x:Name="ComparisonHost" HorizontalContentAlignment="Stretch" />
+</ContentDialog>

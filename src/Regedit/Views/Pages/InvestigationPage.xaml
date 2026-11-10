@@ -1,0 +1,198 @@
+﻿<Page
+    x:Class="JPSoftworks.Regedit.Views.Pages.InvestigationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:lists="using:JPSoftworks.Regedit.Controls.Lists"
+    xmlns:local="using:JPSoftworks.Regedit.Controls.Shared">
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator
+            Key="P"
+            Invoked="InspectDetails_Invoked"
+            Modifiers="Menu" />
+    </Page.KeyboardAccelerators>
+    <Grid
+        x:Name="Layout"
+        Padding="24"
+        SizeChanged="Layout_SizeChanged"
+        Style="{StaticResource ToolPageSurfaceStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="100" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <local:ToolPageHeader
+            x:Name="PageHeader"
+            Title="{x:Bind ViewModel.Title}"
+            Margin="0,0,0,24"
+            Description="{x:Bind ViewModel.Description, Mode=OneWay}" />
+
+        <local:ToolToolbar
+            x:Name="LocalControls"
+            Grid.Row="1"
+            Margin="0,0,0,12"
+            SearchChanged="Filter_Changed"
+            SearchName="Filter tool items"
+            SearchPlaceholder="Filter items…">
+            <local:ToolToolbar.CommandsContent>
+                <local:ListCommandBar
+                    x:Name="ItemCommands"
+                    HorizontalAlignment="Stretch"
+                    Background="Transparent"
+                    DefaultLabelPosition="Right"
+                    IsDynamicOverflowEnabled="True" />
+            </local:ToolToolbar.CommandsContent>
+        </local:ToolToolbar>
+        <Grid
+            x:Name="Workspace"
+            Grid.Row="2"
+            ColumnSpacing="16"
+            RowSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="InspectorWidth" Width="0" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition x:Name="InspectorHeight" Height="0" />
+            </Grid.RowDefinitions>
+            <Grid x:Name="Collection" RowSpacing="8">
+                <FlyoutBase.AttachedFlyout>
+                    <Flyout x:Name="SearchScopeFlyout">
+                        <StackPanel MaxWidth="440" Spacing="8">
+                            <TextBlock FontWeight="SemiBold" Text="Original search scope" />
+                            <TextBlock
+                                Style="{StaticResource ToolSelectableTextStyle}"
+                                Text="{x:Bind Search.ScopeDescription}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Flyout>
+                </FlyoutBase.AttachedFlyout>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <local:ToolContextRow
+                    x:Name="SearchContext"
+                    AutomationProperties.AutomationId="ToolContextRow"
+                    Visibility="Collapsed">
+                    <local:ToolContextRow.PrimaryContent>
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <HyperlinkButton
+                                MinHeight="24"
+                                Padding="0"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                AutomationProperties.Name="Search scope"
+                                Click="SearchScope_Click">
+                                <TextBlock Text="{x:Bind Search.ScopeDescription}" TextTrimming="CharacterEllipsis" />
+                            </HyperlinkButton>
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.CountText, Mode=OneWay}" />
+                        </Grid>
+                    </local:ToolContextRow.PrimaryContent>
+                </local:ToolContextRow>
+                <Grid Grid.Row="1" Style="{StaticResource ToolListSurfaceStyle}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <!--  Presentations share selection and the virtualized list.  -->
+                    <lists:ColumnListView
+                        x:Name="ResultColumns"
+                        Grid.Row="1"
+                        ColumnSpacing="12"
+                        CompactItemTemplate="{StaticResource ToolRowTemplate}"
+                        ItemsSource="{x:Bind ViewModel.DisplayRows, Mode=OneWay}"
+                        ShowColumns="True">
+                        <lists:ColumnListView.LeadingColumn>
+                            <lists:ListColumn
+                                CellTemplate="{StaticResource ToolIconCell}"
+                                DefaultWidth="20"
+                                Id="Icon" />
+                        </lists:ColumnListView.LeadingColumn>
+                        <lists:ColumnListView.Columns>
+                            <lists:ListColumn
+                                MinWidth="64"
+                                CanHide="False"
+                                CellTemplate="{StaticResource ToolSubjectCell}"
+                                FillWeight="2"
+                                Header="Match"
+                                Id="Subject" />
+                            <lists:ListColumn
+                                MinWidth="64"
+                                CellTemplate="{StaticResource ToolPathCell}"
+                                FillWeight="6"
+                                Header="Registry path"
+                                Id="Path" />
+                            <lists:ListColumn
+                                MinWidth="64"
+                                CellTemplate="{StaticResource ToolSummaryCell}"
+                                FillWeight="2"
+                                Header="Data"
+                                Id="Summary" />
+                        </lists:ColumnListView.Columns>
+                    </lists:ColumnListView>
+                    <StackPanel
+                        Grid.Row="1"
+                        MaxWidth="360"
+                        Margin="16"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsHitTestVisible="False"
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}">
+                        <TextBlock
+                            x:Name="EmptyTitle"
+                            AutomationProperties.LiveSetting="Polite"
+                            FontWeight="SemiBold"
+                            Text="{x:Bind ViewModel.DisplayEmptyTitle, Mode=OneWay}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="EmptyDescription"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.DisplayEmptyDescription, Mode=OneWay}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ProgressBar
+                        Grid.RowSpan="2"
+                        Height="2"
+                        MinHeight="0"
+                        VerticalAlignment="Top"
+                        AutomationProperties.AutomationId="SearchProgress"
+                        AutomationProperties.Name="Searching registry"
+                        IsHitTestVisible="False"
+                        IsIndeterminate="{x:Bind Search.IsBusy, Mode=OneWay}"
+                        Visibility="{x:Bind Search.IsBusy, Mode=OneWay}" />
+                </Grid>
+                <TextBlock
+                    x:Name="Count"
+                    Grid.Row="2"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.CountText, Mode=OneWay}" />
+            </Grid>
+            <local:ToolDetails
+                x:Name="Details"
+                Grid.Column="1"
+                Visibility="Collapsed" />
+            <local:ToolPaneSplitter x:Name="DetailsSplitter" Visibility="Collapsed" />
+        </Grid>
+        <InfoBar
+            x:Name="Notice"
+            Grid.Row="3"
+            Margin="0,12,0,0"
+            IsOpen="False"
+            Visibility="{x:Bind Notice.IsOpen, Mode=OneWay}" />
+    </Grid>
+</Page>
