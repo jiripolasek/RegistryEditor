@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title description">
+    <title id="title">Fluent Registry</title>
+    <desc id="description">Nine equal teal cube faces: six form a stepped pyramid with three cubes along the bottom, two in the middle, and one at the top. Three loose cubes float above and to the right.</desc>
+    <defs>
+        <linearGradient id="teal" x1="0%" y1="0%" x2="90%" y2="100%">
+            <stop stop-color="#67DDDA"/>
+            <stop offset="0.48" stop-color="#31C2C7"/>
+            <stop offset="1" stop-color="#139BA6"/>
+        </linearGradient>
+        <linearGradient id="deepTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop stop-color="#30BFC3"/>
+            <stop offset="0.5" stop-color="#1AA6AE"/>
+            <stop offset="1" stop-color="#10858F"/>
+        </linearGradient>
+        <linearGradient id="edge" x1="0%" y1="0%" x2="75%" y2="100%">
+            <stop stop-color="#DBFFFB" stop-opacity="0.55"/>
+            <stop offset="0.5" stop-color="#B8F9F3" stop-opacity="0.08"/>
+            <stop offset="1" stop-color="#077B86" stop-opacity="0.2"/>
+        </linearGradient>
+        <filter id="stackShadow" x="40" y="144" width="360" height="344" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#07515A" flood-opacity="0.16"/>
+        </filter>
+        <filter id="cubeShadow" x="-24" y="-24" width="144" height="152" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#07515A" flood-opacity="0.14"/>
+        </filter>
+        <g id="cube">
+            <rect width="96" height="96" rx="12"/>
+            <rect x="1" y="1" width="94" height="94" rx="11" fill="none" stroke="url(#edge)" stroke-width="2"/>
+        </g>
+    </defs>
+    <g filter="url(#stackShadow)">
+        <use href="#cube" transform="translate(64 160)" fill="url(#teal)"/>
+        <use href="#cube" transform="translate(64 264)" fill="url(#deepTeal)"/>
+        <use href="#cube" transform="translate(168 264)" fill="url(#teal)"/>
+        <use href="#cube" transform="translate(64 368)" fill="url(#teal)"/>
+        <use href="#cube" transform="translate(168 368)" fill="url(#deepTeal)"/>
+        <use href="#cube" transform="translate(272 368)" fill="url(#teal)"/>
+    </g>
+    <g transform="translate(248 148) rotate(45) translate(-48 -48)" filter="url(#cubeShadow)">
+        <use href="#cube" fill="url(#teal)"/>
+    </g>
+    <g transform="translate(360 64)" filter="url(#cubeShadow)">
+        <use href="#cube" fill="url(#teal)"/>
+    </g>
+    <g transform="translate(408 254) rotate(-16) translate(-48 -48)" filter="url(#cubeShadow)">
+        <use href="#cube" fill="url(#teal)"/>
+    </g>
+</svg>
