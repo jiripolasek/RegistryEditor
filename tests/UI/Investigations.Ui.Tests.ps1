@@ -4800,6 +4800,34 @@ try {
         Wait-Ui { param($items) $items.name -notcontains 'Snapshot comparison' }
     }
 
+    Test-Ui 'Live snapshot comparison stays responsive when resized and reopened' {
+        Browser
+        $snapshotFile = Join-Path $ArtifactDirectory 'snapshot-layout.regsnap'
+        Snapshot-Action 'Capture branch snapshot…'
+        File-Picker 'Save' $snapshotFile
+        Wait-Ui { param($items) $items.name -contains 'Snapshot saved' }
+        Snapshot-Action 'Compare last capture with registry'
+        Wait-Ui { param($items) $items.name -contains 'Snapshot comparison' }
+        foreach ($width in 760, 1380) {
+            if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, $width, 900, 0x16)) {
+                throw 'Could not resize the snapshot comparison window.'
+            }
+            Wait-Ui { param($items) $items.name -contains 'No differences. Keys, types, and raw value bytes match.' }
+            if ((Pick 'Button' 'Export selected').isEnabled) { throw 'An unchanged snapshot enabled export.' }
+        }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'snapshot-layout.png')) | Out-Null
+        $comparison = Pick 'Window' 'Snapshot comparison'
+        $close = @($comparison.children | Where-Object automationId -eq 'CloseButton')[0]
+        Ui @('invoke', $close.selector, '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.name -notcontains 'Snapshot comparison' }
+        Snapshot-Action 'Reopen last comparison'
+        Wait-Ui { param($items) $items.name -contains 'No differences. Keys, types, and raw value bytes match.' }
+        $comparison = Pick 'Window' 'Snapshot comparison'
+        $close = @($comparison.children | Where-Object automationId -eq 'CloseButton')[0]
+        Ui @('invoke', $close.selector, '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.name -notcontains 'Snapshot comparison' }
+    }
+
     Test-Ui 'Historical version 1 snapshot opens through the browser command' {
         Browser
         $started = [DateTimeOffset]::Parse('2020-01-02T03:04:05.0000000+00:00')
