@@ -1,4 +1,6 @@
 * text=auto eol=crlf
 
 *.png binary
+*.webp binary
 *.ico binary
+*.woff2 binary

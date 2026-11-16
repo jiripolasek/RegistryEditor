@@ -1,0 +1,19 @@
+---
+import WindowIcon from '../assets/icons/window.svg';
+
+interface Props {
+  label: string;
+  caption: string;
+}
+
+const { label, caption } = Astro.props;
+---
+
+<figure class="feature-preview">
+  <div class="screenshot-placeholder" role="img" aria-label={`${label}. Screenshot coming soon.`}>
+    <WindowIcon class="fluent-icon" width="36" height="36" aria-hidden="true" focusable="false" />
+    <span class="placeholder-title">{label}</span>
+    <span class="placeholder-note">Screenshot coming soon</span>
+  </div>
+  <figcaption>{caption}</figcaption>
+</figure>

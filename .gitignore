@@ -5,3 +5,8 @@ dist/
 .env.*
 !.env.example
 *.log
+
+# Superseded screenshot drafts.
+src/assets/registry-browser.png
+src/assets/registry-favorites.png
+src/assets/capture-journal.png

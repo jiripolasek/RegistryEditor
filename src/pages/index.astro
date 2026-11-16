@@ -1,12 +1,90 @@
 ---
 import '../styles/global.css';
+import themeScript from '../scripts/theme.js?raw';
+import soraFont from '../assets/fonts/sora-latin.woff2?url';
+import creatorMark from '../assets/jiri-polasek.webp?url';
+import browserScreenshot from '../assets/capture-browser.png';
+import searchScreenshot from '../assets/capture-search.png';
+import inspectorScreenshot from '../assets/capture-inspector.png';
+import watchScreenshot from '../assets/capture-watch.png';
+import workspaceScreenshot from '../assets/capture-workspace.png';
+import ScreenshotCapture from '../components/ScreenshotCapture.astro';
+import ScreenshotPlaceholder from '../components/ScreenshotPlaceholder.astro';
+import OpenIcon from '../assets/icons/open.svg';
+import ArrowRight from '../assets/icons/arrow-right.svg';
+import ArrowUp from '../assets/icons/arrow-up.svg';
+import WeatherSunny from '../assets/icons/weather-sunny.svg';
+import WeatherMoon from '../assets/icons/weather-moon.svg';
 
 const repo = 'https://github.com/jiripolasek/RegistryEditor';
 const guide = `${repo}/blob/master/docs/user/Guide.md`;
 const features = [
-  { number: '01', title: 'More room to explore', description: 'Keep locations side by side with tabs, then pick up where you left off with favorites and workspaces.', label: 'Tabs & workspaces' },
-  { number: '02', title: 'Find the value that matters', description: 'Search across keys and values, filter by type, and keep your results close while you investigate.', label: 'Search & discovery' },
-  { number: '03', title: 'See what changed', description: 'Compare branch snapshots, follow live changes, and review your edits in the change journal.', label: 'Snapshots & journal' },
+  {
+    id: 'search',
+    image: searchScreenshot,
+    window: true,
+    alt: 'Scoped search results retained below the registry, with the matching Enabled value selected in the Contoso Orion Telemetry key.',
+    title: 'Find it. Keep the context.',
+    description: 'Search keys and values without losing your place. Keep matches in the bottom panel while you explore the registry above, and return to your results when you need them.',
+    highlights: 'Retained results · Value-type filters · Saved searches',
+    screenshot: 'Search alongside the registry',
+    caption: 'Search results below, with a matching value selected in the browser above.',
+  },
+  {
+    id: 'inspector',
+    image: inspectorScreenshot,
+    window: false,
+    alt: 'BatchPayload raw hex and ASCII bytes, with the first 18 bytes interpreted as the UTF-8 text ORIONTLM version=1.',
+    title: 'Understand what you’re looking at.',
+    description: 'Read full value contents, inspect key details and notes, or interpret selected bytes as numbers, text, GUIDs, and timestamps. Follow supported registry links and reveal local file paths in File Explorer, with the detail panel beside or below your list.',
+    highlights: 'Key and value details · Hex and ASCII · Byte interpretations',
+    screenshot: 'Raw bytes, explained',
+    caption: 'The selected bytes of a demo telemetry payload, decoded as UTF-8 text in the detail panel.',
+  },
+  {
+    id: 'editing',
+    image: null,
+    window: false,
+    alt: '',
+    title: 'Edit. Review. Undo.',
+    description: 'Edit strings, numbers, or raw bytes, then undo or redo supported edits in the current tab. Review persistent before-and-after records in the change journal. Conflict checks can block an undo or revert when later changes would be affected.',
+    highlights: 'Per-tab Undo and Redo · Persistent journal · Conflict checks',
+    screenshot: 'An edit and its history',
+    caption: 'A value edit in the main window, with Undo and the change journal visible.',
+  },
+  {
+    id: 'changes',
+    image: null,
+    window: false,
+    alt: '',
+    title: 'See exactly what changed.',
+    description: 'Capture a branch snapshot, then compare it with the registry to see added, changed, and removed items. Examine before-and-after data and raw bytes. Export selected differences or copy them as PowerShell or reg.exe scripts.',
+    highlights: 'Branch snapshots · Before-and-after details · Selected difference export',
+    screenshot: 'Snapshot comparison',
+    caption: 'Added, changed, and removed entries, with raw before-and-after details for a selected difference and export or script-copy commands visible.',
+  },
+  {
+    id: 'watches',
+    image: watchScreenshot,
+    window: false,
+    alt: 'Six timestamped demo registry observations, with before and after data for the selected BatchSize change.',
+    title: 'Watch your registry at work.',
+    description: 'Watch a local key or value and follow timestamped observations as changes happen. Inspect raw before-and-after data and copy selected changes as PowerShell or reg.exe scripts. Pause viewing to examine an observation while capture continues.',
+    highlights: 'Local live watches · Timestamped observations · Follow latest',
+    screenshot: 'Live changes in context',
+    caption: 'Six timestamped observations, with the selected BatchSize change showing its before-and-after data.',
+  },
+  {
+    id: 'workspace',
+    image: workspaceScreenshot,
+    window: true,
+    alt: 'Telemetry and Scheduling registry tabs, retained searches below, and numeric BatchSize details beside the list.',
+    title: 'Make room for the way you work.',
+    description: 'Keep favorites and key notes close, and save named workspaces with tabs, searches, and watch definitions. Arrange tools in tabs, the sidebar, or the bottom panel; choose columns, data fonts, toolbar buttons, and row spacing from compact to comfortable.',
+    highlights: 'Saved workspaces · Dockable tools · Customizable density',
+    screenshot: 'Your tools, where you need them',
+    caption: 'Two registry tabs, retained searches below, and numeric value details beside the list.',
+  },
 ];
 const base = import.meta.env.BASE_URL;
 ---
@@ -17,99 +95,133 @@ const base = import.meta.env.BASE_URL;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content="A modern Windows registry editor. Explore with tabs, search with context, and understand changes in a native Fluent interface." />
-    <meta name="theme-color" content="#f5f5f5" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#e6eff0" />
+    <script is:inline set:html={themeScript}></script>
+    <link rel="preload" href={soraFont} as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="icon" type="image/svg+xml" href={`${base}/logo.svg`} />
     <title>Modern Registry Editor | A clearer view of your registry</title>
   </head>
-  <body>
+  <body id="page-top">
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="container header-content">
         <a class="brand" href={`${base}/`} aria-label="Modern Registry Editor home">
           <img src={`${base}/logo.svg`} width="32" height="32" alt="" />
-          <span>Registry Editor</span>
+          <span>Modern Registry Editor</span>
         </a>
-        <nav aria-label="Main navigation">
-          <a href="#features">Features</a>
-          <a href={guide}>Documentation</a>
-          <a class="source-link" href={repo}>GitHub <span aria-hidden="true">↗</span></a>
-        </nav>
+        <div class="header-links">
+          <nav class="main-nav" aria-label="Main navigation">
+            <a href="#features">Features</a>
+            <a href={guide}>Documentation</a>
+            <a class="source-link" href={repo}>GitHub <OpenIcon class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
+          </nav>
+          <div class="theme-control" data-theme-control hidden>
+            <button type="button" class="theme-toggle" aria-label="Switch color theme" data-theme-toggle>
+              <WeatherSunny class="fluent-icon theme-icon-light" width="20" height="20" aria-hidden="true" focusable="false" />
+              <WeatherMoon class="fluent-icon theme-icon-dark" width="20" height="20" aria-hidden="true" focusable="false" />
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
     <main id="main">
-      <section class="hero container" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Native Windows app · Open source</p>
-          <h1 id="hero-title">A clearer view<br />of your <span>registry.</span></h1>
-          <p class="hero-description">A familiar place to explore. A better way to investigate. Meet a modern registry editor built for the way you work.</p>
-          <div class="actions">
-            <a class="button primary" href={`${repo}#development`}>Build from source <span aria-hidden="true">↗</span></a>
-            <a class="button secondary" href={guide}>Read the guide <span aria-hidden="true">→</span></a>
-          </div>
-          <p class="availability">For Windows 10 & 11 <span aria-hidden="true">·</span> Currently available as a source build</p>
-        </div>
-
-        <figure class="app-preview" aria-label="Illustrative Registry Editor interface">
-          <div class="window-title">
-            <div><img src={`${base}/logo.svg`} width="19" height="19" alt="" /><span>Registry Editor</span></div>
-            <span class="window-controls" aria-hidden="true">&#x2212; &nbsp; &#x25A1; &nbsp; &#x00D7;</span>
-          </div>
-          <div class="tab-strip" aria-hidden="true"><span class="active-tab">▱ &nbsp; Explorer &nbsp; <span>×</span></span><span>＋</span></div>
-          <div class="address-bar"><span aria-hidden="true">← &nbsp; → &nbsp; ↑</span><span class="address">Computer <span aria-hidden="true">›</span> HKEY_CURRENT_USER <span aria-hidden="true">›</span> Software</span></div>
-          <div class="registry-content">
-            <div class="registry-tree" aria-hidden="true">
-              <span>⌄ &nbsp; Computer</span>
-              <span class="tree-indent">› &nbsp; HKEY_CLASSES_ROOT</span>
-              <span class="tree-indent">⌄ &nbsp; HKEY_CURRENT_USER</span>
-              <span class="tree-child">› &nbsp; Control Panel</span>
-              <span class="tree-child">› &nbsp; Environment</span>
-              <span class="tree-child selected">⌄ &nbsp; Software</span>
-              <span class="tree-grandchild">› &nbsp; Microsoft</span>
-              <span class="tree-grandchild">› &nbsp; Classes</span>
-              <span class="tree-indent">› &nbsp; HKEY_LOCAL_MACHINE</span>
-              <span class="tree-indent">› &nbsp; HKEY_USERS</span>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-stage">
+          <div class="container hero-layout">
+            <div class="hero-copy">
+              <h1 id="hero-title">A clearer<br /> view of your <span>registry.</span></h1>
+              <p class="product-meta">Native Windows app · Open source</p>
+              <p class="hero-description">A familiar place to explore. A better way to investigate. Meet a modern registry editor built for the way you work.</p>
+              <div class="actions">
+                <a class="button primary" href={`${repo}#development`}>Build from source <OpenIcon class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
+                <a class="button secondary" href={guide}>Read the guide <ArrowRight class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
+              </div>
+              <p class="availability">For Windows 10 & 11 <span aria-hidden="true">·</span> Currently available as a source build</p>
             </div>
-            <div class="registry-values">
-              <div class="list-caption">Software <span>3 items</span></div>
-              <table>
-                <caption class="visually-hidden">Illustrative registry values</caption>
-                <thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Data</th></tr></thead>
-                <tbody>
-                  <tr><td><span class="value-icon" aria-hidden="true">ab</span> (Default)</td><td>REG_SZ</td><td>(value not set)</td></tr>
-                  <tr><td><span class="folder-icon" aria-hidden="true">▱</span> Classes</td><td>Key</td><td></td></tr>
-                  <tr><td><span class="folder-icon" aria-hidden="true">▱</span> Microsoft</td><td>Key</td><td></td></tr>
-                </tbody>
-              </table>
-              <div class="preview-panel"><span class="panel-title">Change journal</span><span class="empty-journal">Your changes, in context.</span><span class="journal-detail">Review recorded edits as you work.</span></div>
-            </div>
-          </div>
-          <div class="window-status"><span>HKEY_CURRENT_USER\Software</span><span>64-bit view</span></div>
-          <figcaption>Designed for Windows. Built around your workflow. <span>Interface illustration</span></figcaption>
-        </figure>
-      </section>
 
-      <section class="features container" id="features" aria-labelledby="features-title">
-        <div class="section-heading"><p class="eyebrow">Familiar foundations. Thoughtful tools.</p><h2 id="features-title">Go beyond a single window.</h2><p>Everything you need to navigate, inspect, and understand the Windows registry.</p></div>
-        <div class="feature-grid">
-          {features.map((feature) => (
-            <article class="feature-card">
-              <span class="feature-number" aria-hidden="true">{feature.number}</span>
-              <p class="feature-label">{feature.label}</p>
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
-            </article>
-          ))}
+            <figure class="app-preview">
+              <p class="hero-intro" aria-hidden="true">A clearer view of your <span>registry.</span></p>
+              <div class="app-preview-frame">
+                <img src={browserScreenshot.src} width={browserScreenshot.width} height={browserScreenshot.height} alt="Modern Registry Editor browsing synthetic Contoso Orion Telemetry settings, with the BatchSize DWORD selected and numeric details in the preview pane." loading="eager" fetchpriority="high" />
+              </div>
+              <figcaption>A familiar view. More room to explore.</figcaption>
+            </figure>
+          </div>
         </div>
       </section>
 
+      <nav class="feature-nav" id="features" aria-label="Feature sections">
+        <div class="container feature-nav-links">
+          <a href="#search">Search</a>
+          <a href="#inspector">Inspector</a>
+          <a href="#editing">Editing &amp; journal</a>
+          <a href="#changes">Snapshots</a>
+          <a href="#watches">Watches</a>
+          <a href="#workspace">Workspace</a>
+        </div>
+      </nav>
+
+      {features.map((feature) => (
+        <section class:list={["feature-section", "container", { "feature-section--wide": feature.id === "watches" }]} id={feature.id} aria-labelledby={`${feature.id}-title`}>
+          <div class="feature-copy">
+            <h2 id={`${feature.id}-title`}>{feature.title}</h2>
+            <p>{feature.description}</p>
+            <p class="feature-highlights">{feature.highlights}</p>
+          </div>
+          {feature.image ? (
+            <ScreenshotCapture image={feature.image} alt={feature.alt} caption={feature.caption} window={feature.window} wide={feature.id === 'watches'} />
+          ) : (
+            <ScreenshotPlaceholder label={feature.screenshot} caption={feature.caption} />
+          )}
+        </section>
+      ))}
+
+      <section class="capabilities container" aria-labelledby="capabilities-title">
+        <h2 id="capabilities-title">And the everyday essentials.</h2>
+        <ul>
+          <li>Tabbed browsing, navigation history, and duplicate or reopened tabs</li>
+          <li>Inline rename, hex and ASCII editing, and byte-preserving value duplication</li>
+          <li>Paste PowerShell paths and jump between matching HKCU and HKLM keys</li>
+          <li>Web lookup for a key path or value name, without sending value data</li>
+          <li>Open locations through regedit2:// links and taskbar favorites</li>
+          <li>Import and export .reg files</li>
+          <li>32-bit and 64-bit registry views and native Windows permissions dialogs</li>
+          <li>Keyboard shortcuts and light or dark appearance</li>
+        </ul>
+        <p class="availability">Remote registry connections are available as a preview.</p>
+      </section>
       <section class="getting-started container" aria-labelledby="start-title">
-        <div><p class="eyebrow">Make yourself at home</p><h2 id="start-title">Familiar by design.<br />Open by nature.</h2><p>A native Fluent interface with light and dark appearance. Open source, so you can explore the code as easily as your registry.</p><a class="text-link" href={repo}>Explore the project <span aria-hidden="true">→</span></a></div>
-        <div class="start-card"><span class="small-label">Getting started</span><h3>Start with the source.</h3><p>There’s no installer yet. The repository includes build instructions and a guide to your first session.</p><a class="button primary" href={`${repo}#development`}>View build instructions <span aria-hidden="true">↗</span></a><p class="safety-note">Registry edits apply immediately. Back up important keys before making changes.</p></div>
+        <div><h2 id="start-title">Familiar by design.<br />Open by nature.</h2><p>A native Fluent interface with light and dark appearance. Open source, so you can explore the code as easily as your registry.</p><a class="text-link" href={repo}>Explore the project <ArrowRight class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a></div>
+        <div class="start-card"><h3>Start with the source.</h3><p>There’s no installer yet. The repository includes build instructions and a guide to your first session.</p><a class="button primary" href={`${repo}#development`}>View build instructions <OpenIcon class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a><p class="safety-note">Registry edits apply immediately. Back up important keys before making changes.</p></div>
+      </section>
+      <section class="creator container" aria-label="About the creator">
+        <span class="creator-mark" style={`--creator-logo: url("${creatorMark}")`} aria-hidden="true"></span>
+        <div>
+          <p class="creator-label">An independent project</p>
+          <p class="creator-copy">Made with care by <a href="https://jiripolasek.com">Jiří Polášek</a>.<br /><span>For people who like their tools to get out of the way.</span></p>
+        </div>
+        <a class="text-link" href={repo}>Say hello on GitHub <OpenIcon class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
       </section>
     </main>
 
-    <footer class="container site-footer"><span>Modern Registry Editor</span><span>By <a href="https://jiripolasek.com">Jiří Polášek</a></span><a href={`${repo}/blob/master/LICENSE.txt`}>Apache 2.0 license</a></footer>
+    <footer class="container site-footer">
+      <div class="footer-top">
+        <a class="brand" href={`${base}/`}><img src={`${base}/logo.svg`} alt="" width="32" height="32" /><span>Modern Registry Editor</span></a>
+        <p>A clearer view. A more familiar workflow.</p>
+        <a class="text-link" href="#page-top">Back to top <ArrowUp class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
+      </div>
+      <div class="footer-bottom">
+        <p>Made by <a href="https://jiripolasek.com">Jiří Polášek</a> <span class="footer-dot">/</span> Free &amp; open source</p>
+        <nav aria-label="Footer navigation">
+          <a href={repo}>GitHub</a>
+          <a href={`${repo}/releases`}>Releases</a>
+          <a href={guide}>Documentation</a>
+          <a href={`${repo}/issues`}>Support</a>
+          <a href={`${repo}/blob/master/LICENSE.txt`}>License</a>
+          <a href="https://jiripolasek.com">jiripolasek.com <OpenIcon class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

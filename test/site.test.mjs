@@ -8,7 +8,8 @@ const origin = 'https://jiripolasek.github.io';
 const base = '/RegistryEditor/';
 
 test('built page resolves local assets and navigation under the repository base', () => {
-  const links = [...html.matchAll(/(?:href|src)="([^"]+)"/g)].map((match) => match[1]);
+  const candidates = [...html.matchAll(/srcset="([^"]+)"/g)].flatMap((match) => match[1].split(',').map((candidate) => candidate.trim().split(/\s+/)[0]));
+  const links = [...html.matchAll(/(?:href|src)="([^"]+)"/g)].map((match) => match[1]).concat(candidates);
   assert.ok(links.some((link) => link.endsWith('/logo.svg')));
   assert.ok(links.some((link) => link.endsWith('.css')));
 
