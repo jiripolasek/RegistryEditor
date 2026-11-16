@@ -12,6 +12,7 @@ import ScreenshotCapture from '../components/ScreenshotCapture.astro';
 import ScreenshotPlaceholder from '../components/ScreenshotPlaceholder.astro';
 import OpenIcon from '../assets/icons/open.svg';
 import ArrowRight from '../assets/icons/arrow-right.svg';
+import ArrowDownload from '../assets/icons/arrow-download.svg';
 import ArrowUp from '../assets/icons/arrow-up.svg';
 import WeatherSunny from '../assets/icons/weather-sunny.svg';
 import WeatherMoon from '../assets/icons/weather-moon.svg';
@@ -133,10 +134,10 @@ const socialImageUrl = new URL(`${base}/social-preview.png`, Astro.site).href;
         </a>
         <div class="header-links">
           <nav class="main-nav" aria-label="Main navigation">
-            <a class="source-link" href={downloadUrl}>Download</a>
             <a href="#features">Features</a>
             <a href={guide}>Documentation</a>
             <a class="source-link" href={repo}>GitHub <OpenIcon class="fluent-icon" width="16" height="16" aria-hidden="true" focusable="false" /></a>
+            <a class="button primary header-download" href={downloadUrl}><ArrowDownload class="fluent-icon" width="20" height="20" aria-hidden="true" focusable="false" />Download</a>
           </nav>
           <div class="theme-control" data-theme-control hidden>
             <button type="button" class="theme-toggle" aria-label="Switch color theme" data-theme-toggle>
