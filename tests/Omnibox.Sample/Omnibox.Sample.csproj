@@ -3,8 +3,8 @@
     <RootNamespace>JPSoftworks.Omnibox.Sample</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <Page Include="..\..\src\Regedit\Controls\Omnibox\Omnibox.xaml" Link="Controls\Omnibox.xaml" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\Omnibox.xaml.cs" Link="Controls\Omnibox.xaml.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxItem.cs" Link="Controls\OmniboxItem.cs" />

@@ -17,25 +17,25 @@
 
   <ItemGroup>
     <!-- UI libraries reference the metapackage; suppress its unused component assets. -->
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.AI" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.ML" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" Version="2.4.89" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.Search" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.Widgets" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.6.5" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.5" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.6.5" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.371" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
-    <PackageReference Include="BetterHexViewer.WinUI3" Version="1.2.3" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.250402" />
-    <PackageReference Include="Serilog" Version="4.4.0" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Search" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Widgets" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="BetterHexViewer.WinUI3" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.File" />
     <ProjectReference Include="..\Regedit.Core\Regedit.Core.csproj" />
   </ItemGroup>
 
