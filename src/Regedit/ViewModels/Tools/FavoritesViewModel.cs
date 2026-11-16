@@ -137,7 +137,7 @@ internal sealed partial class FavoritesViewModel(
         }
 
         this.TreeSelection = true;
-        this.Selected = item.Id.Length == 0 ? [] : [item];
+        this.Selected = item.Id.Length == 0 ? [] : (FavoriteItemId[])[item];
         if (refresh)
         {
             this.Refresh(false);
@@ -155,7 +155,7 @@ internal sealed partial class FavoritesViewModel(
         this.FolderId = id.Length == 0 ? null : id;
         this.ExpandedFolders.Add(id);
         this.TreeSelection = true;
-        this.Selected = id.Length == 0 ? [] : [new FavoriteItemId(id, true)];
+        this.Selected = id.Length == 0 ? [] : (FavoriteItemId[])[new FavoriteItemId(id, true)];
         this.Refresh();
     }
 

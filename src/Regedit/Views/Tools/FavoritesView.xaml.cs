@@ -95,7 +95,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         };
         this.LocalControls.SetPreviewCommand(this._previewCommand);
         this.PanelCommands =
-        [
+        (ToolCommand[])[
             this._addCommand,
             new ToolCommand("New folder", Symbol.NewFolder) { Command = this.ViewModel.NewFolderCommand },
             this._searchCommand,

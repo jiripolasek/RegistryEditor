@@ -8,7 +8,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
     <Compile Include="..\..\src\Regedit\Controls\Shared\ResizeThumb.cs" Link="Controls\Shared\ResizeThumb.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Shared\CommandIcon.cs" Link="Controls\Shared\CommandIcon.cs" />

@@ -1,6 +1,6 @@
 # Development
 
-Requires Windows 10 version 2004 or later, the .NET 10 SDK, and Windows SDK 10.0.26100. Visual Studio with the WinUI workload is recommended for editing XAML.
+Requires Windows 10 version 2004 or later, the .NET 11 SDK, and Windows SDK 10.0.26100. Visual Studio 2026 (18.12 or later) with the WinUI workload is recommended for editing XAML. .NET 11 requires x86-64-v2 instructions on x64 and LSE on ARM64.
 
 From the repository root:
 

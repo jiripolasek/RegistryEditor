@@ -64,7 +64,7 @@ internal static class ComponentChecks
                 "An in-place row update changes its accessible name without replacing the row or changing selection");
             var liveSource = (System.Collections.ObjectModel.ObservableCollection<SampleEntry>)registry.ItemsSource!;
             liveSource.Move(0, 3);
-            registry.RestoreSelection([liveEntry]);
+            registry.RestoreSelection((object[])[liveEntry]);
             Check(
                 ReferenceEquals(registry.ListView.SelectedItem, liveEntry),
                 "Selection restoration retains an updated row after its sort position changes");
@@ -217,7 +217,7 @@ internal static class ComponentChecks
                 "Header hit-testing finds the drop target under the pointer");
             registry.MoveColumnBy("Data", 1);
             Check(
-                registry.EffectiveLayout.Columns.Select(column => column.Id).Take(2).SequenceEqual(["Name", "Data"]),
+                registry.EffectiveLayout.Columns.Select(column => column.Id).Take(2).SequenceEqual((string[])["Name", "Data"]),
                 "Move right swaps with the next visible column");
 
             // Drag feedback, driven through the same pipeline the pointer handlers use.
@@ -269,7 +269,7 @@ internal static class ComponentChecks
             await WaitAsync(() => header.DragGhost.Visibility == Visibility.Collapsed);
             Check(
                 registry.EffectiveLayout.Visible.Select(column => column.Id)
-                    .SequenceEqual(["Name", "Type", "LastWrite", "Data"]) && dataLabel.Opacity == 1 &&
+                    .SequenceEqual((string[])["Name", "Type", "LastWrite", "Data"]) && dataLabel.Opacity == 1 &&
                 header.InsertionMarker.Visibility == Visibility.Collapsed,
                 "The drop lands in the marked gap and clears the drag visuals");
             var beforeCancel = registry.EffectiveLayout;
@@ -285,7 +285,7 @@ internal static class ComponentChecks
             Check(
                 header.MoveByKeyboard(dataColumn, -1) &&
                 registry.EffectiveLayout.Visible.Select(column => column.Id)
-                    .SequenceEqual(["Name", "Type", "Data", "LastWrite"]) &&
+                    .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite"]) &&
                 !header.MoveByKeyboard(registry.FindColumn("Name")!, -1),
                 "The reorder shortcut moves the focused header's column and stops at the edge");
             Check(
@@ -693,10 +693,10 @@ internal static class ComponentChecks
                 registry.EffectiveLayout.IsEquivalentTo(saved) &&
                 Grid.GetColumn(registry.HeaderRow.LabelFor(registry.FindColumn("LastWrite")!)!) == 1 &&
                 registry.CurrentWidth("Type") == 222, "A saved layout survives a JSON round trip");
-            registry.Layout = new ColumnLayout([new ColumnState("Bogus", 10, true), new ColumnState("Type", -5, true)]);
+            registry.Layout = new ColumnLayout((ColumnState[])[new ColumnState("Bogus", 10, true), new ColumnState("Type", -5, true)]);
             Check(
                 registry.EffectiveLayout.Columns.Select(column => column.Id)
-                    .SequenceEqual(["Name", "Type", "Data", "LastWrite", "Size"]) &&
+                    .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite", "Size"]) &&
                 registry.CurrentWidth("Type") == 140,
                 "Stale saved layouts are normalized against the declared columns");
             File.Delete(page.LayoutFile);
@@ -767,7 +767,7 @@ internal static class ComponentChecks
         await WaitAsync(() => !header.IsDragging);
         check(
             registry.EffectiveLayout.Visible.Select(column => column.Id)
-                .SequenceEqual(["Name", "Data", "LastWrite", "Type"]) &&
+                .SequenceEqual((string[])["Name", "Data", "LastWrite", "Type"]) &&
             (registry.SortColumnId, registry.SortDescending) == sortBefore &&
             header.DragGhost.Visibility == Visibility.Collapsed, "Mouse: releasing drops the column without sorting");
 

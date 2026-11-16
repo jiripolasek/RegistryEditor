@@ -165,7 +165,7 @@ internal static class ComponentChecks
             await Task.Delay(30);
             Check(requests == 1, "The current breadcrumb does not request navigation");
 
-            first.SetLocation(App.Notes.Address, [App.Workspace, App.Notes with { HasChildren = null }]);
+            first.SetLocation(App.Notes.Address, (OmniboxItem[])[App.Workspace, App.Notes with { HasChildren = null }]);
             childButton = Button(first, "BreadcrumbChildren1");
             Check(
                 childButton.Visibility == Visibility.Visible,
@@ -205,7 +205,7 @@ internal static class ComponentChecks
             first.BeginEdit();
             await WaitAsync(() => !menu.IsOpen);
             Check(pendingToken.IsCancellationRequested, "Editing cancels an open child request");
-            pending.SetResult([new OmniboxItem("Stale result", "stale:")]);
+            pending.SetResult((OmniboxItem[])[new OmniboxItem("Stale result", "stale:")]);
             await Task.Delay(50);
             Check(
                 !menu.IsOpen && Locations(menu).Items.Count == 0,
@@ -215,7 +215,7 @@ internal static class ComponentChecks
             var older = new TaskCompletionSource<IReadOnlyList<OmniboxItem>>();
             var call = 0;
             first.ChildrenProvider = (_, _) =>
-                ++call == 1 ? older.Task : Task.FromResult<IReadOnlyList<OmniboxItem>>([App.Projects]);
+                ++call == 1 ? older.Task : Task.FromResult<IReadOnlyList<OmniboxItem>>((OmniboxItem[])[App.Projects]);
             childButton = Button(first, "BreadcrumbChildren0");
             menu = (Flyout)childButton.Flyout;
             menu.ShowAt(childButton);
@@ -226,7 +226,7 @@ internal static class ComponentChecks
                 () => Locations(menu).Items.OfType<OmniboxItem>().Any(item => item.Label == "Projects"),
                 () =>
                     $"Reopen requests: {call}; open: {menu.IsOpen}; items: {string.Join(", ", Locations(menu).Items)}");
-            older.SetResult([new OmniboxItem("Older request", "old:")]);
+            older.SetResult((OmniboxItem[])[new OmniboxItem("Older request", "old:")]);
             await Task.Delay(50);
             Check(
                 Locations(menu).Items.OfType<OmniboxItem>().Single().Label == "Projects",
@@ -385,7 +385,7 @@ internal static class ComponentChecks
             var input = (TextBox)FocusManager.GetFocusedElement(first.XamlRoot);
             input.Text = "p";
             await WaitAsync(() => suggestionRequests.Count == 1);
-            suggestionRequests[0].Result.SetResult([App.Projects]);
+            suggestionRequests[0].Result.SetResult((OmniboxItem[])[App.Projects]);
             await WaitAsync(
                 () => editor.IsSuggestionListOpen,
                 () =>
@@ -396,18 +396,18 @@ internal static class ComponentChecks
             input.Text = "pr";
             await WaitAsync(() => suggestionRequests.Count == 2);
             Check(
-                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual([App.Projects]),
+                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Projects]),
                 "Typing preserves the open suggestion list during debounce and loading");
             input.Text = "pro";
             await WaitAsync(() => suggestionRequests.Count == 3);
             Check(
                 suggestionRequests[1].Token.IsCancellationRequested, "Typing cancels the previous suggestion request");
-            suggestionRequests[2].Result.SetResult([App.Component]);
-            await WaitAsync(() => editor.Items.OfType<OmniboxItem>().SequenceEqual([App.Component]));
-            suggestionRequests[1].Result.SetResult([App.Notes]);
+            suggestionRequests[2].Result.SetResult((OmniboxItem[])[App.Component]);
+            await WaitAsync(() => editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Component]));
+            suggestionRequests[1].Result.SetResult((OmniboxItem[])[App.Notes]);
             await Task.Delay(50);
             Check(
-                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual([App.Component]),
+                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Component]),
                 "Replacement suggestions stay open and ignore cancelled results");
             editor.UnregisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, openCallback);
             input.Text = "missing";
@@ -425,7 +425,7 @@ internal static class ComponentChecks
             input.Text = "pending";
             await WaitAsync(() => suggestionRequests.Count == 6);
             first.SetLocation(App.Workspace.Address, App.Paths[App.Workspace.Address]);
-            suggestionRequests[5].Result.SetResult([App.Projects]);
+            suggestionRequests[5].Result.SetResult((OmniboxItem[])[App.Projects]);
             await Task.Delay(50);
             Check(
                 suggestionRequests[5].Token.IsCancellationRequested && !editor.IsSuggestionListOpen &&
@@ -467,7 +467,7 @@ internal static class ComponentChecks
             await WaitAsync(() => menu.IsOpen);
             parent.Children.Remove(first);
             await WaitAsync(() => pendingToken.IsCancellationRequested);
-            pending.SetResult([App.Projects]);
+            pending.SetResult((OmniboxItem[])[App.Projects]);
             await Task.Delay(50);
             Check(!menu.IsOpen, "Unloading cancels requests and closes the menu");
         }

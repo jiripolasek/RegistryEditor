@@ -64,7 +64,7 @@ internal sealed partial class ToolResultActionsViewModel(Action<string> copy) : 
 
         return rows.SelectMany(row => row.Source switch
         {
-            WatchObservation observation => [observation.Change],
+            WatchObservation observation => (RegistryDifference[])[observation.Change],
             JournalEntry entry => this._differences.Get(entry),
             _ => Array.Empty<RegistryDifference>()
         }).ToArray();

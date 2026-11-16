@@ -107,9 +107,9 @@ public partial class App : Application
         await Task.Delay(30, token);
         return address switch
         {
-            null => [Workspace],
-            "space:home" => [Projects, Notes],
-            "space:projects" => [Component],
+            null => (OmniboxItem[])[Workspace],
+            "space:home" => (OmniboxItem[])[Projects, Notes],
+            "space:projects" => (OmniboxItem[])[Component],
             _ => []
         };
     }

@@ -123,7 +123,7 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
         if (this.ScopeIndex == 1)
         {
             if (this._currentLocation() is not { } scope || !entry.Before.Select(state => state.Scope.Location)
-                    .Concat(entry.ActivityLocation is { } location ? [location] : []).Any(location =>
+                    .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : []).Any(location =>
                         location.View == scope.View &&
                         string.Equals(location.Machine, scope.Machine, StringComparison.OrdinalIgnoreCase) &&
                         (scope.IsComputer || location.Hive == scope.Hive &&

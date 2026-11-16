@@ -162,7 +162,7 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
         }
 
         var row = this.DisplayRows[index];
-        this.Selected = [row];
+        this.Selected = (InvestigationRow[])[row];
         this.ResultSelected?.Invoke(row);
         return (RegistrySearchMatch)row.Source;
     }

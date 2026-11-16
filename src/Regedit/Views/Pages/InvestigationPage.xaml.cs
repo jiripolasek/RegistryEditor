@@ -51,7 +51,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
 
     public string PanelCommandsId => "ItemCommands";
 
-    public IReadOnlyList<ToolCommand> PanelCommands => [.. this._itemCommands, this.LocalControls.ViewCommand];
+    public IReadOnlyList<ToolCommand> PanelCommands => (ToolCommand[])[.. this._itemCommands, this.LocalControls.ViewCommand];
 
     public PanelSearch? PanelSearch { get; }
 
@@ -188,7 +188,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
                 this._restoringSelection = true;
                 try
                 {
-                    this.ResultColumns.RestoreSelection([row]);
+                    this.ResultColumns.RestoreSelection((object[])[row]);
                 }
                 finally
                 {
@@ -417,7 +417,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
             else if (row.Source is SavedSearch search)
             {
                 this.Details.Show(
-                    search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty, [
+                    search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty, (ToolComparison[])[
                         new ToolComparison(
                             string.Empty, search.Options.Text, ToolPresentation.SearchOptionsText(search.Options),
                             "Query", "Match options")
@@ -433,7 +433,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
                     RegistryDifference difference => ToolPresentation.Compare(difference) with { Name = string.Empty },
                     _ => new ToolComparison(string.Empty, row.Before, row.After, "Details", "Contents")
                 };
-                this.Details.Show(row.Title, row.Path, row.Subtitle, [comparison]);
+                this.Details.Show(row.Title, row.Path, row.Subtitle, (ToolComparison[])[comparison]);
             }
         }
 

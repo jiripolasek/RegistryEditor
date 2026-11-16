@@ -27,7 +27,7 @@ internal static class JumpListEntries
         }.Concat(
             favorites.Where(favorite => !hiddenFavorites.Contains(favorite.Id)).Select(favorite => new JumpListEntry(
                 favorite.Name + (favorite.Is32Bit ? " (32-bit)" : string.Empty),
-                RegistryLaunch.FormatArguments(favorite.Is32Bit ? [favorite.Address, "--32"] : [favorite.Address]),
+                RegistryLaunch.FormatArguments(favorite.Is32Bit ? (string[])[favorite.Address, "--32"] : (string[])[favorite.Address]),
                 favorite.Id))).ToArray();
     }
 

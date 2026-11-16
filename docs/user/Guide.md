@@ -1,6 +1,6 @@
 # User guide
 
-Modern Registry Editor is a native WinUI 3 app with an Explorer-inspired layout: tabs, navigation history, a breadcrumb omnibox, a resizable registry tree, and a sortable value list. Built with C# / .NET 10 and Windows App SDK 1.8.
+Modern Registry Editor is a native WinUI 3 app with an Explorer-inspired layout: tabs, navigation history, a breadcrumb omnibox, a resizable registry tree, and a sortable value list. Built with C# / .NET 11 and Windows App SDK 2.6.5.
 
 For source builds and prerequisites, see [Development](../dev/readme.md). Commands below run from the repository root or the directory containing `regedit2.exe`, as shown.
 

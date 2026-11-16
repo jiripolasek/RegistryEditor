@@ -227,7 +227,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
             return;
         }
 
-        using var connection = RemoteRegistryCredentials.Retain([location.Machine]);
+        using var connection = RemoteRegistryCredentials.Retain((string?[])[location.Machine]);
         try
         {
             await action(location, dialogs);

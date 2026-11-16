@@ -172,7 +172,7 @@ public sealed partial class BrowserViewModel
                 return;
             }
 
-            using var connection = RemoteRegistryCredentials.Retain([edit.Target.Machine]);
+            using var connection = RemoteRegistryCredentials.Retain((string?[])[edit.Target.Machine]);
             this._historyJournalEntry = edit.Entries.Last();
             try
             {

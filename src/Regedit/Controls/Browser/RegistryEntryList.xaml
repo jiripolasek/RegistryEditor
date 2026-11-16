@@ -35,7 +35,7 @@
                 <IconSourceElement
                     Width="16"
                     Height="16"
-                    IconSource="{x:Bind resources:ToolRowResources.BinaryIcon}"
+                    IconSource="{x:Bind resources:ToolRowResources.BinaryIcon, Mode=OneTime}"
                     Style="{ThemeResource RegistryDataIconStyle}"
                     Visibility="{x:Bind HasBinaryIcon}" />
                 <FontIcon

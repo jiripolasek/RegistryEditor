@@ -14,7 +14,7 @@
                 <TextBlock
                     x:Name="Heading"
                     AutomationProperties.HeadingLevel="Level2"
-                    AutomationProperties.Name="{Binding Text, RelativeSource={RelativeSource Self}}"
+                    AutomationProperties.Name="{x:Bind Heading.Text, Mode=OneWay}"
                     FontFamily="{ThemeResource ContentControlThemeFontFamily}"
                     FontSize="20"
                     FontWeight="SemiBold"
@@ -22,7 +22,7 @@
                     TextWrapping="Wrap" />
                 <TextBlock
                     x:Name="PathText"
-                    AutomationProperties.Name="{Binding Text, RelativeSource={RelativeSource Self}}"
+                    AutomationProperties.Name="{x:Bind PathText.Text, Mode=OneWay}"
                     Style="{StaticResource ToolSelectableTextStyle}"
                     TextWrapping="Wrap" />
                 <StackPanel Spacing="2">

@@ -57,6 +57,9 @@ internal static class RegistryWebSearch
             path += "\\" + (valueName.Length == 0 ? "(Default)" : valueName);
         }
 
-        return new Uri(template.Replace("{query}", Uri.EscapeDataString(path), StringComparison.Ordinal));
+        // Canonicalization can remove escaped trailing spaces that belong to the registry name.
+        return new Uri(
+            template.Replace("{query}", Uri.EscapeDataString(path), StringComparison.Ordinal),
+            new UriCreationOptions { DangerousDisablePathAndQueryCanonicalization = true });
     }
 }

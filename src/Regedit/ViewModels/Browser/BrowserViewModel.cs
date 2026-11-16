@@ -181,7 +181,7 @@ public sealed partial class BrowserViewModel : ObservableObject
     public RegistryEntry? SelectedEntry
     {
         get => this.SelectedEntries.FirstOrDefault();
-        set => this.SetSelection(value is null ? [] : [value]);
+        set => this.SetSelection(value is null ? [] : (RegistryEntry[])[value]);
     }
 
     [ObservableProperty]
@@ -1063,7 +1063,7 @@ public sealed partial class BrowserViewModel : ObservableObject
             return;
         }
 
-        using var connection = RemoteRegistryCredentials.Retain([copied.Key?.Machine]);
+        using var connection = RemoteRegistryCredentials.Retain((string?[])[copied.Key?.Machine]);
         var form = new RegistryNamePrompt(
             RegistryNameOperation.Paste, copied.Key?.Name ?? copied.Value?.Name ?? string.Empty, destination.Name);
         await this.PromptAndWriteAsync(
@@ -1106,7 +1106,7 @@ public sealed partial class BrowserViewModel : ObservableObject
             return;
         }
 
-        using var connection = RemoteRegistryCredentials.Retain([target.Location.Machine]);
+        using var connection = RemoteRegistryCredentials.Retain((string?[])[target.Location.Machine]);
         this.CanPrompt = false;
         var version = this._request;
         try

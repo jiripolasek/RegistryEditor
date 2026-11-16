@@ -56,7 +56,7 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
             ? Task.CompletedTask
             : this.RunAsync(async token =>
             {
-                using var connection = RemoteRegistryCredentials.Retain([location!.Machine]);
+                using var connection = RemoteRegistryCredentials.Retain((string?[])[location!.Machine]);
                 if (this.SaveFileRequested is null || await this.SaveFileRequested() is not { } file)
                 {
                     return;
@@ -97,7 +97,7 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
 
     private async Task CompareAsync(RegistryBranchSnapshot before, CancellationToken token)
     {
-        using var connection = RemoteRegistryCredentials.Retain([before.Root.Machine]);
+        using var connection = RemoteRegistryCredentials.Retain((string?[])[before.Root.Machine]);
         token.ThrowIfCancellationRequested();
         if (before.Root.Machine is null && !before.Computer.Equals(
                 Environment.MachineName, StringComparison.OrdinalIgnoreCase))
