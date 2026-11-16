@@ -86,7 +86,7 @@ const features = [
     caption: 'Two registry tabs, retained searches below, and numeric value details beside the list.',
   },
 ];
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <!doctype html>

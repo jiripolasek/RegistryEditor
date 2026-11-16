@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  site: 'https://jiripolasek.github.io',
-  base: '/RegistryEditor',
+  site: process.env.SITE_URL || 'https://jiripolasek.github.io',
+  base: process.env.BASE_PATH || '/RegistryEditor',
 });

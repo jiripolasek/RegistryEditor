@@ -19,7 +19,7 @@ npm test
 npm run preview
 ```
 
-The static output is in `dist/`. `astro.config.mjs` uses the repository's GitHub Pages URL and base path. Change `site` and `base` together if hosting somewhere else. Asset URLs use Astro's base path.
+The static output is in `dist/`. Local builds default to `https://jiripolasek.github.io/RegistryEditor/`. Set `SITE_URL` and `BASE_PATH` to override the site origin and base path together; asset and navigation URLs follow the configured path.
 
 ## Content and design
 
@@ -39,6 +39,12 @@ The static output is in `dist/`. `astro.config.mjs` uses the repository's GitHub
 - Hero motion stays within one sticky introduction, inspired by https://code.visualstudio.com/. The header blends into the centered opening without a divider. Its background is an optimized local copy of the [user-selected WallpaperHub landscape](https://cdn.wallpaperhub.app/cloudcache/f/7/6/b/8/9/f76b8904797759d72d93810eb6b29b8f84e03ce3.jpg), softened with a theme-aware overlay and faded out with the opening surface. A large centered app preview moves and shrinks into the dark text-left, image-right layout, then holds before normal page scrolling resumes. The same image is used throughout. Native CSS view timelines drive the sequence without scroll interception or dependencies; keyboard focus shows the final layout immediately. Small or short viewports, reduced-motion preferences, and browsers without view-timeline support retain the static hero with a more subdued landscape background. Feature sections keep their existing layout and hover feedback.
 - Product and documentation links point to the desktop app's `master` branch.
 
-This setup does not configure deployment or publish the site. Build instructions are linked because the app currently has no installer.
+## Deployment
+
+The workflow in `.github/workflows/pages.yml` follows the [Media Controls website workflow](https://github.com/jiripolasek/MediaControlsExtension/blob/pages/.github/workflows/pages.yml). Pushes to `pages` check, build, and test the site using Node.js 24, upload the static artifact, and deploy it to the `github-pages` environment. The site origin and base path come from GitHub Pages configuration, including root paths for custom domains.
+
+Before the first deployment, select **GitHub Actions** under **Settings > Pages > Build and deployment > Source**. If the `github-pages` environment restricts deployment branches, allow `pages`. See the [Astro GitHub Pages guide](https://docs.astro.build/en/guides/deploy/github/).
+
+Build instructions remain linked because the desktop app currently has no installer.
 
 Licensed under Apache 2.0; see `LICENSE.txt`.
