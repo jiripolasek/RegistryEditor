@@ -99,7 +99,7 @@ try {
 
     Test-Shell 'Application menu exposes global commands' {
         $menu = Open-Menu
-        foreach ($name in @('New tab', 'Close tab', 'Tools', 'Import registry file…', 'Export entire registry…', 'Network registry', 'Open as administrator', 'Settings', 'Keyboard shortcuts', 'Help and about', 'Exit')) {
+        foreach ($name in @('New tab', 'Close tab', 'Tools', 'Import registry file…', 'Export entire registry…', 'Network registry', 'Open as administrator', 'Settings', 'Keyboard shortcuts', 'Help and about', 'Close application')) {
             if ($menu.items.name -notcontains $name) { throw "Missing global command: $name" }
         }
         if (@($menu.items | Where-Object name -in @('Watch this branch', 'Notes for this key', 'Modify…', 'Delete')).Count) { throw 'Application menu contains registry item actions.' }
@@ -178,12 +178,12 @@ try {
         Navigate-Root 'HKCU' 'HKEY_CURRENT_USER'
         Navigate-Root 'HKLM' 'HKEY_LOCAL_MACHINE'
         foreach ($keys in @('ctrl+backspace', 'shift+backspace', 'alt+backspace')) {
-            Invoke-Ui @('send-keys', $keys, '--via', 'send-input', '--target', 'Items') | Out-Null
+            Invoke-Ui @('send-keys', $keys, '--via', 'send-input', '--target', 'EntriesList') | Out-Null
             if (@(Read-Ui | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq 'HKEY_LOCAL_MACHINE' }).Count -ne 1) {
                 throw "$keys navigated history from the list."
             }
         }
-        Invoke-Ui @('send-keys', 'backspace', '--via', 'send-input', '--target', 'Items') | Out-Null
+        Invoke-Ui @('send-keys', 'backspace', '--via', 'send-input', '--target', 'EntriesList') | Out-Null
         Wait-State { param($elements) @($elements | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq 'HKEY_CURRENT_USER' }).Count -eq 1 }
         Navigate-Root 'HKLM' 'HKEY_LOCAL_MACHINE'
         Invoke-Ui @('send-keys', 'ctrl+l', '--via', 'send-input') | Out-Null
