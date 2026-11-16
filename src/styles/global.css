@@ -127,6 +127,7 @@ h3 { font-size: 20px; line-height: 1.35; font-weight: 600; letter-spacing: -.02e
 .text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
 .start-card { padding: 28px; border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(145deg, var(--tint), var(--surface)); transition: border-color .25s; }
 .start-card .button { margin-top: 8px; }
+.start-card .actions { justify-content: flex-start; }
 .getting-started .start-card .safety-note { font-size: 12px; border-top: 1px solid var(--border); padding-top: 18px; margin: 24px 0 0; }
 .creator { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 28px; padding-block: 44px 64px; border-top: 1px solid var(--border); }
 .creator-mark { width: 76px; height: 76px; background: var(--accent); mask: var(--creator-logo) center / contain no-repeat; }
@@ -162,6 +163,7 @@ h3 { font-size: 20px; line-height: 1.35; font-weight: 600; letter-spacing: -.02e
 }
 
 @media (max-width: 900px) {
+  .main-nav a:not(:first-child) { display: none; }
   .hero { padding-block: 40px; }
   .hero-layout { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .hero-copy { max-width: 640px; }
@@ -188,7 +190,6 @@ h3 { font-size: 20px; line-height: 1.35; font-weight: 600; letter-spacing: -.02e
   .brand img { width: 27px; height: 27px; }
   .header-links { gap: 8px; }
   .main-nav { font-size: 13px; }
-  .main-nav a:not(:first-child) { display: none; }
   .hero { padding-block: 32px; }
   .hero-layout { gap: 24px; }
   .hero h1 { font-size: clamp(32px, 9vw, 40px); }

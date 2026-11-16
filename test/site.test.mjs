@@ -29,3 +29,28 @@ test('built page resolves local assets and navigation under the configured site 
     assert.ok(existsSync(resolve('dist', decodeURIComponent(path))), `Missing output: ${link}`);
   }
 });
+
+
+test('social previews use absolute site URLs and the published image dimensions', () => {
+  const meta = new Map([...html.matchAll(/<meta (?:name|property)="([^"]+)" content="([^"]*)"/g)].map((match) => [match[1], match[2]]));
+  const canonical = new URL(base, origin).href;
+  const imageUrl = new URL(`${base}social-preview.png`, origin).href;
+  assert.equal(html.match(/<link rel="canonical" href="([^"]+)"/)?.[1], canonical);
+  assert.equal(meta.get('og:url'), canonical);
+  assert.equal(meta.get('og:type'), 'website');
+  assert.equal(meta.get('og:title'), html.match(/<title>([^<]+)<\/title>/)?.[1]);
+  assert.equal(meta.get('og:description'), meta.get('description'));
+  assert.equal(meta.get('og:image'), imageUrl);
+  assert.equal(meta.get('og:image:type'), 'image/png');
+  assert.equal(meta.get('twitter:card'), 'summary_large_image');
+  assert.equal(meta.get('twitter:title'), meta.get('og:title'));
+  assert.equal(meta.get('twitter:description'), meta.get('description'));
+  assert.equal(meta.get('twitter:image'), imageUrl);
+  assert.ok(meta.get('og:image:alt'));
+  assert.equal(meta.get('twitter:image:alt'), meta.get('og:image:alt'));
+
+  const image = readFileSync(resolve('dist', 'social-preview.png'));
+  assert.equal(image.toString('hex', 0, 8), '89504e470d0a1a0a');
+  assert.equal(Number(meta.get('og:image:width')), image.readUInt32BE(16));
+  assert.equal(Number(meta.get('og:image:height')), image.readUInt32BE(20));
+});

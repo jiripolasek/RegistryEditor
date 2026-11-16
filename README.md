@@ -38,6 +38,7 @@ The static output is in `dist/`. Local builds default to `https://jiripolasek.gi
 - The creator section, local creator mark, theme switching, and two-row footer follow https://mediacontrols.jiripolasek.com/. The creator mark uses the site accent through a CSS mask, and its GitHub link points to Registry Editor. The toggle remembers the choice in `registry-editor-theme`, follows the system until a choice is made, and respects reduced motion.
 - Hero motion stays within one sticky introduction, inspired by https://code.visualstudio.com/. The header blends into the centered opening without a divider. Its background is an optimized local copy of the [user-selected WallpaperHub landscape](https://cdn.wallpaperhub.app/cloudcache/f/7/6/b/8/9/f76b8904797759d72d93810eb6b29b8f84e03ce3.jpg), softened with a theme-aware overlay and faded out with the opening surface. A large centered app preview moves and shrinks into the dark text-left, image-right layout, then holds before normal page scrolling resumes. The same image is used throughout. Native CSS view timelines drive the sequence without scroll interception or dependencies; keyboard focus shows the final layout immediately. Small or short viewports, reduced-motion preferences, and browsers without view-timeline support retain the static hero with a more subdued landscape background. Feature sections keep their existing layout and hover feedback.
 - Product and documentation links point to the desktop app's `master` branch.
+- Open Graph and Twitter/X large-image cards share `public/social-preview.png` (1280 by 640). Canonical and image URLs follow the configured site origin and base path. Keep this image synchronized with the app artwork when updating the social preview.
 
 ## Deployment
 
@@ -45,6 +46,6 @@ The workflow in `.github/workflows/pages.yml` follows the [Media Controls websit
 
 Before the first deployment, select **GitHub Actions** under **Settings > Pages > Build and deployment > Source**. If the `github-pages` environment restricts deployment branches, allow `pages`. See the [Astro GitHub Pages guide](https://docs.astro.build/en/guides/deploy/github/).
 
-Build instructions remain linked because the desktop app currently has no installer.
+Download calls link to the latest GitHub release, which offers x64 and ARM64 installers and portable ZIPs. Source-build instructions remain a secondary option.
 
 Licensed under Apache 2.0; see `LICENSE.txt`.
