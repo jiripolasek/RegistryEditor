@@ -12,6 +12,8 @@ dotnet run --project tests/Regedit.Tests
 
 Open `JPSoftworks.Regedit.slnx` in Visual Studio for the full solution.
 
+GitHub Actions builds the solution in Release for x64 and runs the default unit test suite on pull requests and pushes to `master`. The suite uses a console runner (`dotnet run --project tests/Regedit.Tests`), not `dotnet test`. UI tests and opt-in registry/native integration tests are excluded from CI.
+
 Build self-contained Native AOT releases for x64 and ARM64 with the MSVC Desktop development with C++ tools installed:
 
 ```powershell
