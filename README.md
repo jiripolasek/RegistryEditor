@@ -39,9 +39,11 @@ See the [user guide](docs/user/Guide.md) for workflows and keyboard shortcuts, o
 
 ## Installation
 
-Registry Editor currently runs from a source build. There is no installer or `.reg` file association setup. The app bundles the Windows App SDK runtime and requires the .NET 10 runtime.
+Download the latest [release](https://github.com/jiripolasek/RegistryEditor/releases/latest). Installers and portable ZIPs are available for x64 and ARM64.
 
-See [Development](docs/dev/readme.md) to build and run it locally.
+For the portable version, extract the ZIP and run `regedit2.exe`. Current installers are unsigned.
+
+See [Development](docs/dev/readme.md) to build and run from source.
 
 ## Usage
 
