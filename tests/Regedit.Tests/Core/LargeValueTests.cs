@@ -219,12 +219,16 @@ internal static class LargeValueTests
                 sorted[0].Value!.Name == "ZSortFirst" && sorted[1].Value!.Name == "ASortLast",
                 "Data sorting compares suffixes beyond identical large-value previews");
             await RegistryExport.ExportAsync(service, [location], file);
-            var exported = (await File.ReadAllTextAsync(file)).Replace(",\\\r\n  ", ",");
-            var line = exported.Split("\r\n").Single(text => text.StartsWith("\"Large\"=hex(1):"));
-            var bytes = Convert.FromHexString(line[(line.IndexOf(':') + 1)..].Replace(",", string.Empty));
+            var exported = await File.ReadAllTextAsync(file);
             check(
-                bytes.AsSpan().SequenceEqual(value.Data), "Registry export retains every byte beyond the row preview");
+                exported.Contains("\"Large\"=\"" + contents + "\"\r\n"),
+                "Registry export retains the complete readable string beyond the row preview");
             browser.CancelPending();
+            service.DeleteKey(location);
+            await RegistryService.RunRegAsync("import", file, "/reg:64");
+            check(
+                value.SameData(service.ReadValue(location, value.Name)),
+                "Windows imports the complete large quoted string without truncating its bytes");
         }
         finally
         {
