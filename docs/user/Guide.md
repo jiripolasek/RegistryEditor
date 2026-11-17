@@ -215,7 +215,28 @@ Writes apply immediately to the Windows registry. Deletions and file imports req
 
 When a key name already exists, the rename form keeps the name you typed so you can correct it. If Windows denies a local edit in a standard window, the form identifies the affected key and registry view and offers **Open as administrator**. Windows opens a separate editor at that key and view if you approve elevation. The original window retains your draft. Review the key's permissions if access is still denied.
 
-With Settings or a tool tab active, **Export entire registry…** and **Import registry file…** use the most recently active registry tab's computer and registry view. With no registry tabs they use the local 64-bit view. Import requires a local connection and names the target view in its confirmation.
+With Settings or a tool tab active, **Export entire registry…** and **Import registry file…** use the most recently active registry tab's computer and registry view. With no registry tabs they use the local 64-bit view. Import requires a local connection.
+
+**Import registry file…** opens a separate, resizable preview window. You can also drop one `.reg` file onto the main window to open the same preview, using the current local registry view. Dropping a file does not import it automatically. Drag and drop requires a non-administrator window; use the menu when running as administrator. Edit the source with registry syntax highlighting in WinUIEdit on the left and inspect the read-only preview on the right, with keys above their value instructions. Deleted folders use a maroon folder icon and a Delete label; delete-then-recreate folders use an amber reset label. Ancestor deletions affect their children. Repeated writes and deletions remain in source order; this is a preview of file instructions, not a comparison with the current registry. Selecting a key or value reveals its source line. **Open key in registry** opens a normal registry tab. File errors appear in a collapsible **Problems** list below the editor and as gutter markers. Select a problem or click its marker to jump to that source line. The error count in the status bar or **Alt+D** reopens Problems, including from preview-only mode. Editing updates the list without moving the caret. Import stays disabled until all errors are resolved.
+
+The **View layout** selector beside Import switches between **Editor only**, **Editor and preview**, and **Preview only**. Returning to both restores the split position. Switching views keeps source edits, selection and Undo history.
+
+**File > Settings…** opens **Registry file editor** in Settings. Choose the default view for new preview windows and the editor's font family and size in points. Font changes apply to open editors without resetting their text or Undo history. The initial default view is **Editor and preview**.
+
+Press **Alt** for key hints. **Alt+F** opens File; within it, **O** opens a file, **R** reloads, **S** saves, **A** opens Save as, **T** opens editor settings, and **C** closes the preview. **Alt+1**, **Alt+2**, and **Alt+3** switch to editor, split, and preview. **Ctrl+,** opens editor settings; **Ctrl+W** or **File > Close** closes the preview and offers to save unsaved changes.
+
+The **File** menu contains **Open** (Ctrl+O), **Reload**, **Save** (Ctrl+S), and **Save as** (Ctrl+Shift+S). The toolbar has **Undo** (Ctrl+Z) and **Redo** (Ctrl+Y or Ctrl+Shift+Z) for source edits. Saving preserves its encoding and line endings. If the file changed outside the app, reload it or save your edits to another file. Unsaved edits require a save/discard/cancel decision before opening another file or closing the window. Preview supports files up to 10 MiB, in UTF-16 or UTF-8 with a byte order mark, or Windows ANSI.
+
+Optional header comments appear in a collapsible **About this file** panel above the preview tree:
+
+    ;Title=Registry preview sample
+    ;Description=Preview changes before importing.
+    ;Author=UI fixture
+    ;Requires=ExplorerRestart
+
+Recognized names are case-insensitive and must appear before the first key section. The last Title, Description or Author wins; repeated Requires entries accumulate without duplication. Supported actions are ExplorerRestart, Restart and Logoff. Unknown directives and actions are ignored. These are notes supplied by the file. Successful import repeats its follow-up recommendations, including unsaved changes; it does not perform those actions.
+
+Choose **32-bit** or **64-bit** in the preview's status bar before **Import…**. Import confirms the target and applies the current source, including unsaved edits, without saving the file. It records journal activity, has no automatic revert, and can partially succeed before an error. Opening or editing a preview does not write to the registry.
 
 Export and hive-save operations first write a temporary sibling file and replace the destination after success. Selected-branch export fails on an unreadable key. Whole-registry export skips inaccessible branches, annotates them in the file, and reports the count. A `.reg` backup contains keys and values, not permissions. Use a native hive backup when preserving the security descriptor is necessary. Names containing line breaks cannot be safely represented in `.reg` syntax and require a hive backup.
 

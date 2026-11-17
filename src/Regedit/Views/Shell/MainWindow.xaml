@@ -8,6 +8,8 @@
     Title="Registry Editor">
     <Grid
         x:Name="Shell"
+        AllowDrop="True"
+        Background="Transparent"
         KeyboardAcceleratorPlacementMode="Hidden"
         Loaded="Shell_Loaded"
         SizeChanged="Shell_SizeChanged">

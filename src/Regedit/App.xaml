@@ -111,6 +111,16 @@
             </Style>
             <Thickness x:Key="ListRowPadding">0,3</Thickness>
             <x:Double x:Key="ListRowMinHeight">28</x:Double>
+            <Style
+                x:Key="StatusButtonStyle"
+                BasedOn="{StaticResource SubtleButtonStyle}"
+                TargetType="Button">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="28" />
+                <Setter Property="Padding" Value="8,4" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Style>
             <Style x:Key="TabSurfaceStyle" TargetType="Grid">
                 <Setter Property="Background" Value="{ThemeResource PanelBackgroundBrush}" />
             </Style>

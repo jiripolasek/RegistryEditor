@@ -12,6 +12,7 @@ using JPSoftworks.Regedit.Infrastructure;
 using JPSoftworks.Regedit.Infrastructure.Interop;
 using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.ViewModels.Browser;
+using JPSoftworks.Regedit.ViewModels.Files;
 using JPSoftworks.Regedit.ViewModels.Tools;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -30,16 +31,27 @@ internal sealed partial class ApplicationRegistryViewModel(
     Action<ProcessStartInfo>? startProcess = null,
     Action<string, RegistryLocation>? startStandardAccess = null)
 {
+    internal event Action<string, string, NoticeKind>? Notice;
+
     private readonly Action<ProcessStartInfo> _startProcess = startProcess ?? (info => Process.Start(info));
 
     private readonly Action<string, RegistryLocation> _startStandardAccess
         = startStandardAccess ?? RegistryLaunch.StartStandardAccess;
 
-    internal event Action<string, string, NoticeKind>? Notice;
+    internal Func<string, RegistryView, Task>? OpenFilePreviewAsync { get; set; }
+
+    private bool CanElevate => !isAdministrator;
+
+    private bool CanOpenStandardAccess => isAdministrator;
 
     [RelayCommand]
-    private async Task ImportAsync()
+    private async Task ImportAsync(string? file)
     {
+        if (!window.CanOpenRegistryFile)
+        {
+            return;
+        }
+
         var browser = window.ContextBrowser;
         var location = browser?.Location ?? new RegistryLocation();
         await this.GuardAsync(async () =>
@@ -50,34 +62,66 @@ internal sealed partial class ApplicationRegistryViewModel(
                     "Registry files are imported on this computer. Switch to a local registry tab first.");
             }
 
-            var view = location.View;
-            var file = await dialogs.PickOpenAsync(".reg");
+            file ??= await dialogs.PickOpenAsync(".reg");
             if (file is null)
             {
                 return;
             }
 
-            if (!await dialogs.ConfirmAsync(
-                    "Import registry file?",
-                    $"{file}\n\nThis file can add, replace, or delete keys and values anywhere in this computer's {(view == RegistryView.Registry32 ? "32" : "64")}-bit registry. Only import files you trust. Import is not atomic: changes made before an error cannot be automatically undone.",
-                    "Import"))
+            if (!string.Equals(Path.GetExtension(file), ".reg", StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                throw new InvalidOperationException("Choose a .reg file to preview registry changes.");
             }
 
+            if (this.OpenFilePreviewAsync is { } open)
+            {
+                await open(file, location.View);
+            }
+        });
+    }
+
+    internal RegistryFilePreviewViewModel CreateFilePreview(RegistryView view, IRegistryFileDialogs fileDialogs)
+    {
+        var model = new RegistryFilePreviewViewModel(
+            view, window.RegistryFileLayout, fileDialogs, this.ImportPreviewAsync, logger);
+        model.OpenKeyRequested += location => window.OpenBrowser(location);
+        model.SettingsRequested += () => window.OpenRegistryFileEditorSettingsCommand.Execute(null);
+        return model;
+    }
+
+    internal async Task ImportPreviewAsync(string snapshot, string source, RegistryView view)
+    {
+        var location = new RegistryLocation { View = view };
+        try
+        {
             await Task.Run(() => journal.Journal.RecordActivity(
                 "Import registry file", location,
-                file +
+                source +
                 "\nWindows imports may affect any branch. Previous values are not retained for automatic revert.",
                 () => RegistryService.RunRegAsync(
-                    "import", file, view == RegistryView.Registry32 ? "/reg:32" : "/reg:64").GetAwaiter().GetResult()));
-            if (browser is not null)
-            {
-                await browser.RefreshAfterImportAsync();
-            }
+                        "import", snapshot, view == RegistryView.Registry32 ? "/reg:32" : "/reg:64").GetAwaiter()
+                    .GetResult()));
+        }
+        finally
+        {
+            await this.RefreshAfterImportAsync();
+        }
+    }
 
-            this.Notice?.Invoke("Import complete", Path.GetFileName(file), NoticeKind.Success);
-        });
+    internal async Task RefreshAfterImportAsync()
+    {
+        foreach (var tab in window.Tabs.OfType<BrowserTab>().Where(tab => tab.Browser.Location.Machine is null)
+                     .ToArray())
+        {
+            try
+            {
+                await tab.Browser.RefreshAfterImportAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogFailure(LogLevel.Warning, "Refresh registry after import", ex);
+            }
+        }
     }
 
     [RelayCommand]
@@ -136,10 +180,6 @@ internal sealed partial class ApplicationRegistryViewModel(
             }
         });
     }
-
-    private bool CanElevate => !isAdministrator;
-
-    private bool CanOpenStandardAccess => isAdministrator;
 
     [RelayCommand(CanExecute = nameof(CanOpenStandardAccess))]
     private Task OpenStandardAccessAsync()

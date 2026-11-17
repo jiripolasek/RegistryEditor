@@ -186,6 +186,9 @@ public static class UxTestWindow {
 
     [DllImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
     private static extern int PostMessage(nint window, uint message, nuint key, nint state);
+    public static void CloseWindow(nint window) {
+        if (PostMessage(window, 0x0010, 0, 0) == 0) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+    }
     public static void AltF4(nint window) {
         // Send the Alt+F4 system key to the test HWND without injecting a desktop-wide shortcut.
         if (PostMessage(window, 0x0104, 0x73, 0x203e0001) == 0) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
@@ -276,6 +279,13 @@ function Get-TestActivationPoint {
     $items = Read-Ui
     $add = @($items | Where-Object automationId -eq 'AddButton')[0]
     $minimize = @($items | Where-Object automationId -eq 'Minimize')[0]
+    $titleBar = @($items | Where-Object automationId -eq 'RegFileTitleBar')[0]
+    if ($titleBar -and $minimize) {
+        return @{
+            X = [int][Math]::Min($minimize.x - 24, $titleBar.x + $titleBar.width / 2)
+            Y = [int]($titleBar.y + [Math]::Min($titleBar.height, $minimize.height) / 2)
+        }
+    }
     if (-not $add -or -not $minimize -or $add.x + $add.width -ge $minimize.x) { throw 'The window has no visible title-bar drag area.' }
     @{ X = [int](($add.x + $add.width + $minimize.x) / 2); Y = [int]($minimize.y + $minimize.height / 2) }
 }

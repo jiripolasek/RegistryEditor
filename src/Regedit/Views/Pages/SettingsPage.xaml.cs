@@ -16,6 +16,9 @@ namespace JPSoftworks.Regedit.Views.Pages;
 
 public sealed partial class SettingsPage : Page
 {
+    private int _focusRequest;
+    private (FrameworkElement Target, RoutedEventHandler Handler)? _pendingFocus;
+
     internal SettingsViewModel ViewModel { get; }
 
     internal Button MenuButton => this.PageHeader.MenuButton;
@@ -26,6 +29,7 @@ public sealed partial class SettingsPage : Page
     {
         this.ViewModel = viewModel;
         this.InitializeComponent();
+        this.Unloaded += (_, _) => this.CancelDeferredFocus();
         this.AddShortcutGroup(
             "Tabs and navigation", ("Open the application menu", "Alt+F"), ("Open Settings", "Ctrl+,"),
             ("Open Keyboard shortcuts", "Ctrl+/"), ("Open Help and about", "F1"), ("New tab", "Ctrl+T"),
@@ -53,12 +57,16 @@ public sealed partial class SettingsPage : Page
             ("Add or remove the selected key or current location in Favorites", "Ctrl+D"),
             ("Save the current note in Notes", "Ctrl+S"));
         this.AddShortcutGroup(
+            "Registry file editor", ("Open the File menu", "Alt+F"), ("Open / save a registry file", "Ctrl+O / Ctrl+S"),
+            ("Save as", "Ctrl+Shift+S"), ("Editor / split / preview", "Alt+1 / Alt+2 / Alt+3"),
+            ("Open editor settings", "Ctrl+,"), ("Close the preview window", "Ctrl+W / Alt+F4"));
+        this.AddShortcutGroup(
             "Mouse actions", ("Back / forward", "Mouse Back / Forward buttons"),
             ("Open a location in a background tab", "Middle-click the location"),
             ("Close a tab", "Middle-click the tab"));
     }
 
-    private async void DataFontExpander_Expanded(object? sender, EventArgs args)
+    private async void FontExpander_Expanded(object? sender, EventArgs args)
     {
         await this.ViewModel.LoadFontFamiliesAsync(SystemFonts.GetFontFamilies);
     }
@@ -103,16 +111,50 @@ public sealed partial class SettingsPage : Page
         }
     }
 
+    private void CancelDeferredFocus()
+    {
+        this._focusRequest++;
+        if (this._pendingFocus is { } pending)
+        {
+            pending.Target.Loaded -= pending.Handler;
+            this._pendingFocus = null;
+        }
+    }
+
     internal void ShowShortcuts(bool show, Control? focusTarget = null)
     {
+        this.CancelDeferredFocus();
+        var request = this._focusRequest;
         this.SettingsScroll.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
         this.ShortcutsScroll.Visibility
             = this.ShortcutsBackButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         this.PageHeader.Title = show ? "Keyboard shortcuts" : "Settings";
         var target = focusTarget ?? (show ? (Control)this.ShortcutsBackButton : this.ThemeSelector);
+        if (!target.IsLoaded)
+        {
+            this._pendingFocus = (target, Target_Loaded);
+            target.Loaded += Target_Loaded;
+            return;
+        }
+
+        void Target_Loaded(object sender, RoutedEventArgs args)
+        {
+            target.Loaded -= Target_Loaded;
+            if (request == this._focusRequest)
+            {
+                this._pendingFocus = null;
+                this.ShowShortcuts(show, target);
+            }
+        }
+
         this.DispatcherQueue.TryEnqueue(
             Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             {
+                if (request != this._focusRequest || !this.IsLoaded)
+                {
+                    return;
+                }
+
                 var scroll = show ? this.ShortcutsScroll : this.SettingsScroll;
                 scroll.UpdateLayout();
                 scroll.ChangeView(
@@ -147,6 +189,12 @@ public sealed partial class SettingsPage : Page
         this.ShowShortcuts(false, this.ListSpacingSlider);
     }
 
+    internal void ShowRegistryFileEditor()
+    {
+        this.RegistryFileEditorExpander.IsExpanded = true;
+        this.ShowShortcuts(false, this.EditorLayoutSelector);
+    }
+
     private void ShortcutsBack_Click(object sender, RoutedEventArgs args)
     {
         this.ShowShortcuts(false, this.KeyboardShortcutsButton);
@@ -154,22 +202,34 @@ public sealed partial class SettingsPage : Page
 
     private void FontFamily_Changed(object sender, SelectionChangedEventArgs args)
     {
-        if (sender is ComboBox { SelectedItem: string family })
+        if (sender is ComboBox { SelectedItem: string family } selector)
         {
-            this.ViewModel.DataFontFamily = family;
+            this.SetFontFamily(selector, family);
         }
     }
 
     private void FontFamily_Submitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
     {
         args.Handled = true;
-        this.ViewModel.DataFontFamily = args.Text;
+        this.SetFontFamily(sender, args.Text);
     }
 
     private void FontFamily_LostFocus(object sender, RoutedEventArgs args)
     {
         var selector = (ComboBox)sender;
-        this.ViewModel.DataFontFamily = selector.Text;
+        this.SetFontFamily(selector, selector.Text);
+    }
+
+    private void SetFontFamily(ComboBox selector, string family)
+    {
+        if (selector == this.EditorFontSelector)
+        {
+            this.ViewModel.EditorFontFamily = family;
+        }
+        else
+        {
+            this.ViewModel.DataFontFamily = family;
+        }
     }
 
     internal void RevealSaveError()

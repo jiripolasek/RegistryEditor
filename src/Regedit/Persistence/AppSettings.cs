@@ -80,6 +80,13 @@ public sealed partial class AppSettings
 
     public RegistryFont? DataFont { get; set; }
 
+    internal static RegistryFont DefaultEditorFont { get; } = new(
+        OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) ? "Cascadia Code" : "Consolas", 11);
+
+    public RegistryFont EditorFont { get; set; } = DefaultEditorFont;
+
+    public RegistryFileLayout RegistryFileLayout { get; set; } = RegistryFileLayout.Split;
+
     public bool ShowListToolbar { get; set; } = true;
 
     /// <summary>Places the bottom panel tab strip below its content instead of above it.</summary>
@@ -197,6 +204,13 @@ public sealed partial class AppSettings
                                 !string.IsNullOrWhiteSpace(font.Family)
                 ? font with { Family = font.Family.Trim() }
                 : null;
+            settings.EditorFont = saved.EditorFont is { Family: { Length: > 0 }, Size: >= 8 and <= 32 } editorFont &&
+                                  !string.IsNullOrWhiteSpace(editorFont.Family)
+                ? editorFont with { Family = editorFont.Family.Trim() }
+                : DefaultEditorFont;
+            settings.RegistryFileLayout = Enum.IsDefined(saved.RegistryFileLayout)
+                ? saved.RegistryFileLayout
+                : RegistryFileLayout.Split;
             settings.ShowListToolbar = saved.ShowListToolbar;
             settings.PanelTabsAtBottom = saved.PanelTabsAtBottom;
             settings.ToolbarButtons = saved.ToolbarButtons & ToolbarButtons.All;
@@ -271,7 +285,7 @@ public sealed partial class AppSettings
             this.ShowParentKeyInList, this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar,
             this.ListColumns, this.ListRowPadding, this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts,
             this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton,
-            this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl);
+            this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout, this.EditorFont);
         try
         {
             change(this);
@@ -302,6 +316,19 @@ public sealed partial class AppSettings
                 this.DataFont = dataFont with { Family = dataFont.Family.Trim() };
             }
 
+            if (!Enum.IsDefined(this.RegistryFileLayout))
+            {
+                throw new ArgumentException("Choose an editor layout.");
+            }
+
+            if (this.EditorFont is not { } editorFont || string.IsNullOrWhiteSpace(editorFont.Family) ||
+                !double.IsFinite(editorFont.Size) || editorFont.Size is < 8 or > 32)
+            {
+                throw new ArgumentException("Enter an editor font family and a size between 8 and 32 points.");
+            }
+
+            this.EditorFont = editorFont with { Family = editorFont.Family.Trim() };
+
             if (!double.IsFinite(this.ListRowPadding) || this.ListRowPadding is < 0 or > 10)
             {
                 throw new ArgumentException("Choose list spacing between 0 and 10.");
@@ -322,7 +349,8 @@ public sealed partial class AppSettings
                 this.ShowParentKeyInList, this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar,
                 this.ListColumns, this.ListRowPadding, this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts,
                 this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton,
-                this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl) = previous;
+                this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
+                this.EditorFont) = previous;
             throw;
         }
     }
@@ -365,5 +393,7 @@ public sealed partial class AppSettings
         bool AlwaysShowAddressAsText = false,
         string Backdrop = "Mica",
         string[]? HiddenJumpListFavorites = null,
-        string? WebSearchUrl = null);
+        string? WebSearchUrl = null,
+        RegistryFileLayout RegistryFileLayout = RegistryFileLayout.Split,
+        RegistryFont? EditorFont = null);
 }

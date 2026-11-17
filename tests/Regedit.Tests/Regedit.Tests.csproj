@@ -13,6 +13,7 @@
     <PackageReference Include="Serilog.Extensions.Logging" />
     <PackageReference Include="Serilog.Sinks.File" />
     <Compile Include="..\..\src\Regedit\Dialogs\IFavoriteDialogs.cs" Link="Dialogs\IFavoriteDialogs.cs" />
+    <Compile Include="..\..\src\Regedit\Dialogs\IRegistryFileDialogs.cs" Link="Dialogs\IRegistryFileDialogs.cs" />
     <Compile Include="..\..\src\Regedit\Dialogs\IRegistryBranchDialogs.cs" Link="Dialogs\IRegistryBranchDialogs.cs" />
     <Compile Include="..\..\src\Regedit\Infrastructure\AppLogging.cs" Link="Infrastructure\AppLogging.cs" />
     <Compile Include="..\..\src\Regedit\Infrastructure\AppServices.cs" Link="Infrastructure\AppServices.cs" />

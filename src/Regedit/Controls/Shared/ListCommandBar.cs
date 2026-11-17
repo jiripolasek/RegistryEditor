@@ -18,26 +18,17 @@ public sealed partial class ListCommandBar : CommandBar
         nameof(TrailingContent), typeof(UIElement), typeof(ListCommandBar),
         new PropertyMetadata(null, (owner, _) => ((ListCommandBar)owner).UpdateTrailingContent()));
 
-    private ContentPresenter? _trailing;
+    private readonly List<(ToolCommand Command, ButtonBase Button, PropertyChangedEventHandler Handler)> _generated = [];
+
     private bool _toolToolbar;
 
-    internal void UseToolToolbarLayout()
-    {
-        this._toolToolbar = true;
-        this.Resources["AppBarThemeCompactHeight"] = 32d;
-        this.Resources["AppBarThemeMinHeight"] = 32d;
-        this.Resources["AppBarButtonInnerBorderMargin"] = new Thickness(2, 0, 2, 0);
-        this.Resources["AppBarButtonContentViewboxMargin"] = new Thickness(8, 6, 0, 6);
-    }
+    private ContentPresenter? _trailing;
 
     public UIElement? TrailingContent
     {
         get => (UIElement?)this.GetValue(TrailingContentProperty);
         set => this.SetValue(TrailingContentProperty, value);
     }
-
-    private readonly List<(ToolCommand Command, ButtonBase Button, PropertyChangedEventHandler Handler)>
-        _generated = [];
 
     public ListCommandBar()
     {
@@ -54,6 +45,15 @@ public sealed partial class ListCommandBar : CommandBar
         this.RegisterPropertyChangedCallback(IsOpenProperty, (_, _) => this.PositionOverflow());
         this.Loaded += (_, _) => this.UpdateCommands();
         this.Unloaded += (_, _) => this.IsOpen = false;
+    }
+
+    internal void UseToolToolbarLayout()
+    {
+        this._toolToolbar = true;
+        this.Resources["AppBarThemeCompactHeight"] = 32d;
+        this.Resources["AppBarThemeMinHeight"] = 32d;
+        this.Resources["AppBarButtonInnerBorderMargin"] = new Thickness(2, 0, 2, 0);
+        this.Resources["AppBarButtonContentViewboxMargin"] = new Thickness(8, 6, 0, 6);
     }
 
     /// <summary>
@@ -256,6 +256,15 @@ public sealed partial class ListCommandBar : CommandBar
         }
 
         labelMargin.KeyFrames[0].Value = this._toolToolbar ? new Thickness(8, 0, 8, 0) : new Thickness(8, 10, 12, 10);
+        var chevronMargin = labelState?.Storyboard?.Children.OfType<ObjectAnimationUsingKeyFrames>()
+            .FirstOrDefault(animation => Storyboard.GetTargetName(animation) == "SubItemChevron" &&
+                                         Storyboard.GetTargetProperty(animation) == "Margin");
+        if (chevronMargin is { KeyFrames.Count: > 0 } && root.FindName("SubItemChevron") is FrameworkElement chevron)
+        {
+            chevronMargin.KeyFrames[0].Value = new Thickness(-7, 0, 12, 0);
+            chevron.VerticalAlignment = VerticalAlignment.Center;
+        }
+
         if (this._toolToolbar)
         {
             if (root.FindName("TextLabel") is FrameworkElement label)

@@ -24,7 +24,7 @@
                 Text="{x:Bind ViewModel.Summary}"
                 TextWrapping="Wrap" />
         </StackPanel>
-        <!-- Bound the auto row's toolbar height to avoid a WinUI dynamic-overflow measure loop. -->
+        <!--  Bound the auto row's toolbar height to avoid a WinUI dynamic-overflow measure loop.  -->
         <local:ListCommandBar
             Grid.Row="1"
             Height="36"

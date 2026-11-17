@@ -70,12 +70,14 @@ public sealed partial class ToolView
                         var changes = this.ResultActions.Differences(entry);
                         var conflict = this.JournalHistory.BlockingEdit(entry);
                         var views = entry.Before.Select(state => state.Scope.Location)
-                            .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : []).Select(location =>
-                                location.View == RegistryView.Registry32 ? "32-bit" : "64-bit").Distinct();
+                            .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : [])
+                            .Select(location => location.View == RegistryView.Registry32 ? "32-bit" : "64-bit")
+                            .Distinct();
                         this.Details.Show(
                             entry.Operation, entry.Path, $"{row.Status}\n{string.Join(", ", views)}",
                             entry.Activity is not null
-                                ? (ToolComparison[])[new ToolComparison("Activity", entry.Activity, string.Empty, "Details")]
+                                ? (ToolComparison[])
+                                [new ToolComparison("Activity", entry.Activity, string.Empty, "Details")]
                                 : changes.Take(30).Select(change =>
                                     changes.Count == 1
                                         ? ToolPresentation.Compare(change) with { Name = string.Empty }
@@ -88,7 +90,8 @@ public sealed partial class ToolView
                         this.Details.Show(
                             observation.Change.Change, observation.Change.Location.Address,
                             observation.Change.Location.View == RegistryView.Registry32 ? "32-bit" : "64-bit",
-                            (ToolComparison[])[ToolPresentation.Compare(observation.Change) with { Name = string.Empty }],
+                            (ToolComparison[])
+                            [ToolPresentation.Compare(observation.Change) with { Name = string.Empty }],
                             timestamp: observation.Time);
                         break;
                 }

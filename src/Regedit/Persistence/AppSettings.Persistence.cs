@@ -18,19 +18,12 @@ namespace JPSoftworks.Regedit.Persistence;
 
 public sealed partial class AppSettings
 {
-    private sealed record SavedWindowSession(string Id, SavedTab[] Tabs, WindowLayout? Layout = null);
-
-    [JsonSourceGenerationOptions(WriteIndented = true, IgnoreReadOnlyProperties = true)]
-    [JsonSerializable(typeof(SavedSettings))]
-    [JsonSerializable(typeof(string[]))]
-    private sealed partial class SettingsJsonContext : JsonSerializerContext;
-
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
-    private SavedWindowSession[] _sessions = [];
-    private HashSet<string> _restoredSessionIds = [];
-    private WindowLayout? _windowLayout;
     private JsonObject _baseline;
     private string? _loadedContent;
+    private HashSet<string> _restoredSessionIds = [];
+    private SavedWindowSession[] _sessions = [];
+    private WindowLayout? _windowLayout;
 
     private JsonObject Capture()
     {
@@ -44,8 +37,8 @@ public sealed partial class AppSettings
                 this.ToolbarButtons, this.PanelTabsAtBottom,
                 new Dictionary<string, ColumnLayout>(this.ColumnLayouts, StringComparer.Ordinal), this.ShowBackButton,
                 this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText,
-                this.Backdrop, this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl),
-            SettingsJsonContext.Default.SavedSettings)!.AsObject();
+                this.Backdrop, this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl, this.RegistryFileLayout,
+                this.EditorFont), SettingsJsonContext.Default.SavedSettings)!.AsObject();
     }
 
     private static string ReadSettingsFile(string filePath)
@@ -420,4 +413,11 @@ public sealed partial class AppSettings
             workspace.Validate();
         }
     }
+
+    private sealed record SavedWindowSession(string Id, SavedTab[] Tabs, WindowLayout? Layout = null);
+
+    [JsonSourceGenerationOptions(WriteIndented = true, IgnoreReadOnlyProperties = true)]
+    [JsonSerializable(typeof(SavedSettings))]
+    [JsonSerializable(typeof(string[]))]
+    private sealed partial class SettingsJsonContext : JsonSerializerContext;
 }

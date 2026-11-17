@@ -12,16 +12,10 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed partial class JournalSurfaceViewModel : ObservableObject
 {
-    private readonly JournalViewModel _history;
-    private readonly Func<RegistryLocation?> _currentLocation;
+    internal event Action<JournalEntry>? EntryRequested;
 
-    internal JournalSurfaceViewModel(JournalViewModel history, Func<RegistryLocation?> currentLocation)
-    {
-        this._history = history;
-        this._currentLocation = currentLocation;
-        this.ArchiveFilter = this.ArchiveChoices[0];
-        this.OperationFilter = this.OperationChoices[0];
-    }
+    private readonly Func<RegistryLocation?> _currentLocation;
+    private readonly JournalViewModel _history;
 
     internal JournalArchiveChoice[] ArchiveChoices { get; } =
     [
@@ -73,17 +67,25 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
 
     internal string BranchScopeLabel => "Branch: " + ToolPresentation.Address(this._currentLocation());
 
-    internal void RefreshScope()
-    {
-        this.OnPropertyChanged(nameof(this.BranchScopeLabel));
-    }
-
-    internal event Action<JournalEntry>? EntryRequested;
-
     internal IEnumerable<JournalEntry> VisibleEntries => this._history.Entries.Reverse().Where(this.Includes);
 
     internal IEnumerable<InvestigationRow> VisibleRows =>
         this.VisibleEntries.Select(entry => InvestigationRow.Journal(entry, this.Status(entry)));
+
+    private bool CanToggleArchive => this.SelectedEntry is { } entry && this._history.FindEntry(entry.Id) is not null;
+
+    internal JournalSurfaceViewModel(JournalViewModel history, Func<RegistryLocation?> currentLocation)
+    {
+        this._history = history;
+        this._currentLocation = currentLocation;
+        this.ArchiveFilter = this.ArchiveChoices[0];
+        this.OperationFilter = this.OperationChoices[0];
+    }
+
+    internal void RefreshScope()
+    {
+        this.OnPropertyChanged(nameof(this.BranchScopeLabel));
+    }
 
     /// <summary>Describes which history is shown: its owner, scope and any non-default filters.</summary>
     internal string Context(bool administratorOnly)
@@ -123,13 +125,15 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
         if (this.ScopeIndex == 1)
         {
             if (this._currentLocation() is not { } scope || !entry.Before.Select(state => state.Scope.Location)
-                    .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : []).Any(location =>
-                        location.View == scope.View &&
-                        string.Equals(location.Machine, scope.Machine, StringComparison.OrdinalIgnoreCase) &&
-                        (scope.IsComputer || location.Hive == scope.Hive &&
-                            (location.SubKey.Equals(scope.SubKey, StringComparison.OrdinalIgnoreCase) ||
-                             location.SubKey.StartsWith(scope.SubKey + "\\", StringComparison.OrdinalIgnoreCase) ||
-                             scope.SubKey.Length == 0))))
+                    .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : [])
+                    .Any(location => location.View == scope.View &&
+                                     string.Equals(
+                                         location.Machine, scope.Machine, StringComparison.OrdinalIgnoreCase) &&
+                                     (scope.IsComputer || location.Hive == scope.Hive &&
+                                         (location.SubKey.Equals(scope.SubKey, StringComparison.OrdinalIgnoreCase) ||
+                                          location.SubKey.StartsWith(
+                                              scope.SubKey + "\\", StringComparison.OrdinalIgnoreCase) ||
+                                          scope.SubKey.Length == 0))))
             {
                 return false;
             }
@@ -210,8 +214,6 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
                     this.NavigateCommand));
         }
     }
-
-    private bool CanToggleArchive => this.SelectedEntry is { } entry && this._history.FindEntry(entry.Id) is not null;
 
     [RelayCommand(CanExecute = nameof(CanToggleArchive))]
     private Task ToggleArchiveAsync(CancellationToken token)

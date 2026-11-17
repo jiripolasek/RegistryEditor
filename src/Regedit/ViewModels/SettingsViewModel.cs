@@ -18,11 +18,11 @@ namespace JPSoftworks.Regedit.ViewModels;
 internal sealed partial class SettingsViewModel(AppSettings settings, Action<Action<AppSettings>> save)
     : ObservableObject
 {
-    private bool _defaultDataFontRequested;
-
     internal event Action<string>? PreferenceSaved;
 
     internal event Action<Exception>? SaveFailed;
+
+    private bool _defaultDataFontRequested;
 
     [ObservableProperty]
     public partial string? SaveError { get; private set; }
@@ -50,6 +50,180 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
 
     public RegistryFont DataFont =>
         settings.DataFont ?? new RegistryFont(this.DefaultDataFontFamily, settings.FontSize);
+
+    public int ThemeIndex
+    {
+        get => settings.Theme switch { "Light" => 1, "Dark" => 2, _ => 0 };
+        set
+        {
+            if (value is >= 0 and <= 2)
+            {
+                this.Update(
+                    this.ThemeIndex, value, s => s.Theme = value switch { 1 => "Light", 2 => "Dark", _ => "Default" });
+            }
+        }
+    }
+
+    public int BackdropIndex
+    {
+        get => settings.Backdrop == "Acrylic" ? 1 : 0;
+        set
+        {
+            if (value is 0 or 1)
+            {
+                this.Update(this.BackdropIndex, value, s => s.Backdrop = value == 1 ? "Acrylic" : "Mica");
+            }
+        }
+    }
+
+    public bool UseCustomDataFont
+    {
+        get => settings.DataFont is not null;
+        set => this.Update(this.UseCustomDataFont, value, s => s.DataFont = value ? this.DataFont : null);
+    }
+
+    public string WebSearchUrl
+    {
+        get => settings.WebSearchUrl;
+        set => this.Update(this.WebSearchUrl, value, s => s.WebSearchUrl = value);
+    }
+
+    public string DataFontFamily
+    {
+        get => this.DataFont.Family;
+        set
+        {
+            if (settings.DataFont is { } font)
+            {
+                this.Update(this.DataFontFamily, value, s => s.DataFont = font with { Family = value });
+            }
+        }
+    }
+
+    public double DataFontSize
+    {
+        get => this.DataFont.Size;
+        set
+        {
+            if (settings.DataFont is { } font)
+            {
+                this.Update(this.DataFontSize, value, s => s.DataFont = font with { Size = value });
+            }
+        }
+    }
+
+    public int EditorLayoutIndex
+    {
+        get => (int)settings.RegistryFileLayout;
+        set
+        {
+            if (value is >= 0 and <= 2)
+            {
+                this.Update(this.EditorLayoutIndex, value, s => s.RegistryFileLayout = (RegistryFileLayout)value);
+            }
+        }
+    }
+
+    public string EditorFontFamily
+    {
+        get => settings.EditorFont.Family;
+        set => this.Update(this.EditorFontFamily, value, s => s.EditorFont = s.EditorFont with { Family = value });
+    }
+
+    public double EditorFontSize
+    {
+        get => settings.EditorFont.Size;
+        set => this.Update(this.EditorFontSize, value, s => s.EditorFont = s.EditorFont with { Size = value });
+    }
+
+    public bool ShowListToolbar
+    {
+        get => settings.ShowListToolbar;
+        set => this.Update(this.ShowListToolbar, value, s => s.ShowListToolbar = value);
+    }
+
+    public bool ShowBackButton
+    {
+        get => settings.ShowBackButton;
+        set => this.Update(this.ShowBackButton, value, s => s.ShowBackButton = value);
+    }
+
+    public bool ShowForwardButton
+    {
+        get => settings.ShowForwardButton;
+        set => this.Update(this.ShowForwardButton, value, s => s.ShowForwardButton = value);
+    }
+
+    public bool ShowUpButton
+    {
+        get => settings.ShowUpButton;
+        set => this.Update(this.ShowUpButton, value, s => s.ShowUpButton = value);
+    }
+
+    public bool ShowRefreshButton
+    {
+        get => settings.ShowRefreshButton;
+        set => this.Update(this.ShowRefreshButton, value, s => s.ShowRefreshButton = value);
+    }
+
+    public ToolbarButtons ToolbarButtons => settings.ToolbarButtons;
+
+    public bool PanelTabsAtBottom
+    {
+        get => settings.PanelTabsAtBottom;
+        set => this.Update(this.PanelTabsAtBottom, value, s => s.PanelTabsAtBottom = value);
+    }
+
+    public double ListRowPadding
+    {
+        get => settings.ListRowPadding;
+        set
+        {
+            if (double.IsFinite(value))
+            {
+                var padding = Math.Clamp(Math.Round(value), 0, 10);
+                this.Update(this.ListRowPadding, padding, s => s.ListRowPadding = padding);
+            }
+        }
+    }
+
+    public IReadOnlyList<RegistrySortColumn> ListColumns => settings.ListColumns;
+
+    public bool ShowStatusBar
+    {
+        get => settings.ShowStatusBar;
+        set => this.Update(this.ShowStatusBar, value, s => s.ShowStatusBar = value);
+    }
+
+    public bool AlwaysShowAddressAsText
+    {
+        get => settings.AlwaysShowAddressAsText;
+        set => this.Update(this.AlwaysShowAddressAsText, value, s => s.AlwaysShowAddressAsText = value);
+    }
+
+    public bool ShowKeysInList
+    {
+        get => settings.ShowKeysInList;
+        set => this.Update(this.ShowKeysInList, value, s => s.ShowKeysInList = value);
+    }
+
+    public bool ShowParentKeyInList
+    {
+        get => settings.ShowParentKeyInList;
+        set => this.Update(this.ShowParentKeyInList, value, s => s.ShowParentKeyInList = value);
+    }
+
+    public bool ShowValuePreview
+    {
+        get => settings.ShowValuePreview;
+        set => this.Update(this.ShowValuePreview, value, s => s.ShowValuePreview = value);
+    }
+
+    public bool AutoSyncTree
+    {
+        get => settings.AutoSyncTree;
+        set => this.Update(this.AutoSyncTree, value, s => s.AutoSyncTree = value);
+    }
 
     partial void OnDefaultDataFontFamilyChanged(string value)
     {
@@ -122,109 +296,10 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
         }
     }
 
-    public int ThemeIndex
-    {
-        get => settings.Theme switch { "Light" => 1, "Dark" => 2, _ => 0 };
-        set
-        {
-            if (value is >= 0 and <= 2)
-            {
-                this.Update(
-                    this.ThemeIndex, value, s => s.Theme = value switch { 1 => "Light", 2 => "Dark", _ => "Default" });
-            }
-        }
-    }
-
-    public int BackdropIndex
-    {
-        get => settings.Backdrop == "Acrylic" ? 1 : 0;
-        set
-        {
-            if (value is 0 or 1)
-            {
-                this.Update(this.BackdropIndex, value, s => s.Backdrop = value == 1 ? "Acrylic" : "Mica");
-            }
-        }
-    }
-
-    public bool UseCustomDataFont
-    {
-        get => settings.DataFont is not null;
-        set => this.Update(this.UseCustomDataFont, value, s => s.DataFont = value ? this.DataFont : null);
-    }
-
-    public string WebSearchUrl
-    {
-        get => settings.WebSearchUrl;
-        set => this.Update(this.WebSearchUrl, value, s => s.WebSearchUrl = value);
-    }
-
     [RelayCommand]
     private void SetWebSearchUrl(string url)
     {
         this.WebSearchUrl = url;
-    }
-
-    public string DataFontFamily
-    {
-        get => this.DataFont.Family;
-        set
-        {
-            if (settings.DataFont is { } font)
-            {
-                this.Update(this.DataFontFamily, value, s => s.DataFont = font with { Family = value });
-            }
-        }
-    }
-
-    public double DataFontSize
-    {
-        get => this.DataFont.Size;
-        set
-        {
-            if (settings.DataFont is { } font)
-            {
-                this.Update(this.DataFontSize, value, s => s.DataFont = font with { Size = value });
-            }
-        }
-    }
-
-    public bool ShowListToolbar
-    {
-        get => settings.ShowListToolbar;
-        set => this.Update(this.ShowListToolbar, value, s => s.ShowListToolbar = value);
-    }
-
-    public bool ShowBackButton
-    {
-        get => settings.ShowBackButton;
-        set => this.Update(this.ShowBackButton, value, s => s.ShowBackButton = value);
-    }
-
-    public bool ShowForwardButton
-    {
-        get => settings.ShowForwardButton;
-        set => this.Update(this.ShowForwardButton, value, s => s.ShowForwardButton = value);
-    }
-
-    public bool ShowUpButton
-    {
-        get => settings.ShowUpButton;
-        set => this.Update(this.ShowUpButton, value, s => s.ShowUpButton = value);
-    }
-
-    public bool ShowRefreshButton
-    {
-        get => settings.ShowRefreshButton;
-        set => this.Update(this.ShowRefreshButton, value, s => s.ShowRefreshButton = value);
-    }
-
-    public ToolbarButtons ToolbarButtons => settings.ToolbarButtons;
-
-    public bool PanelTabsAtBottom
-    {
-        get => settings.PanelTabsAtBottom;
-        set => this.Update(this.PanelTabsAtBottom, value, s => s.PanelTabsAtBottom = value);
     }
 
     [RelayCommand]
@@ -242,21 +317,6 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
             this.ToolbarButtons, this.ToolbarButtons & ~button, s => s.ToolbarButtons &= ~button,
             nameof(this.ToolbarButtons));
     }
-
-    public double ListRowPadding
-    {
-        get => settings.ListRowPadding;
-        set
-        {
-            if (double.IsFinite(value))
-            {
-                var padding = Math.Clamp(Math.Round(value), 0, 10);
-                this.Update(this.ListRowPadding, padding, s => s.ListRowPadding = padding);
-            }
-        }
-    }
-
-    public IReadOnlyList<RegistrySortColumn> ListColumns => settings.ListColumns;
 
     /// <summary>The saved column layout for a list, or null to use the list's defaults.</summary>
     internal ColumnLayout? ColumnLayout(string listId)
@@ -338,42 +398,6 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
     private void SaveColumns(RegistrySortColumn[] columns)
     {
         this.Update(settings.ListColumns, columns, s => s.ListColumns = columns, nameof(this.ListColumns));
-    }
-
-    public bool ShowStatusBar
-    {
-        get => settings.ShowStatusBar;
-        set => this.Update(this.ShowStatusBar, value, s => s.ShowStatusBar = value);
-    }
-
-    public bool AlwaysShowAddressAsText
-    {
-        get => settings.AlwaysShowAddressAsText;
-        set => this.Update(this.AlwaysShowAddressAsText, value, s => s.AlwaysShowAddressAsText = value);
-    }
-
-    public bool ShowKeysInList
-    {
-        get => settings.ShowKeysInList;
-        set => this.Update(this.ShowKeysInList, value, s => s.ShowKeysInList = value);
-    }
-
-    public bool ShowParentKeyInList
-    {
-        get => settings.ShowParentKeyInList;
-        set => this.Update(this.ShowParentKeyInList, value, s => s.ShowParentKeyInList = value);
-    }
-
-    public bool ShowValuePreview
-    {
-        get => settings.ShowValuePreview;
-        set => this.Update(this.ShowValuePreview, value, s => s.ShowValuePreview = value);
-    }
-
-    public bool AutoSyncTree
-    {
-        get => settings.AutoSyncTree;
-        set => this.Update(this.AutoSyncTree, value, s => s.AutoSyncTree = value);
     }
 
     private void Update<T>(T current, T value, Action<AppSettings> change, [CallerMemberName] string property = "")

@@ -1,4 +1,4 @@
-﻿<Page
+<Page
     x:Class="JPSoftworks.Regedit.Views.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -236,7 +236,7 @@
                     <toolkit:SettingsExpander
                         x:Name="DataFontExpander"
                         Description="Choose the typeface and size for value contents in the registry list."
-                        Expanded="DataFontExpander_Expanded"
+                        Expanded="FontExpander_Expanded"
                         Header="Data column font">
                         <toolkit:SettingsExpander.HeaderIcon>
                             <FontIcon Glyph="&#xE8D2;" />
@@ -415,6 +415,70 @@
                                     KeyDown="WebSearchUrl_KeyDown"
                                     LostFocus="WebSearchUrl_LostFocus"
                                     Text="{x:Bind ViewModel.WebSearchUrl, Mode=OneWay}" />
+                            </toolkit:SettingsCard>
+                        </toolkit:SettingsExpander.Items>
+                    </toolkit:SettingsExpander>
+                    <TextBlock
+                        Margin="0,24,0,8"
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="Registry file editor" />
+                    <toolkit:SettingsExpander
+                        x:Name="RegistryFileEditorExpander"
+                        Description="Configure the source editor and the initial view of registry files."
+                        Expanded="FontExpander_Expanded"
+                        Header="Registry file editor">
+                        <toolkit:SettingsExpander.HeaderIcon>
+                            <FontIcon Glyph="&#xE70F;" />
+                        </toolkit:SettingsExpander.HeaderIcon>
+                        <toolkit:SettingsExpander.Items>
+                            <toolkit:SettingsCard Description="Used when opening a new registry file preview." Header="Default view">
+                                <ComboBox
+                                    x:Name="EditorLayoutSelector"
+                                    Width="240"
+                                    AutomationProperties.AutomationId="EditorLayoutSelector"
+                                    AutomationProperties.Name="Default registry file view"
+                                    SelectedIndex="{x:Bind ViewModel.EditorLayoutIndex, Mode=TwoWay}">
+                                    <ComboBoxItem Content="Editor only" />
+                                    <ComboBoxItem Content="Editor and preview" />
+                                    <ComboBoxItem Content="Preview only" />
+                                </ComboBox>
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Description="{x:Bind ViewModel.FontFamiliesError, Mode=OneWay}" Header="Font family">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ProgressRing
+                                        Width="16"
+                                        Height="16"
+                                        MinWidth="0"
+                                        MinHeight="0"
+                                        AutomationProperties.Name="Loading installed fonts"
+                                        IsActive="{x:Bind ViewModel.IsLoadingFontFamilies, Mode=OneWay}"
+                                        Visibility="{x:Bind ViewModel.IsLoadingFontFamilies, Mode=OneWay}" />
+                                    <ComboBox
+                                        x:Name="EditorFontSelector"
+                                        Width="240"
+                                        AutomationProperties.AutomationId="EditorFontSelector"
+                                        AutomationProperties.Name="Editor font family"
+                                        IsEditable="True"
+                                        ItemsSource="{x:Bind ViewModel.FontFamilies, Mode=OneWay}"
+                                        LostFocus="FontFamily_LostFocus"
+                                        SelectionChanged="FontFamily_Changed"
+                                        Text="{x:Bind ViewModel.EditorFontFamily, Mode=OneWay}"
+                                        TextSubmitted="FontFamily_Submitted" />
+                                </StackPanel>
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard Description="Size in points. Font changes apply to open editors." Header="Font size">
+                                <NumberBox
+                                    x:Name="EditorFontSizeBox"
+                                    Width="160"
+                                    AutomationProperties.AutomationId="EditorFontSizeBox"
+                                    AutomationProperties.Name="Editor font size"
+                                    LargeChange="2"
+                                    Maximum="32"
+                                    Minimum="8"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Inline"
+                                    Value="{x:Bind ViewModel.EditorFontSize, Mode=TwoWay}" />
                             </toolkit:SettingsCard>
                         </toolkit:SettingsExpander.Items>
                     </toolkit:SettingsExpander>
