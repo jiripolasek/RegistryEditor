@@ -34,6 +34,10 @@ namespace JPSoftworks.Regedit.Views.Shell;
 
 public sealed partial class MainWindow : Window
 {
+    private readonly Dictionary<WindowTab, FrameworkElement> _views = [];
+
+    private string? _startupError;
+
     public AppSettings Settings { get; }
 
     public RegistryService Registry { get; }
@@ -60,13 +64,9 @@ public sealed partial class MainWindow : Window
 
     internal WindowDialogPresenter Dialogs { get; }
 
-    private string? _startupError;
-
     internal MainWindowViewModel ViewModel { get; }
 
     internal ApplicationRegistryViewModel RegistryMenu { get; }
-
-    private readonly Dictionary<WindowTab, FrameworkElement> _views = [];
 
     internal MainWindow(
         ILogger<MainWindow> logger,
@@ -123,6 +123,7 @@ public sealed partial class MainWindow : Window
             viewModel, registry, journal, dialogs, branches, logger, journal.Journal.AdministratorOnly);
         this.RegistryMenu.Notice += (title, message, kind) =>
             this.ShowApplicationNotice(title, message, (InfoBarSeverity)kind);
+        this.RegistryMenu.OpenFilePreviewAsync = this.OpenRegistryFileAsync;
         this._startupError = startupError;
         if (this.Settings.LoadError is not null)
         {
@@ -149,6 +150,8 @@ public sealed partial class MainWindow : Window
                 InfoBarSeverity.Warning));
         this.Shell.AddHandler(
             UIElement.PointerReleasedEvent, new PointerEventHandler(this.Shell_PointerReleased), true);
+        this.Shell.AddHandler(UIElement.DragOverEvent, new DragEventHandler(this.RegistryFile_DragOver), true);
+        this.Shell.AddHandler(UIElement.DropEvent, new DragEventHandler(this.RegistryFile_Drop), true);
         this.ViewModel.Initialize(initialLocation);
         this.InitializeTools();
         this.AdministratorShield.Visibility = this.IsAdministrator ? Visibility.Visible : Visibility.Collapsed;
@@ -172,7 +175,15 @@ public sealed partial class MainWindow : Window
             {
                 this.ApplyBackdrop();
             }
-            else if (property != nameof(SettingsViewModel.ColumnLayout))
+            else if (property is nameof(SettingsViewModel.EditorFontFamily) or nameof(SettingsViewModel.EditorFontSize))
+            {
+                foreach (var preview in this._registryFileWindows)
+                {
+                    preview.ApplyEditorFont(this.Settings.EditorFont);
+                }
+            }
+            else if (property is not (nameof(SettingsViewModel.ColumnLayout)
+                     or nameof(SettingsViewModel.EditorLayoutIndex)))
             {
                 this.ApplyViewSettings();
             }
@@ -199,6 +210,8 @@ public sealed partial class MainWindow : Window
         this.ViewModel.PropertyChanged += this.ShellStateChanged;
         this.ViewModel.SettingsSectionRequested += shortcuts =>
             ((SettingsPage)this.ActiveTabContent.Content).ShowShortcuts(shortcuts);
+        this.ViewModel.RegistryFileEditorSettingsRequested += () =>
+            ((SettingsPage)this.ActiveTabContent.Content).ShowRegistryFileEditor();
         this.ViewModel.TabClosed += this.ReleaseView;
         this.ViewModel.SearchFocusRequested += () => (this.SelectedTabContent as BrowserPage)?.FocusSearch();
         this.ViewModel.CloseRequested += this.RequestClose;
@@ -323,6 +336,10 @@ public sealed partial class MainWindow : Window
         this.SystemBackdrop = this.Settings.Backdrop == "Acrylic"
             ? new DesktopAcrylicBackdrop()
             : new MicaBackdrop { Kind = MicaKind.BaseAlt };
+        foreach (var preview in this._registryFileWindows)
+        {
+            preview.ApplyBackdrop(this.Settings.Backdrop);
+        }
     }
 
     public void ApplyTheme(string theme)
@@ -335,6 +352,10 @@ public sealed partial class MainWindow : Window
             ElementTheme.Dark => TitleBarTheme.Dark,
             _ => TitleBarTheme.UseDefaultAppMode
         };
+        foreach (var preview in this._registryFileWindows)
+        {
+            preview.ApplyTheme(this.Shell.RequestedTheme);
+        }
     }
 
     public void ApplyViewSettings()

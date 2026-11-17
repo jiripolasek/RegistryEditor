@@ -22,6 +22,24 @@ namespace JPSoftworks.Regedit.Controls.Lists;
 /// </summary>
 public sealed partial class ColumnListView : UserControl
 {
+    /// <summary>Raised when a sortable header is clicked; the host re-sorts and sets <see cref="SortColumnId" />.</summary>
+    public event EventHandler<string>? SortRequested;
+
+    /// <summary>Raised after the user changes widths, order or visibility. Hosts may debounce saving during drags.</summary>
+    public event EventHandler<ColumnLayout>? LayoutChanged;
+
+    /// <summary>
+    ///     Raised (coalesced, at low priority) when <see cref="VisibleItems" /> may have changed: rows realized, recycled,
+    ///     rebound or scrolled. Use it to load details for on-screen items lazily.
+    /// </summary>
+    public event EventHandler? VisibleItemsChanged;
+
+    private const double DefaultLeadingWidth = 24;
+    private const double FitPadding = 12;
+
+    // Selection changes larger than this are applied in bulk (ranges, ReplaceAll) instead of item by item.
+    private const int BatchThreshold = 32;
+
     public static readonly DependencyProperty LayoutProperty = DependencyProperty.Register(
         nameof(Layout), typeof(object), typeof(ColumnListView),
         new PropertyMetadata(null, (owner, _) => ((ColumnListView)owner).LayoutPropertyChanged()));
@@ -60,58 +78,22 @@ public sealed partial class ColumnListView : UserControl
         nameof(ColumnSpacing), typeof(double), typeof(ColumnListView),
         new PropertyMetadata(8d, (owner, _) => ((ColumnListView)owner).Arrange()));
 
-    private const double DefaultLeadingWidth = 24;
-    private const double FitPadding = 12;
-
-    // Selection changes larger than this are applied in bulk (ranges, ReplaceAll) instead of item by item.
-    private const int BatchThreshold = 32;
+    private readonly HashSet<ListColumn> _declared = [];
 
     private readonly HashSet<ColumnRow> _rows = [];
-    private readonly HashSet<ListColumn> _declared = [];
-    private ColumnSpec[] _specs = [];
-    private ColumnLayout _layout = new([]);
     private ColumnArrangement _arrangement = ColumnArrangement.Empty;
+    private bool _chromeQueued;
+    private int _columnsVersion;
+    private ColumnLayout _layout = new([]);
     private ListColumn? _leading;
     private INotifyCollectionChanged? _observedSelection;
-    private int _columnsVersion;
     private bool _publishing;
-    private bool _syncingSelection;
-    private bool _chromeQueued;
-    private bool _visibleQueued;
 
     // Horizontal space the list takes around each row (item margins, padding, scroll bar), refined from a real row.
     private double _rowInset = 40;
-
-    public ColumnListView()
-    {
-        this.InitializeComponent();
-        this.Columns.CollectionChanged += (_, _) => this.RebuildColumns();
-        this.HorizontalScroll.SizeChanged += (_, _) => this.Arrange();
-        this.Items.SelectionChanged += this.ItemsSelectionChanged;
-        this.Items.GettingFocus += this.ItemsGettingFocus;
-        // An empty list has no remembered row to restore when tabbing into it.
-        this.Items.Items.VectorChanged += (_, _) => this.Items.TabFocusNavigation = this.Items.Items.Count == 0
-            ? KeyboardNavigationMode.Local
-            : KeyboardNavigationMode.Once;
-        this.Items.ItemTemplate = this.RowTemplate;
-        this.Items.RegisterPropertyChangedCallback(
-            ListView.ItemContainerStyleProperty, (_, _) => this.InvalidateChrome());
-        this.Loaded += (_, _) => this.InvalidateChrome();
-        this.InitializeEditing();
-        this.RebuildColumns();
-    }
-
-    /// <summary>Raised when a sortable header is clicked; the host re-sorts and sets <see cref="SortColumnId" />.</summary>
-    public event EventHandler<string>? SortRequested;
-
-    /// <summary>Raised after the user changes widths, order or visibility. Hosts may debounce saving during drags.</summary>
-    public event EventHandler<ColumnLayout>? LayoutChanged;
-
-    /// <summary>
-    ///     Raised (coalesced, at low priority) when <see cref="VisibleItems" /> may have changed: rows realized, recycled,
-    ///     rebound or scrolled. Use it to load details for on-screen items lazily.
-    /// </summary>
-    public event EventHandler? VisibleItemsChanged;
+    private ColumnSpec[] _specs = [];
+    private bool _syncingSelection;
+    private bool _visibleQueued;
 
     public ObservableCollection<ListColumn> Columns { get; } = [];
 
@@ -247,6 +229,25 @@ public sealed partial class ColumnListView : UserControl
     internal IReadOnlyCollection<ColumnRow> RealizedRows => this._rows;
 
     private DataTemplate RowTemplate => (DataTemplate)this.Resources["ColumnRowTemplate"];
+
+    public ColumnListView()
+    {
+        this.InitializeComponent();
+        this.Columns.CollectionChanged += (_, _) => this.RebuildColumns();
+        this.HorizontalScroll.SizeChanged += (_, _) => this.Arrange();
+        this.Items.SelectionChanged += this.ItemsSelectionChanged;
+        this.Items.GettingFocus += this.ItemsGettingFocus;
+        // An empty list has no remembered row to restore when tabbing into it.
+        this.Items.Items.VectorChanged += (_, _) => this.Items.TabFocusNavigation = this.Items.Items.Count == 0
+            ? KeyboardNavigationMode.Local
+            : KeyboardNavigationMode.Once;
+        this.Items.ItemTemplate = this.RowTemplate;
+        this.Items.RegisterPropertyChangedCallback(
+            ListView.ItemContainerStyleProperty, (_, _) => this.InvalidateChrome());
+        this.Loaded += (_, _) => this.InvalidateChrome();
+        this.InitializeEditing();
+        this.RebuildColumns();
+    }
 
     public ListColumn? FindColumn(string id)
     {
@@ -667,6 +668,13 @@ public sealed partial class ColumnListView : UserControl
         this._syncingSelection = true;
         try
         {
+            // WinUI requires SelectedItem for single selection; its SelectedItems collection cannot be modified.
+            if (this.Items.SelectionMode == ListViewSelectionMode.Single)
+            {
+                this.Items.SelectedItem = source.FirstOrDefault();
+                return;
+            }
+
             var wanted = new HashSet<object>(source.Cast<object>());
             var current = this.Items.SelectedItems;
             var removals = current.Count(item => !wanted.Contains(item));

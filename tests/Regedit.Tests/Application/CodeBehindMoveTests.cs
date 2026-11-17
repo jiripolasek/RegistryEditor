@@ -277,6 +277,65 @@ internal static class CodeBehindMoveTests
                 dialogs.Calls.SequenceEqual(["open"]) && notices.Count == 0,
                 "Import without a tab targets this computer and stops quietly when no file is picked");
 
+            var previews = new List<(string File, RegistryView View)>();
+            menu.OpenFilePreviewAsync = (file, view) =>
+            {
+                previews.Add((file, view));
+                return Task.CompletedTask;
+            };
+            dialogs.OpenFile = "preview.reg";
+            dialogs.Calls.Clear();
+            await menu.ImportCommand.ExecuteAsync(null);
+            check(
+                dialogs.Calls.SequenceEqual(["open"]) && previews is [("preview.reg", RegistryView.Registry64)] &&
+                notices.Count == 0, "Import opens a file preview without confirming or writing to the registry");
+
+            dialogs.Calls.Clear();
+            await menu.ImportCommand.ExecuteAsync("dropped.REG");
+            check(
+                dialogs.Calls.Count == 0 && previews[^1] == ("dropped.REG", RegistryView.Registry64) &&
+                notices.Count == 0,
+                "Dropped registry files open the preview without a picker, including an uppercase extension");
+            var previewCount = previews.Count;
+            await menu.ImportCommand.ExecuteAsync("unsupported.txt");
+            check(
+                dialogs.Calls.Count == 0 && previews.Count == previewCount && notices is [{ Kind: NoticeKind.Error }],
+                "Unsupported dropped files are rejected without opening a picker or preview");
+            notices.Clear();
+
+            var opened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            menu.OpenFilePreviewAsync = (_, _) => opened.Task;
+            var opening = menu.ImportCommand.ExecuteAsync("pending.reg");
+            check(
+                !opening.IsCompleted && menu.ImportCommand.IsRunning,
+                "The import command remains active until its preview-opening task completes");
+            opened.SetResult();
+            await opening;
+            check(
+                !menu.ImportCommand.IsRunning && notices.Count == 0,
+                "Completing preview opening finishes the command without an error notice");
+
+            var failedOpen = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            menu.OpenFilePreviewAsync = (_, _) => failedOpen.Task;
+            opening = menu.ImportCommand.ExecuteAsync("failed.reg");
+            failedOpen.SetException(new IOException("Preview initialization failed"));
+            await opening;
+            check(
+                notices is [{ Kind: NoticeKind.Error, Message: "Preview initialization failed" }],
+                "An asynchronous preview-opening failure is observed by the application command guard");
+            notices.Clear();
+
+            var canceledOpen = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            menu.OpenFilePreviewAsync = (_, _) => canceledOpen.Task;
+            opening = menu.ImportCommand.ExecuteAsync(null);
+            canceledOpen.SetCanceled();
+            await opening;
+            check(
+                notices is [{ Kind: NoticeKind.Information, Title: "Canceled" }],
+                "Canceled preview opening is observed and reported as cancellation");
+            notices.Clear();
+            dialogs.OpenFile = null;
+
             dialogs.Calls.Clear();
             await menu.ConnectCommand.ExecuteAsync(null);
             check(
@@ -311,6 +370,40 @@ internal static class CodeBehindMoveTests
             check(
                 notices is [{ Kind: NoticeKind.Error, Message: "No desktop shell" }],
                 "Standard-access launch failures use the existing error notice");
+            notices.Clear();
+            await menu.ImportCommand.ExecuteAsync("remote.reg");
+            check(
+                notices is [{ Kind: NoticeKind.Error }] && previews.Count == previewCount,
+                "Dropping a registry file in a remote context keeps the local-import restriction");
+            notices.Clear();
+            menu.OpenFilePreviewAsync = (file, view) =>
+            {
+                previews.Add((file, view));
+                return Task.CompletedTask;
+            };
+            window.OpenBrowser(new RegistryLocation { View = RegistryView.Registry32 });
+            await menu.ImportCommand.ExecuteAsync("local.reg");
+            check(
+                previews[^1] == ("local.reg", RegistryView.Registry32) && dialogs.Calls.SequenceEqual(["computer"]) &&
+                notices.Count == 0,
+                "Dropped registry files preserve the current local registry view without showing a picker");
+            var refreshed = new List<string>();
+            window.OpenBrowser(RegistryLocation.Parse("HKCU\\Software\\ImportRefreshOne"));
+            window.VisibleBrowser!.RegistryChanged += (_, _) =>
+            {
+                refreshed.Add("first");
+                throw new IOException("Test first refresh failure");
+            };
+            window.OpenBrowser(RegistryLocation.Parse("HKCU\\Software\\ImportRefreshTwo"));
+            window.VisibleBrowser!.RegistryChanged += (_, _) =>
+            {
+                refreshed.Add("second");
+                throw new IOException("Test second refresh failure");
+            };
+            await menu.RefreshAfterImportAsync();
+            check(
+                refreshed.SequenceEqual(["first", "second"]) && notices.Count == 0,
+                "Post-import refresh failures stay isolated per tab and do not replace the import result");
         }
         finally
         {
@@ -322,6 +415,8 @@ internal static class CodeBehindMoveTests
     {
         internal List<string> Calls { get; } = [];
 
+        internal string? OpenFile { get; set; }
+
         // Canceled without connecting, so tests never reach a network registry.
         public Task<bool> RequestComputerNameAsync(Func<string, Task> connect)
         {
@@ -332,7 +427,7 @@ internal static class CodeBehindMoveTests
         public Task<string?> PickOpenAsync(string extension)
         {
             this.Calls.Add("open");
-            return Task.FromResult<string?>(null);
+            return Task.FromResult(this.OpenFile);
         }
 
         public Task<bool> ConfirmAsync(string title, string message, string accept)

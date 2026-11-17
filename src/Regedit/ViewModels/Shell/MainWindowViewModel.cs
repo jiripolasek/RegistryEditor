@@ -23,13 +23,35 @@ namespace JPSoftworks.Regedit.ViewModels.Shell;
 
 internal sealed partial class MainWindowViewModel : ObservableObject
 {
-    private readonly ILogger<MainWindowViewModel> _logger;
-    private readonly AppSettings _settings;
-    private readonly RegistryService _registry;
+    internal event Action<WatchSession>? WatchOpened;
+
+    internal event Action<WatchDefinition>? WatchProposed;
+
+    internal event Action<WatchSession>? WatchFailed;
+
+    public event Action? CloseRequested;
+
+    public event Action<WindowTab>? TabClosed;
+
+    public event EventHandler? ToolsChanged;
+
+    internal event Action<bool>? SettingsSectionRequested;
+
     private readonly Func<RegistryLocation, BrowserViewModel> _createBrowser;
-    private readonly InvestigationStore _investigations;
     private readonly RegistryHistoryBroadcaster? _historyBroadcaster;
+    private readonly InvestigationStore _investigations;
     private readonly JournalViewModel? _journalHistory;
+    private readonly ILogger<MainWindowViewModel> _logger;
+    private readonly List<BrowserTab> _recentBrowsers = [];
+    private readonly RegistryService _registry;
+
+    private readonly HashSet<WatchSession> _reportedWatchFailures = [];
+
+    private readonly Dictionary<SearchResultsViewModel, (BrowserTab Tab, int Navigation)> _searchDestinations = [];
+    private readonly AppSettings _settings;
+    private BrowserTab? _contextTab;
+
+    private bool _replaceRestored;
 
     internal Func<Action, Task> DispatchWatchUpdate { get; set; } = action =>
     {
@@ -37,24 +59,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         return Task.CompletedTask;
     };
 
-    internal event Action<WatchSession>? WatchOpened;
-
-    internal event Action<WatchDefinition>? WatchProposed;
-
-    internal event Action<WatchSession>? WatchFailed;
-
-    private readonly HashSet<WatchSession> _reportedWatchFailures = [];
-
     public int RunningWatchCount => this.Watches.Count(watch => watch.IsRunning);
 
     public string RunningWatchText =>
         $"{this.RunningWatchCount:N0} {(this.RunningWatchCount == 1 ? "watch" : "watches")} running";
 
     public bool HasRunningWatches => this.RunningWatchCount > 0;
-
-    private bool _replaceRestored;
-    private BrowserTab? _contextTab;
-    private readonly List<BrowserTab> _recentBrowsers = [];
 
     public ObservableCollection<WindowTab> Tabs { get; } = [];
 
@@ -89,38 +99,13 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
     internal Func<WindowPlacement>? CapturePlacement { get; set; }
 
-    internal void ResizePane(double delta)
-    {
-        this.PaneWidth = Math.Clamp(this.PaneWidth + delta, 300, 680);
-    }
-
     public bool IsClosing { get; private set; }
 
     public bool CanCloseWindow { get; private set; }
 
     internal bool IsDialogOpen { get; private set; }
 
-    internal bool TryBeginDialog(bool closeConfirmation = false)
-    {
-        if (this.IsDialogOpen || this.CanCloseWindow || !closeConfirmation && this.IsClosing)
-        {
-            return false;
-        }
-
-        this.IsDialogOpen = true;
-        return true;
-    }
-
-    internal void EndDialog()
-    {
-        this.IsDialogOpen = false;
-    }
-
-    public event Action? CloseRequested;
-
-    public event Action<WindowTab>? TabClosed;
-
-    public event EventHandler? ToolsChanged;
+    private bool CanDisconnect => this.ContextLocation?.Machine is not null;
 
     internal MainWindowViewModel(
         AppSettings settings,
@@ -153,6 +138,27 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         this.IsPaneOpen = this.IsPanePinned = settings.ToolPanePinned;
         this.PaneWidth = settings.ToolPaneWidth;
         this.Watches.CollectionChanged += (_, _) => this.WatchesChanged();
+    }
+
+    internal void ResizePane(double delta)
+    {
+        this.PaneWidth = Math.Clamp(this.PaneWidth + delta, 300, 680);
+    }
+
+    internal bool TryBeginDialog(bool closeConfirmation = false)
+    {
+        if (this.IsDialogOpen || this.CanCloseWindow || !closeConfirmation && this.IsClosing)
+        {
+            return false;
+        }
+
+        this.IsDialogOpen = true;
+        return true;
+    }
+
+    internal void EndDialog()
+    {
+        this.IsDialogOpen = false;
     }
 
     internal void Initialize(RegistryLocation? initialLocation)
@@ -279,8 +285,6 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             await browser.NavigateAsync(new RegistryLocation(RegistryHive.CurrentUser, View: browser.Location.View));
         }
     }
-
-    private bool CanDisconnect => this.ContextLocation?.Machine is not null;
 
     [RelayCommand]
     private void NewTab()
@@ -434,8 +438,6 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         this.TabClosed?.Invoke(tab);
     }
 
-    internal event Action<bool>? SettingsSectionRequested;
-
     [RelayCommand]
     private void OpenSettings()
     {
@@ -546,8 +548,6 @@ internal sealed partial class MainWindowViewModel : ObservableObject
                 this.Placement, this.IsPaneOpen, this.IsPanePinned, this.PaneWidth, this.SelectedTool.ToString(),
                 this.IsBottomPaneOpen, this.BottomPaneHeight, (this.ActiveBottomTab as ToolTab)?.Tool.ToString()));
     }
-
-    private readonly Dictionary<SearchResultsViewModel, (BrowserTab Tab, int Navigation)> _searchDestinations = [];
 
     internal void StartSearch(SavedSearch search)
     {
@@ -1018,8 +1018,14 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
         this.IsClosing = true;
         this.NoteStore.Pause();
+        var files = this._registryFiles.ToArray();
         try
         {
+            if (!await PrepareRegistryFilesAsync(files))
+            {
+                return false;
+            }
+
             Dictionary<NoteDraft, string> discarded = [];
             this.NoteStore.Flush();
             while (this.Notes.Any(note => note.IsDirty))
@@ -1042,6 +1048,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
             void CheckDrafts()
             {
+                if (files.Any(model => !model.CanCompleteClose))
+                {
+                    throw new InvalidOperationException(
+                        "A registry file changed while closing. Review your changes and close again.");
+                }
+
                 if (this.Notes.Any(note =>
                         note.IsDirty && (!discarded.TryGetValue(note, out var text) || text != note.Text)))
                 {
@@ -1059,6 +1071,11 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
             await Task.WhenAll(this.Watches.Select(watch => watch.Completion));
             CheckDrafts();
+            foreach (var model in files)
+            {
+                model.CompleteClose();
+            }
+
             this.CanCloseWindow = true;
             return true;
         }
@@ -1067,6 +1084,11 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             this.IsClosing = false;
             if (!this.CanCloseWindow)
             {
+                foreach (var model in files)
+                {
+                    model.CancelPendingClose();
+                }
+
                 this.NoteStore.Resume();
             }
         }

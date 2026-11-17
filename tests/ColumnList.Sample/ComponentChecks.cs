@@ -217,8 +217,8 @@ internal static class ComponentChecks
                 "Header hit-testing finds the drop target under the pointer");
             registry.MoveColumnBy("Data", 1);
             Check(
-                registry.EffectiveLayout.Columns.Select(column => column.Id).Take(2).SequenceEqual((string[])["Name", "Data"]),
-                "Move right swaps with the next visible column");
+                registry.EffectiveLayout.Columns.Select(column => column.Id).Take(2)
+                    .SequenceEqual((string[])["Name", "Data"]), "Move right swaps with the next visible column");
 
             // Drag feedback, driven through the same pipeline the pointer handlers use.
             await WaitAsync(() => Aligned(registry), () => Misalignment(registry));
@@ -693,7 +693,8 @@ internal static class ComponentChecks
                 registry.EffectiveLayout.IsEquivalentTo(saved) &&
                 Grid.GetColumn(registry.HeaderRow.LabelFor(registry.FindColumn("LastWrite")!)!) == 1 &&
                 registry.CurrentWidth("Type") == 222, "A saved layout survives a JSON round trip");
-            registry.Layout = new ColumnLayout((ColumnState[])[new ColumnState("Bogus", 10, true), new ColumnState("Type", -5, true)]);
+            registry.Layout = new ColumnLayout(
+                (ColumnState[])[new ColumnState("Bogus", 10, true), new ColumnState("Type", -5, true)]);
             Check(
                 registry.EffectiveLayout.Columns.Select(column => column.Id)
                     .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite", "Size"]) &&

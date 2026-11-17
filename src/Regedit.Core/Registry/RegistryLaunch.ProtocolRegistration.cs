@@ -40,8 +40,8 @@ public static partial class RegistryLaunch
 
         try
         {
-            return SplitArguments(command) is [var target, "%1"]
-                   && string.Equals(target, executable, StringComparison.OrdinalIgnoreCase);
+            return SplitArguments(command) is [var target, "%1"] && string.Equals(
+                target, executable, StringComparison.OrdinalIgnoreCase);
         }
         catch (ArgumentException)
         {

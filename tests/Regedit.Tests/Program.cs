@@ -109,6 +109,8 @@ AddAsync("bottom-panel", () => BottomPanelTests.RunAsync(Check));
 AddAsync("search-result-navigation", () => SearchResultNavigationTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("investigation-view-model", () => InvestigationViewModelTests.RunAsync(Check));
 AddAsync("branch-workflow", () => BranchWorkflowTests.RunAsync(Check, args.Contains("--registry")));
+AddAsync("registry-file", () => RegistryFileTests.RunAsync(Check, args.Contains("--registry")));
+AddAsync("registry-file-view-model", () => RegistryFilePreviewViewModelTests.RunAsync(Check));
 AddAsync("large-value", () => LargeValueTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("registry-export", () => RegistryExportTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("clipboard-routing", () => ClipboardRoutingTests.RunAsync(Check, args.Contains("--registry")));
@@ -228,6 +230,7 @@ if (args.Contains("--registry"))
 }
 
 Add("settings", () => SettingsTests.Run(Check));
+Add("registry-file-editor-settings", () => RegistryFileEditorSettingsTests.Run(Check));
 AddAsync("settings-concurrency", () => SettingsConcurrencyTests.RunAsync(Check));
 Add("journal-security", () => JournalSecurityTests.Run(Check));
 Add(

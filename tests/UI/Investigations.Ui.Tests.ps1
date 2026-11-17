@@ -2052,6 +2052,9 @@ try {
     Test-Ui 'Help and about expands the final Settings section and reuses its tab' {
         $before = [IO.File]::ReadAllText($settingsFile)
         Open-Menu 'Settings'
+        Wait-Ui { param($items) $items.automationId -contains 'SettingsScroll' }
+        Ui @('scroll', 'SettingsScroll', '--to', 'bottom') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'github.com/jiripolasek/RegistryEditor' } -All
         $items = Read-Ui -All
         foreach ($url in @('github.com/jiripolasek/RegistryEditor', 'jiripolasek.com')) {
             if ($items.name -notcontains $url) { throw "The default-expanded About section is missing '$url'." }
@@ -4612,7 +4615,129 @@ try {
         Open-Menu 'Close tab'
     }
 
+    Test-Ui 'Registry file Problems lists and navigates all errors without a syntax InfoBar' {
+        Browser
+        [UxTestWindow]::SetWindowPos($script:mainWindow, 0, 100, 100, 1400, 900, 0x14) | Out-Null
+        $file = Join-Path $ArtifactDirectory 'problems.reg'
+        [IO.File]::WriteAllLines($file, @('Windows Registry Editor Version 5.00', '',
+            '[HKEY_CURRENT_USER\Software\Contoso\Agent]', '"First"=unknown', '"Second"=dword:invalid'), [Text.Encoding]::Unicode)
+        Open-Menu 'Import registry file…'
+        File-Picker 'Open' $file
+        $originalWindow = $script:mainWindow
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        do {
+            $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+            $preview = @($windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -like '*problems.reg*' })
+            if ($preview.Count -eq 1) { break }
+            Start-Sleep -Milliseconds 100
+        } while ($timer.Elapsed.TotalSeconds -lt 15)
+        if ($preview.Count -ne 1) { throw 'The registry file Problems preview did not open.' }
+        $previewWindow = [long]$preview[0].hwnd
+        try {
+            $script:mainWindow = $previewWindow
+            [UxTestWindow]::TargetWindow = $previewWindow
+            Wait-Ui { param($items) $items.automationId -contains 'RegFileProblemsList' -and $items.name -contains '2 errors' }
+            $ownerBounds = @((Read-Ui -Window $originalWindow) | Where-Object type -eq 'Window')[0]
+            $previewBounds = @((Read-Ui) | Where-Object type -eq 'Window')[0]
+            if ([Math]::Abs(($previewBounds.x + $previewBounds.width / 2) - ($ownerBounds.x + $ownerBounds.width / 2)) -gt 4 -or
+                [Math]::Abs(($previewBounds.y + $previewBounds.height / 2) - ($ownerBounds.y + $ownerBounds.height / 2)) -gt 4) {
+                throw 'The registry file preview did not open centered over its owner.'
+            }
+            Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'False', '-t', '3000') | Out-Null
+            $items = @(Read-Ui)
+            $values = @($items | Where-Object automationId -eq 'RegFileValues')[0]
+            foreach ($column in 'name', 'operation', 'type', 'data', 'line') {
+                $header = @($items | Where-Object automationId -eq ($column + 'Header'))[0]
+                if (-not $header -or $header.x -lt $values.x -or $header.x + $header.width -gt $values.x + $values.width + 1) {
+                    throw "The $column column does not fit the default split preview."
+                }
+            }
+            [UxTestWindow]::SetWindowPos($previewWindow, 0, 0, 0, 720, 520, 0x16) | Out-Null
+            Wait-Ui { param($items) $items.automationId -contains 'nameHeader' }
+            [UxTestWindow]::SetWindowPos($previewWindow, 0, 0, 0, 1200, 780, 0x16) | Out-Null
+            Wait-Ui { param($items) $items.automationId -contains 'lineHeader' }
+            if ((Read-Ui).automationId -contains 'RegFileNotice') { throw 'Syntax errors still occupy the operation InfoBar.' }
+            Ui @('hover', 'RegFileTitleBar') | Out-Null
+            Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-problems.png')) | Out-Null
+            Ui @('screenshot', 'RegFileSource', '--output', (Join-Path $ArtifactDirectory 'registry-file-problem-markers.png')) | Out-Null
+            Ui @('invoke', 'RegFileProblems', '--action', 'collapse') | Out-Null
+            Ui @('invoke', 'RegFileLayoutPreview', '--action', 'select') | Out-Null
+            Wait-Ui { param($items) $items.automationId -notcontains 'RegFileSource' }
+            Ui @('send-keys', 'alt+d', '--via', 'send-input') | Out-Null
+            Wait-Ui { param($items) $items.automationId -contains 'RegFileSource' -and $items.automationId -contains 'RegFileProblemsList' }
+            $problem = @((Read-Ui) | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*Line 5:*' })[0]
+            if (-not $problem) { throw 'The second parser error is missing from the Problems list.' }
+            Ui @('invoke', $problem.selector, '--action', 'invoke') | Out-Null
+            Wait-Ui { param($items) $items.name -contains 'Ln 5, Col 1' }
+            $source = @((Read-Ui) | Where-Object { $_.type -eq 'Edit' -and $_.className -eq 'WinUIEditor.EditorBaseControl' })[0]
+            Ui @('invoke', 'RegFileProblems', '--action', 'collapse') | Out-Null
+            Ui @('send-keys', 'ctrl+end', '--via', 'send-input', '--target', $source.selector) | Out-Null
+            Ui @('send-keys', '; typing remains possible', '--verbatim', '--via', 'send-input') | Out-Null
+            Wait-Ui { param($items) $items.name -contains '2 errors' -and $items.name -contains 'Ln 6, Col 26' }
+            if ((Read-Ui).automationId -contains 'RegFileProblemsList') { throw 'Typing reopened the collapsed Problems panel.' }
+            Ui @('send-keys', 'ctrl+z', '--via', 'send-input', '--target', $source.selector) | Out-Null
+            Wait-Ui { param($items) $items.name -contains 'Ln 6, Col 1' }
+        } finally {
+            [UxTestWindow]::CloseWindow($previewWindow)
+            $script:mainWindow = $originalWindow
+            [UxTestWindow]::TargetWindow = $originalWindow
+        }
+    }
+
     Test-Ui '32-bit address and tab identify the import target with the status bar hidden' {
+        function Set-PreviewLayout([string] $Mode) {
+            Ui @('invoke', ('RegFileLayout' + $Mode), '--action', 'select') | Out-Null
+            Wait-Ui { param($items)
+                $hasEditor = $items.automationId -contains 'RegFileSource'
+                $hasPreview = $items.automationId -contains 'RegFileKeys'
+                $hasEditor -eq ($Mode -ne 'Preview') -and $hasPreview -eq ($Mode -ne 'Editor')
+            }
+        }
+        function Read-SourceCharacterMetrics {
+            $element = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$script:mainWindow).FindFirst(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ClassNameProperty, 'WinUIEditor.EditorBaseControl'))
+            $range = $element.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern).DocumentRange
+            $range.MoveEndpointByRange([System.Windows.Automation.Text.TextPatternRangeEndpoint]::End, $range, [System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start)
+            [void]$range.MoveEndpointByUnit([System.Windows.Automation.Text.TextPatternRangeEndpoint]::End, [System.Windows.Automation.Text.TextUnit]::Character, 1)
+            $rectangles = @($range.GetBoundingRectangles())
+            if ($rectangles.Count -ne 1 -or $rectangles[0].Height -le 0) { throw 'The source character has no measurable font height.' }
+            @{
+                Height = $rectangles[0].Height
+                Inset = $rectangles[0].X - $element.Current.BoundingRectangle.X
+            }
+        }
+        function Read-SourceCharacterHeight { (Read-SourceCharacterMetrics).Height }
+        function Set-EditorFontFamily([string] $Name) {
+            Ui @('scroll-into-view', 'EditorFontSelector') | Out-Null
+            $family = Pick 'ComboBox' 'Editor font family'
+            Set-TestWindowForeground
+            [UxTestWindow]::LeftClickAt([int]($family.x + 20), [int]($family.y + $family.height / 2))
+            Ui @('send-keys', 'ctrl+a', '--via', 'send-input') | Out-Null
+            Ui @('send-keys', $Name, '--verbatim', '--via', 'send-input') | Out-Null
+            Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        }
+        function Step-EditorFontSize([string] $Button) {
+            $size = @(Read-Ui -All | Where-Object automationId -eq 'EditorFontSizeBox')[0]
+            $spin = @(Elements $size.children | Where-Object automationId -eq $Button)[0]
+            foreach ($step in 1..3) { Ui @('invoke', $spin.selector, '--action', 'invoke') | Out-Null }
+        }
+        function Assert-RegistrySyntax([string] $Theme, [int[]] $Colors) {
+            $path = Join-Path $ArtifactDirectory ('registry-file-syntax-' + $Theme + '.png')
+            Ui @('screenshot', 'RegFileSource', '--output', $path) | Out-Null
+            Add-Type -AssemblyName System.Drawing
+            $bitmap = [Drawing.Bitmap]::new($path)
+            $missing = [Collections.Generic.HashSet[int]]::new($Colors)
+            try {
+                :scan for ($y = 0; $y -lt $bitmap.Height; $y++) {
+                    for ($x = 0; $x -lt $bitmap.Width; $x++) {
+                        [void]$missing.Remove($bitmap.GetPixel($x, $y).ToArgb() -band 0xFFFFFF)
+                        if ($missing.Count -eq 0) { break scan }
+                    }
+                }
+                if ($missing.Count) { throw "Missing $Theme registry syntax colors: $($missing -join ', ')." }
+            } finally { $bitmap.Dispose() }
+        }
         function Switch-RegistryView([string] $label) {
             Press 'View'
             $popup = Read-ContextMenu 'Registry view'
@@ -4634,20 +4759,463 @@ try {
             $items.name -contains '32-bit registry view' -and $items.automationId -notcontains 'StatusBar' }
         $classKey = 'Software\Classes\CLSID\' + [guid]::NewGuid().ToString('B')
         $importFile = Join-Path $ArtifactDirectory 'view-target.reg'
-        $lines = @('Windows Registry Editor Version 5.00', '', "[HKEY_CURRENT_USER\$classKey]", '"RegeditViewFixture"="32"', '')
+        $lines = @('Windows Registry Editor Version 5.00', '; Syntax highlighting fixture',
+            ';Title=Registry preview sample', ';Description=Preview changes before importing.', ';Author=UI fixture',
+            ';Requires=ExplorerRestart', '', "[HKEY_CURRENT_USER\$classKey]", '"RegeditViewFixture"="32"',
+            '"Enabled"=dword:00000001', '"Payload"=hex:01,ab,ff',
+            "[HKEY_CURRENT_USER\$classKey\Removed]", '@="discard"', "[-HKEY_CURRENT_USER\$classKey\Removed]",
+            "[HKEY_CURRENT_USER\$classKey\Reset]", '"Old"="discard"', "[-HKEY_CURRENT_USER\$classKey\Reset]",
+            "[HKEY_CURRENT_USER\$classKey\Reset]", '"After"="retained"', '')
+        $editedSource = (($lines -join [Environment]::NewLine).Replace('"32"', '"unsaved"').
+            Replace(';Title=Registry preview sample', ';Title=Edited registry preview').
+            Replace(';Requires=ExplorerRestart', ';Requires=Logoff'))
         [IO.File]::WriteAllLines($importFile, $lines, [Text.Encoding]::Unicode)
         $user32 = [Microsoft.Win32.RegistryKey]::OpenBaseKey('CurrentUser', 'Registry32')
         $user64 = [Microsoft.Win32.RegistryKey]::OpenBaseKey('CurrentUser', 'Registry64')
         try {
             Open-Menu 'Import registry file…'
             File-Picker 'Open' $importFile
-            Wait-Ui { param($items) @($items | Where-Object { $_.name -like '*32-bit registry*Only import files you trust*' }).Count -gt 0 }
-            Primary
-            Wait-Ui { param($items) $items.name -contains 'Import complete' }
+            $originalWindow = $script:mainWindow
+            try {
+                $timer = [Diagnostics.Stopwatch]::StartNew()
+                do {
+                    $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+                    $preview = @($windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -like '*view-target.reg*' })
+                    if ($preview.Count -eq 1) { break }
+                    Start-Sleep -Milliseconds 100
+                } while ($timer.Elapsed.TotalSeconds -lt 15)
+                if ($preview.Count -ne 1) { throw 'The separate registry file preview did not appear.' }
+                $script:mainWindow = [long]$preview[0].hwnd
+                [UxTestWindow]::TargetWindow = $script:mainWindow
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                if (-not [UxTestWindow]::SetWindowPos($script:mainWindow, 0, 0, 0, 1200, 780, 0x16)) { throw 'Could not position the preview.' }
+                $items = @(Read-Ui)
+                if ($items.automationId -notcontains 'RegFileTitleBar') { throw 'The custom preview title bar is missing.' }
+                Ui @('hover', 'RegFileTitleBar') | Out-Null
+                Ui @('screenshot', 'RegFileMenu', '--output', (Join-Path $ArtifactDirectory 'registry-file-menu-button.png')) | Out-Null
+                Ui @('screenshot', 'RegFileLayoutModes', '--output', (Join-Path $ArtifactDirectory 'registry-file-layout-switcher.png')) | Out-Null
+                Ui @('wait-for', 'RegFileLayoutBoth', '-p', 'IsSelected', '--value', 'True', '-t', '3000') | Out-Null
+                $navigation = @($items | Where-Object automationId -eq 'RegFileKeys')[0]
+                $source = @($items | Where-Object automationId -eq 'RegFileSource')[0]
+                $values = @($items | Where-Object automationId -eq 'RegFileValues')[0]
+                $target = @($items | Where-Object automationId -eq 'RegFileTarget')[0]
+                if (-not $navigation -or -not $source -or -not $values -or $source.x + $source.width -gt $navigation.x -or $navigation.y + $navigation.height -gt $values.y) {
+                    throw 'Preview panes do not keep source left and the key tree above values on the right.'
+                }
+                if (-not $target -or $target.height / ([UxTestWindow]::GetDpiForWindow($script:mainWindow) / 96.0) -gt 32) { throw 'The target selector does not fit the compact status bar.' }
+                if ($user32.OpenSubKey($classKey) -or $user64.OpenSubKey($classKey)) { throw 'Opening a preview modified the registry.' }
+                if ($items.automationId -notcontains 'RegFileMetadata' -or $items.name -notcontains 'Registry preview sample') {
+                    throw 'Header metadata is missing from the preview.'
+                }
+                $metadata = @($items | Where-Object automationId -eq 'RegFileMetadata')[0]
+                $keysHeading = @($items | Where-Object automationId -eq 'RegFileKeysHeading')[0]
+                $valuesHeading = @($items | Where-Object automationId -eq 'RegFileValuesHeading')[0]
+                if (-not $keysHeading -or -not $valuesHeading -or $metadata.y + $metadata.height -gt $keysHeading.y -or
+                    [Math]::Abs($keysHeading.x - $valuesHeading.x) -gt 1) {
+                    throw 'File metadata is not above the matching Keys and Values preview headings.'
+                }
+                Ui @('wait-for', 'RegFileUndo', '-p', 'IsEnabled', '--value', 'False', '-t', '3000') | Out-Null
+                Ui @('wait-for', 'RegFileRedo', '-p', 'IsEnabled', '--value', 'False', '-t', '3000') | Out-Null
+                $initialEditor = @($items | Where-Object { $_.type -eq 'Edit' -and $_.className -eq 'WinUIEditor.EditorBaseControl' })[0]
+                Ui @('send-keys', 'ctrl+end', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                Wait-Ui { param($items) $items.name -notcontains 'Ln 1, Col 1' }
+                Ui @('send-keys', 'alt+f', '--via', 'send-input') | Out-Null
+                [void](Read-ContextMenu 'Reload')
+                Ui @('send-keys', 'r', '--via', 'send-input') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Ln 1, Col 1' }
+                Ui @('wait-for', 'RegFileUndo', '-p', 'IsEnabled', '--value', 'False', '-t', '3000') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                $smallInset = (Read-SourceCharacterMetrics).Inset
+                $largeSourceFile = Join-Path $ArtifactDirectory 'large-line-margin.reg'
+                $largeSource = [IO.File]::ReadAllText($importFile) + [string]::Concat(@(1..12000 | ForEach-Object { "; margin line" + [Environment]::NewLine }))
+                [IO.File]::WriteAllText($largeSourceFile, $largeSource, [Text.Encoding]::Unicode)
+                Ui @('send-keys', 'ctrl+o', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                File-Picker 'Open' $largeSourceFile
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                Ui @('send-keys', 'ctrl+home', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                $largeInset = (Read-SourceCharacterMetrics).Inset
+                if ($largeInset -le $smallInset + 4) { throw 'Loading a five-digit line count did not widen the line-number margin.' }
+                Set-Clipboard -Value ([IO.File]::ReadAllText($importFile))
+                Ui @('send-keys', 'ctrl+a', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                Ui @('send-keys', 'ctrl+v', '--via', 'send-input') | Out-Null
+                $clearedInset = (Read-SourceCharacterMetrics).Inset
+                if ($clearedInset -ge $largeInset - 4) { throw 'Deleting lines did not shrink the line-number margin.' }
+                Ui @('send-keys', 'ctrl+z', '--via', 'send-input') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                Ui @('send-keys', 'ctrl+home', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                $restoredInset = (Read-SourceCharacterMetrics).Inset
+                if ($restoredInset -le $smallInset + 4) { throw 'Restoring lines did not widen the line-number margin.' }
+                @{ small = $smallInset; loaded = $largeInset; deleted = $clearedInset; restored = $restoredInset } |
+                    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ArtifactDirectory 'registry-file-line-margin.json')
+                Ui @('send-keys', 'ctrl+o', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                File-Picker 'Open' $importFile
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                Ui @('send-keys', 'ctrl+shift+s', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'False', '-t', '5000') | Out-Null
+                [UxTestWindow]::CloseWindow($originalWindow)
+                Wait-Ui { param($items) $items.name -contains 'Finish the current operation before closing.' } -All
+                File-Picker 'Cancel'
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                $notice = @(Read-Ui | Where-Object automationId -eq 'RegFileNotice')[0]
+                $dismissNotice = @(Elements $notice.children | Where-Object automationId -eq 'CloseButton')[0]
+                Ui @('invoke', $dismissNotice.selector, '--action', 'invoke') | Out-Null
+                Wait-Ui { param($items) $items.name -notcontains 'Finish the current operation before closing.' }
+                Ui @('send-keys', 'alt+f', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
+                $fileMenu = Read-ContextMenu 'Reload'
+                if (($fileMenu.Items.automationId -join ',') -cne 'RegFileOpen,RegFileReload,RegFileSave,RegFileSaveAs,RegFileSettings,RegFileClose') {
+                    throw 'The File menu commands are missing or out of order.'
+                }
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-menu.png')) -Window $fileMenu.Window | Out-Null
+                Ui @('send-keys', 'escape', '--via', 'send-input') | Out-Null
+                Ui @('invoke', 'RegFileMetadata', '--action', 'collapse') | Out-Null
+                Wait-Ui { param($items) $items.name -notcontains 'Registry preview sample' }
+                $collapsedTree = @(Read-Ui | Where-Object automationId -eq 'RegFileKeys')[0]
+                if ($collapsedTree.height -le $navigation.height) { throw 'Collapsing metadata did not release tree space.' }
+                Ui @('invoke', 'RegFileMetadata', '--action', 'expand') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Registry preview sample' }
+                Ui @('hover', 'RegFileTitleBar') | Out-Null
+                $metadataEditor = @(Read-Ui | Where-Object { $_.type -eq 'Edit' -and $_.className -eq 'WinUIEditor.EditorBaseControl' })[0]
+                Ui @('focus', $metadataEditor.selector) | Out-Null
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-metadata.png')) | Out-Null
+                if (-not [UxTestWindow]::SetWindowPos($script:mainWindow, 0, 0, 0, 780, 520, 0x16)) { throw 'Could not test the minimum preview height.' }
+                Wait-Ui { param($items)
+                    $values = @($items | Where-Object automationId -eq 'RegFileValues')[0]
+                    $status = @($items | Where-Object automationId -eq 'RegFileStatus')[0]
+                    $values -and $status -and $values.height -ge 76 -and $values.y + $values.height -le $status.y
+                }
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-metadata-minimum.png')) | Out-Null
+                [void][UxTestWindow]::SetWindowPos($script:mainWindow, 0, 0, 0, 1200, 780, 0x16)
+                Ui @('invoke', 'RegFileMetadata', '--action', 'collapse') | Out-Null
+                $leaf = Pick 'TreeItem' ($classKey.Split([char]92))[-1]
+                Ui @('invoke', $leaf.selector, '--action', 'expand') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Removed (Delete)' -and $items.name -contains 'Reset (Delete, then recreate)' }
+
+                for ($navigation = 0; $navigation -lt 3; $navigation++) {
+                    $valueRow = @(Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' })
+                    if ($valueRow.Count -ne 1) { throw 'The file preview value row is missing.' }
+                    Ui @('invoke', $valueRow[0].selector, '--action', 'select') | Out-Null
+                    Ui @('wait-for', $valueRow[0].selector, '-p', 'IsSelected', '--value', 'True', '-t', '3000') | Out-Null
+                    $parentKey = Pick 'TreeItem' 'Software'
+                    Ui @('click', $parentKey.selector, '--double') | Out-Null
+                    Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' }).Count -eq 0 }
+                    $parentKey = Pick 'TreeItem' 'Software'
+                    Ui @('invoke', $parentKey.selector, '--action', 'expand') | Out-Null
+                    $leaf = Pick 'TreeItem' ($classKey.Split([char]92))[-1]
+                    Ui @('invoke', $leaf.selector, '--action', 'select') | Out-Null
+                    Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' }).Count -eq 1 }
+                }
+                Ui @('send-keys', 'alt+f', '--via', 'send-input', '--target', $leaf.selector) | Out-Null
+                [void](Read-ContextMenu 'Reload')
+                Ui @('send-keys', 'escape', '--via', 'send-input') | Out-Null
+                $typingEditor = @(Read-Ui | Where-Object { $_.type -eq 'Edit' -and $_.className -eq 'WinUIEditor.EditorBaseControl' })[0]
+                $typingRow = @(Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' })[0]
+                Ui @('click', $typingRow.selector) | Out-Null
+                $valueLine = '"RegeditViewFixture"="32"'
+                $valueLineNumber = [Array]::IndexOf($lines, $valueLine) + 1
+                Wait-Ui { param($items) $items.name -contains ('Ln ' + $valueLineNumber + ', Col 1') }
+                Ui @('send-keys', 'end', '--target', $typingEditor.selector, '--via', 'send-input') | Out-Null
+                Ui @('send-keys', 'left', '--via', 'send-input') | Out-Null
+                $typed = ''
+                foreach ($character in @('a', 'b', 'c')) {
+                    Ui @('send-keys', $character, '--via', 'send-input') | Out-Null
+                    $typed += $character
+                    Start-Sleep -Milliseconds 600
+                    $expectedCaret = 'Ln ' + $valueLineNumber + ', Col ' + ($valueLine.Length + $typed.Length)
+                    $state = @(Read-Ui)
+                    if ($state.name -notcontains $expectedCaret) {
+                        throw "Preview refresh moved the typing caret; expected $expectedCaret."
+                    }
+                    if (@($state | Where-Object { $_.type -eq 'ListItem' -and $_.name -like ('*REG_SZ, 32' + $typed + ', line*') }).Count -ne 1) {
+                        throw 'Typing did not update the selected value preview.'
+                    }
+                }
+                Ui @('send-keys', 'd', '--via', 'send-input') | Out-Null
+                Ui @('send-keys', 'ctrl+shift+left', '--via', 'send-input') | Out-Null
+                Start-Sleep -Milliseconds 600
+                Set-Clipboard -Value 'caret selection sentinel'
+                Ui @('send-keys', 'ctrl+c', '--via', 'send-input') | Out-Null
+                Assert-Clipboard '32abcd' 'registry-file-selection-after-refresh.txt' 'caret selection sentinel'
+                $initialSource = @(Read-Ui | Where-Object automationId -eq 'RegFileSource')[0]
+                Ui @('send-keys', 'left', '--target', 'RegFileSourceResize', '--via', 'send-input') | Out-Null
+                Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RegFileSource' -and $_.width -lt $initialSource.width - 10 }).Count -eq 1 }
+                $splitSource = @(Read-Ui | Where-Object automationId -eq 'RegFileSource')[0]
+                Set-PreviewLayout 'Editor'
+                $editorOnly = @(Read-Ui | Where-Object automationId -eq 'RegFileSource')[0]
+                if ($editorOnly.width -le $splitSource.width + 100) { throw 'Editor-only layout did not reclaim preview space.' }
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-editor-only.png')) | Out-Null
+                Set-PreviewLayout 'Preview'
+                $previewOnly = @(Read-Ui | Where-Object automationId -eq 'RegFileKeys')[0]
+                if ($previewOnly.width -le $splitSource.width + 100) { throw 'Preview-only layout did not reclaim editor space.' }
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-preview-only.png')) | Out-Null
+                Ui @('send-keys', 'left', '--target', 'RegFileLayoutPreview', '--via', 'send-input') | Out-Null
+                Ui @('wait-for', 'RegFileLayoutBoth', '-p', 'IsSelected', '--value', 'True', '-t', '3000') | Out-Null
+                Wait-Ui { param($items) $items.automationId -contains 'RegFileSource' -and $items.automationId -contains 'RegFileKeys' }
+                $restoredSource = @(Read-Ui | Where-Object automationId -eq 'RegFileSource')[0]
+                if ([Math]::Abs($restoredSource.width - $splitSource.width) -gt 2) { throw 'Switching layouts lost the resized split width.' }
+                Set-Clipboard -Value 'layout selection sentinel'
+                Ui @('send-keys', 'ctrl+c', '--target', $typingEditor.selector, '--via', 'send-input') | Out-Null
+                Assert-Clipboard '32abcd' 'registry-file-selection-after-layout.txt' 'layout selection sentinel'
+                Set-PreviewLayout 'Editor'
+                Ui @('send-keys', 'x', '--target', $typingEditor.selector, '--via', 'send-input') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '5000') | Out-Null
+                Set-PreviewLayout 'Preview'
+                Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*REG_SZ, x, line*' }).Count -eq 1 }
+                Ui @('send-keys', 'alt+z', '--via', 'send-input') | Out-Null
+                Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*REG_SZ, 32abcd, line*' }).Count -eq 1 }
+                Set-PreviewLayout 'Both'
+                Ui @('focus', $typingEditor.selector) | Out-Null
+                foreach ($mode in @(@('alt+1','Editor'), @('alt+3','Preview'), @('alt+2','Both'))) {
+                    Ui @('send-keys', $mode[0], '--via', 'send-input') | Out-Null
+                    Ui @('wait-for', ('RegFileLayout' + $mode[1]), '-p', 'IsSelected', '--value', 'True', '-t', '3000') | Out-Null
+                }
+
+                $fontRow = @(Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' })[0]
+                Ui @('click', $fontRow.selector) | Out-Null
+                Ui @('send-keys', 'end', '--target', $typingEditor.selector, '--via', 'send-input') | Out-Null
+                Ui @('send-keys', 'left', '--via', 'send-input') | Out-Null
+                Ui @('send-keys', 'ctrl+shift+left', '--via', 'send-input') | Out-Null
+                Set-Clipboard -Value 'before font selection sentinel'
+                Ui @('send-keys', 'ctrl+c', '--via', 'send-input') | Out-Null
+                Assert-Clipboard '32abcd' 'registry-file-selection-before-font.txt' 'before font selection sentinel'
+                $originalEditorPreferences = Get-Content $settingsFile -Raw | ConvertFrom-Json
+                $originalEditorFamily = $originalEditorPreferences.EditorFont.Family ?? 'Cascadia Code'
+                $originalEditorSize = $originalEditorPreferences.EditorFont.Size ?? 11
+                $originalCharacterHeight = Read-SourceCharacterHeight
+                $previewWindow = $script:mainWindow
+                Ui @('send-keys', 'alt+f', '--via', 'send-input', '--target', $typingEditor.selector) | Out-Null
+                [void](Read-ContextMenu 'Settings…')
+                Ui @('send-keys', 't', '--via', 'send-input') | Out-Null
+                try {
+                    $script:mainWindow = $originalWindow
+                    [UxTestWindow]::TargetWindow = $originalWindow
+                    Wait-Ui { param($items) $items.automationId -contains 'EditorLayoutSelector' -and $items.automationId -contains 'EditorFontSelector' }
+                    Wait-Ui {
+                        param($items)
+                        $focusJson = Ui @('get-focused', '--json')
+                        $focusJson | Set-Content -LiteralPath (Join-Path $ArtifactDirectory 'registry-file-settings-focus.json')
+                        $focused = $focusJson | ConvertFrom-Json
+                        $focused.hasFocus -and $focused.element.automationId -eq 'EditorLayoutSelector'
+                    }
+                    Ui @('send-keys', 'home', '--via', 'send-input', '--target', 'EditorLayoutSelector') | Out-Null
+                    Set-EditorFontFamily 'Courier New'
+                    Step-EditorFontSize 'UpSpinButton'
+                    Wait-Ui { param($items)
+                        $prefs = Get-Content $settingsFile -Raw | ConvertFrom-Json
+                        $prefs.RegistryFileLayout -eq 0 -and $prefs.EditorFont.Family -ceq 'Courier New' -and $prefs.EditorFont.Size -eq $originalEditorSize + 3
+                    }
+                    Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-editor-settings.png')) | Out-Null
+                } finally {
+                    $script:mainWindow = $previewWindow
+                    [UxTestWindow]::TargetWindow = $previewWindow
+                    Set-TestWindowForeground
+                }
+                $current = @(Read-Ui)
+                if ($current.automationId -notcontains 'RegFileSource' -or $current.automationId -notcontains 'RegFileKeys') { throw 'Changing the default view changed an already open preview.' }
+                $newCharacterHeight = Read-SourceCharacterHeight
+                if ($newCharacterHeight -le $originalCharacterHeight + 1) { throw 'The editor did not apply the new point size live.' }
+                Ui @('screenshot', 'RegFileSource', '--output', (Join-Path $ArtifactDirectory 'registry-file-custom-font.png')) | Out-Null
+                Ui @('wait-for', 'RegFileUndo', '-p', 'IsEnabled', '--value', 'True', '-t', '3000') | Out-Null
+                Set-Clipboard -Value 'font selection sentinel'
+                Ui @('send-keys', 'ctrl+c', '--target', $typingEditor.selector, '--via', 'send-input') | Out-Null
+                Assert-Clipboard '32abcd' 'registry-file-selection-after-font.txt' 'font selection sentinel'
+
+                foreach ($defaultView in 0, 2) {
+                    if ($defaultView -eq 2) {
+                        Ui @('send-keys', 'ctrl+,', '--via', 'send-input', '--target', $typingEditor.selector) | Out-Null
+                        try {
+                            $script:mainWindow = $originalWindow
+                            [UxTestWindow]::TargetWindow = $originalWindow
+                            Wait-Ui { param($items) $items.automationId -contains 'EditorLayoutSelector' }
+                            Ui @('send-keys', 'end', '--via', 'send-input', '--target', 'EditorLayoutSelector') | Out-Null
+                            Wait-Ui { param($items) (Get-Content $settingsFile -Raw | ConvertFrom-Json).RegistryFileLayout -eq 2 }
+                        } finally {
+                            $script:mainWindow = $previewWindow
+                            [UxTestWindow]::TargetWindow = $previewWindow
+                            Set-TestWindowForeground
+                        }
+                    }
+                    try {
+                        $script:mainWindow = $originalWindow
+                        [UxTestWindow]::TargetWindow = $originalWindow
+                        $registryTab = Pick 'TabItem' ($fixtureName + ' · 32-bit')
+                        Ui @('invoke', $registryTab.selector, '--action', 'select') | Out-Null
+                        Wait-Ui { param($items) $items.name -contains 'Registry keys and values' }
+                        Open-Menu 'Import registry file…'
+                        File-Picker 'Open' $importFile
+                        $timer = [Diagnostics.Stopwatch]::StartNew()
+                        do {
+                            $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+                            $newPreview = @($windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -like '*view-target.reg*' -and $_.hwnd -ne $previewWindow })
+                            if ($newPreview.Count -eq 1) { break }
+                            Start-Sleep -Milliseconds 100
+                        } while ($timer.Elapsed.TotalSeconds -lt 15)
+                        if ($newPreview.Count -ne 1) { throw 'The second preview did not open.' }
+                        $script:mainWindow = [long]$newPreview[0].hwnd
+                        [UxTestWindow]::TargetWindow = $script:mainWindow
+                        Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
+                        Wait-Ui { param($items)
+                            $hasEditor = $items.automationId -contains 'RegFileSource'
+                            $hasPreview = $items.automationId -contains 'RegFileKeys'
+                            $hasEditor -eq ($defaultView -eq 0) -and $hasPreview -eq ($defaultView -eq 2)
+                        }
+                        $layoutName = if ($defaultView -eq 0) { 'editor' } else { 'preview' }
+                        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory ('registry-file-default-' + $layoutName + '.png'))) | Out-Null
+                        $closeTarget = 'RegFileMenu'
+                        if ($defaultView -eq 0) {
+                            if ([Math]::Abs((Read-SourceCharacterHeight) - $newCharacterHeight) -gt 1) { throw 'A new preview did not inherit the editor font.' }
+                            $closeTarget = @(Read-Ui | Where-Object { $_.type -eq 'Edit' -and $_.className -eq 'WinUIEditor.EditorBaseControl' })[0].selector
+                        }
+                        Ui @('send-keys', 'alt+f', '--via', 'send-input', '--target', $closeTarget) | Out-Null
+                        [void](Read-ContextMenu 'Close')
+                        Ui @('send-keys', 'c', '--via', 'send-input') | Out-Null
+                        Start-Sleep -Milliseconds 400
+                        $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+                        if ($windows.hwnd -contains $script:mainWindow) { throw 'File Close did not close the clean preview.' }
+                    } finally {
+                        $script:mainWindow = $previewWindow
+                        [UxTestWindow]::TargetWindow = $previewWindow
+                        Set-TestWindowForeground
+                    }
+                }
+                Ui @('send-keys', 'ctrl+,', '--via', 'send-input', '--target', $typingEditor.selector) | Out-Null
+                try {
+                    $script:mainWindow = $originalWindow
+                    [UxTestWindow]::TargetWindow = $originalWindow
+                    Wait-Ui { param($items) $items.automationId -contains 'EditorLayoutSelector' }
+                    Ui @('send-keys', 'home', '--via', 'send-input', '--target', 'EditorLayoutSelector') | Out-Null
+                    Ui @('send-keys', 'down', '--via', 'send-input', '--target', 'EditorLayoutSelector') | Out-Null
+                    Set-EditorFontFamily $originalEditorFamily
+                    Step-EditorFontSize 'DownSpinButton'
+                    Wait-Ui { param($items)
+                        $prefs = Get-Content $settingsFile -Raw | ConvertFrom-Json
+                        $prefs.RegistryFileLayout -eq 1 -and $prefs.EditorFont.Family -ceq $originalEditorFamily -and $prefs.EditorFont.Size -eq $originalEditorSize
+                    }
+                } finally {
+                    $script:mainWindow = $previewWindow
+                    [UxTestWindow]::TargetWindow = $previewWindow
+                    Set-TestWindowForeground
+                }
+                if ([Math]::Abs((Read-SourceCharacterHeight) - $originalCharacterHeight) -gt 1) { throw 'Restoring editor preferences did not restore the font size.' }
+                [ordered]@{ originalHeight=$originalCharacterHeight; customHeight=$newCharacterHeight; restoredHeight=(Read-SourceCharacterHeight) } |
+                    ConvertTo-Json | Set-Content (Join-Path $ArtifactDirectory 'registry-file-font-heights.json')
+                Ui @('focus', $typingEditor.selector) | Out-Null
+
+                Ui @('send-keys', 'ctrl+end', '--via', 'send-input') | Out-Null
+                Start-Sleep -Milliseconds 600
+                $originalSource = [IO.File]::ReadAllText($importFile)
+                $endCaret = 'Ln ' + ($originalSource -split '\r\n|\n|\r').Count + ', Col 1'
+                if ((Read-Ui).name -notcontains $endCaret) { throw 'Synchronizing another key moved the source caret.' }
+                Ui @('send-keys', 'ctrl+a', '--via', 'send-input') | Out-Null
+                Set-Clipboard -Value 'caret source sentinel'
+                Ui @('send-keys', 'ctrl+c', '--via', 'send-input') | Out-Null
+                Assert-Clipboard ($originalSource.Replace($valueLine, '"RegeditViewFixture"="32abcd"')) 'registry-file-typed-source.txt' 'caret source sentinel'
+                Set-Clipboard -Value $editedSource
+                $editors = @(Read-Ui | Where-Object { $_.type -eq 'Edit' -and $_.className -eq 'WinUIEditor.EditorBaseControl' })
+                if ($editors.Count -ne 1) { throw 'The WinUIEdit editing surface is missing.' }
+                Ui @('send-keys', 'ctrl+a', '--target', $editors[0].selector, '--via', 'send-input') | Out-Null
+                Ui @('send-keys', 'ctrl+v', '--via', 'send-input') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '5000') | Out-Null
+                Ui @('wait-for', 'RegFileUndo', '-p', 'IsEnabled', '--value', 'True', '-t', '3000') | Out-Null
+                Ui @('invoke', 'RegFileUndo') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '5000') | Out-Null
+                Ui @('wait-for', 'RegFileRedo', '-p', 'IsEnabled', '--value', 'True', '-t', '3000') | Out-Null
+                Ui @('invoke', 'RegFileMetadata', '--action', 'expand') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Registry preview sample' }
+                Ui @('invoke', 'RegFileRedo') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Edited registry preview' -and $items.name -contains 'After import: Sign out' }
+                Ui @('invoke', 'RegFileMetadata', '--action', 'collapse') | Out-Null
+                Set-Clipboard -Value ($editedSource + '"Incomplete')
+                Ui @('send-keys', 'ctrl+a', '--target', $editors[0].selector, '--via', 'send-input') | Out-Null
+                Ui @('send-keys', 'ctrl+v', '--via', 'send-input') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'False', '-t', '5000') | Out-Null
+                Set-PreviewLayout 'Preview'
+                Ui @('invoke', 'RegFileErrorCount') | Out-Null
+                Ui @('wait-for', 'RegFileLayoutBoth', '-p', 'IsSelected', '--value', 'True', '-t', '3000') | Out-Null
+                Wait-Ui { param($items) $items.automationId -contains 'RegFileSource' }
+                Assert-RegistrySyntax 'light-incomplete' @(0x008000, 0xA31515, 0x0000FF, 0x098658)
+                Ui @('send-keys', 'ctrl+z', '--target', $editors[0].selector, '--via', 'send-input') | Out-Null
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '5000') | Out-Null
+                $sourceRoot = Pick 'TreeItem' ($classKey.Split([char]92))[-1]
+                Ui @('click', $sourceRoot.selector) | Out-Null
+                Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' }).Count -eq 1 }
+                Ui @('hover', 'RegFileTitleBar') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Removed (Delete)' -and $items.name -contains 'Reset (Delete, then recreate)' }
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-preview.png')) | Out-Null
+                Assert-RegistrySyntax 'light' @(0x008000, 0xA31515, 0x0000FF, 0x098658)
+                if (-not [UxTestWindow]::SetWindowPos($script:mainWindow, 0, 0, 0, 780, 720, 0x16)) { throw 'Could not narrow the preview.' }
+                Wait-Ui { param($items) $items.name -contains 'Read-only preview' -and @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*RegeditViewFixture*' }).Count -eq 1 }
+                Ui @('hover', 'RegFileTitleBar') | Out-Null
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-preview-narrow.png')) | Out-Null
+                [void][UxTestWindow]::SetWindowPos($script:mainWindow, 0, 0, 0, 1200, 780, 0x16)
+                $previewWindow = $script:mainWindow
+                try {
+                    $script:mainWindow = $originalWindow
+                    [UxTestWindow]::TargetWindow = $originalWindow
+                    Open-Menu 'Settings'
+                    Wait-Ui { param($items) $items.automationId -contains 'ThemeSelector' }
+                    Ui @('send-keys', 'end', '--via', 'send-input', '--target', 'ThemeSelector') | Out-Null
+                    Wait-Ui { param($items) (Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json).Theme -eq 'Dark' }
+                    $script:mainWindow = $previewWindow
+                    [UxTestWindow]::TargetWindow = $previewWindow
+                    Set-TestWindowForeground
+                    Ui @('hover', 'RegFileTitleBar') | Out-Null
+                    Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-preview-dark.png')) | Out-Null
+                    Ui @('screenshot', 'RegFileMenu', '--output', (Join-Path $ArtifactDirectory 'registry-file-menu-button-dark.png')) | Out-Null
+                    Assert-RegistrySyntax 'dark' @(0x6A9955, 0xCE9178, 0x569CD6, 0xB5CEA8)
+                    $script:mainWindow = $originalWindow
+                    [UxTestWindow]::TargetWindow = $originalWindow
+                    Ui @('send-keys', 'home', '--via', 'send-input', '--target', 'ThemeSelector') | Out-Null
+                    Ui @('send-keys', 'down', '--via', 'send-input', '--target', 'ThemeSelector') | Out-Null
+                    Wait-Ui { param($items) (Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json).Theme -eq 'Light' }
+                    $registryTab = Pick 'TabItem' ($fixtureName + ' · 32-bit')
+                    Ui @('invoke', $registryTab.selector, '--action', 'select') | Out-Null
+                    Wait-Ui { param($items) $items.name -contains 'Registry keys and values' }
+                } finally {
+                    $script:mainWindow = $previewWindow
+                    [UxTestWindow]::TargetWindow = $previewWindow
+                }
+                Ui @('send-keys', 'alt+i', '--via', 'send-input') | Out-Null
+                Wait-Ui { param($items) @($items | Where-Object { $_.name -like '*32-bit registry*' -and $_.name -like '*current editor contents*' }).Count -gt 0 }
+                Primary
+                Wait-Ui { param($items) $items.name -contains 'Import complete' }
+                Wait-Ui { param($items) @($items | Where-Object { $_.name -like '*File recommends: Sign out.*' }).Count -gt 0 }
+                Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'registry-file-follow-up.png')) | Out-Null
+                if ([IO.File]::ReadAllText($importFile) -match 'unsaved') { throw 'Import saved the edited source file.' }
+                [UxTestWindow]::CloseWindow($originalWindow)
+                Wait-Ui { param($items) $items.name -contains 'Unsaved registry file' }
+                Ui @('invoke', 'Cancel', '--action', 'invoke', '--type', 'Button') | Out-Null
+                Wait-Ui { param($items) $items.automationId -contains 'RegFileImport' -and $items.name -notcontains 'Unsaved registry file' }
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '3000') | Out-Null
+                Set-TestWindowForeground
+                Ui @('send-keys', 'alt+f', '--via', 'send-input') | Out-Null
+                $fileMenu = Read-ContextMenu 'Close'
+                $close = @($fileMenu.Items | Where-Object automationId -eq 'RegFileClose')[0]
+                Ui @('invoke', $close.selector) -Window $fileMenu.Window | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Unsaved registry file' }
+                [UxTestWindow]::AltF4($script:mainWindow)
+                Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'Window' -and $_.name -eq 'Unsaved registry file' }).Count -eq 1 }
+                Ui @('invoke', 'Cancel', '--action', 'invoke', '--type', 'Button') | Out-Null
+                Wait-Ui { param($items) $items.automationId -contains 'RegFileImport' -and $items.name -notcontains 'Unsaved registry file' }
+                Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '3000') | Out-Null
+                Ui @('get-focused', '--json') | Set-Content (Join-Path $ArtifactDirectory 'registry-file-focus-after-cancel.json')
+                Ui @('send-keys', 'ctrl+w', '--via', 'send-input') | Out-Null
+                Wait-Ui { param($items) $items.name -contains 'Unsaved registry file' }
+                Ui @('invoke', 'SecondaryButton', '--action', 'invoke') | Out-Null
+            } finally {
+                $script:mainWindow = $originalWindow
+                [UxTestWindow]::TargetWindow = $originalWindow
+            }
             $included = $user32.OpenSubKey($classKey)
             $excluded = $user64.OpenSubKey($classKey)
             try {
-                if (-not $included -or $included.GetValue('RegeditViewFixture') -cne '32' -or $excluded) { throw 'Import wrote outside the selected 32-bit view.' }
+                if (-not $included -or $included.GetValue('RegeditViewFixture') -cne 'unsaved' -or $excluded) { throw 'Import did not apply the current buffer to the selected 32-bit view.' }
+                if ($included.OpenSubKey('Removed')) { throw 'A deleted key survived import.' }
+                $reset = $included.OpenSubKey('Reset')
+                try {
+                    if (-not $reset -or $reset.GetValue('Old') -or $reset.GetValue('After') -cne 'retained') {
+                        throw 'Delete then recreate did not clear old contents and retain later writes.'
+                    }
+                } finally { if ($reset) { $reset.Dispose() } }
             } finally { if ($included) { $included.Dispose() }; if ($excluded) { $excluded.Dispose() } }
         } finally {
             $user32.DeleteSubKeyTree($classKey, $false)
@@ -5679,7 +6247,8 @@ catch {
 }
 finally {
     if ($appProcess -and -not $appProcess.HasExited) {
-        $appProcess.CloseMainWindow() | Out-Null
+        if ($mainWindow) { [UxTestWindow]::CloseWindow($mainWindow) }
+        else { $appProcess.CloseMainWindow() | Out-Null }
         if (-not $appProcess.WaitForExit(10000)) {
             $results.Add(@{ name = 'Graceful shutdown'; status = 'FAIL'; detail = 'The fixture editor did not exit.' })
             $appProcess.Kill(); $appProcess.WaitForExit(5000) | Out-Null

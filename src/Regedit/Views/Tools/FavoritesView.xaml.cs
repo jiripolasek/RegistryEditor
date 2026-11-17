@@ -24,34 +24,25 @@ namespace JPSoftworks.Regedit.Views.Tools;
 
 public sealed partial class FavoritesView : UserControl, IToolSurface
 {
+    private readonly ToolCommand _addCommand, _searchCommand, _folderActionsCommand;
+
+    private readonly Dictionary<FavoriteItemId, TreeViewNode> _nodes = [];
+
+    private ToolCommand? _previewCommand;
+    private FavoriteRow? _renderedRoot;
+    private bool _syncing, _loaded, _focusPending, _focusSelection;
+
     private ListView Results => this.ResultColumns.ListView;
 
     private TextBox Search => this.LocalControls.SearchBox;
 
-    private ToolCommand? _previewCommand;
-
-    internal void ApplyListSpacing(double spacing)
-    {
-        ListDensity.SetSpacing(this.Results, spacing);
-    }
-
     internal FavoritesViewModel ViewModel { get; }
-
-    private readonly Dictionary<FavoriteItemId, TreeViewNode> _nodes = [];
-    private FavoriteRow? _renderedRoot;
-    private bool _syncing, _loaded, _focusPending, _focusSelection;
-    private readonly ToolCommand _addCommand, _searchCommand, _folderActionsCommand;
 
     public ToolKind Tool => ToolKind.Favorites;
 
     public Button MenuButton => this.PageHeader.MenuButton;
 
     public IReadOnlyList<ToolCommand> PanelCommands { get; }
-
-    public static Visibility TextVisibility(string text)
-    {
-        return text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-    }
 
     internal FavoritesView(
         FavoritesStore store,
@@ -94,8 +85,8 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
             Command = this.ViewModel.ToggleDetailsCommand, IsToggle = true
         };
         this.LocalControls.SetPreviewCommand(this._previewCommand);
-        this.PanelCommands =
-        (ToolCommand[])[
+        this.PanelCommands = (ToolCommand[])
+        [
             this._addCommand,
             new ToolCommand("New folder", Symbol.NewFolder) { Command = this.ViewModel.NewFolderCommand },
             this._searchCommand,
@@ -149,6 +140,16 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
                 ? row
                 : null, row => this.ViewModel.OpenBackgroundCommand.Execute(row.Key));
         this.UpdateSurfaceLayout();
+    }
+
+    internal void ApplyListSpacing(double spacing)
+    {
+        ListDensity.SetSpacing(this.Results, spacing);
+    }
+
+    public static Visibility TextVisibility(string text)
+    {
+        return text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void ItemMenu_Opening(object sender, object args)

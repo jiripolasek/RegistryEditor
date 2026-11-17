@@ -28,12 +28,12 @@ namespace JPSoftworks.Regedit.Views.Pages;
 
 public sealed partial class InvestigationPage : Page, IPanelView
 {
-    private bool _restoringSelection;
+    private readonly WindowDialogPresenter _dialogs;
+    private readonly ToolCommand _inspectCommand;
+    private readonly List<ToolCommand> _itemCommands = [];
     private bool _detailsExpanded, _detailsCollapsed;
     private bool _docked;
-    private readonly List<ToolCommand> _itemCommands = [];
-    private readonly ToolCommand _inspectCommand;
-    private readonly WindowDialogPresenter _dialogs;
+    private bool _restoringSelection;
 
     internal InvestigationViewModel ViewModel { get; }
 
@@ -51,7 +51,8 @@ public sealed partial class InvestigationPage : Page, IPanelView
 
     public string PanelCommandsId => "ItemCommands";
 
-    public IReadOnlyList<ToolCommand> PanelCommands => (ToolCommand[])[.. this._itemCommands, this.LocalControls.ViewCommand];
+    public IReadOnlyList<ToolCommand> PanelCommands =>
+        (ToolCommand[])[.. this._itemCommands, this.LocalControls.ViewCommand];
 
     public PanelSearch? PanelSearch { get; }
 
@@ -60,34 +61,8 @@ public sealed partial class InvestigationPage : Page, IPanelView
     // The inner list of the column control; selection, menus, density and scrolling helpers act on it.
     private ListView Results => this.ResultColumns.ListView;
 
-    private void InitializeResults(ColumnLayoutPersistence? layouts)
-    {
-        if (!this.IsSearch)
-        {
-            var declared = this.ResultColumns.Columns.ToArray();
-            declared[0].Header = "Name";
-            declared[1].Header = this.IsWorkspace ? "Contents" : "Registry scope";
-            declared[2].Header = "Find";
-            this.ResultColumns.Columns.Clear();
-            foreach (var column in this.IsWorkspace ? declared.Take(2) : declared)
-            {
-                this.ResultColumns.Columns.Add(column);
-            }
-        }
-
-        var list = this.Results;
-        AutomationProperties.SetName(list, this.IsSearch ? "Investigation results" : "Investigation items");
-        list.ItemContainerStyle = (Style)Application.Current.Resources["ToolListItemStyle"];
-        list.DoubleTapped += this.Results_DoubleTapped;
-        list.PreviewKeyDown += this.Results_KeyDown;
-        list.SelectionChanged += this.Selection_Changed;
-        this.ResultColumns.ItemAutomationName = item => (item as InvestigationRow)?.AccessibleName;
-        if (layouts is not null)
-        {
-            var listId = this.IsSearch ? "SearchResults" : this.IsWorkspace ? "Workspaces" : "SavedSearches";
-            layouts.Attach(this.ResultColumns, listId);
-        }
-    }
+    private bool IsWide => !this._docked &&
+                           this.Layout.ActualWidth - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
 
     internal InvestigationPage(
         InvestigationViewModel viewModel,
@@ -209,6 +184,35 @@ public sealed partial class InvestigationPage : Page, IPanelView
                 this.Results,
                 args => MiddleClick.Container<ListViewItem>(this.Results, args)?.Content as InvestigationRow,
                 row => search.OpenInBackgroundCommand.Execute(row));
+        }
+    }
+
+    private void InitializeResults(ColumnLayoutPersistence? layouts)
+    {
+        if (!this.IsSearch)
+        {
+            var declared = this.ResultColumns.Columns.ToArray();
+            declared[0].Header = "Name";
+            declared[1].Header = this.IsWorkspace ? "Contents" : "Registry scope";
+            declared[2].Header = "Find";
+            this.ResultColumns.Columns.Clear();
+            foreach (var column in this.IsWorkspace ? declared.Take(2) : declared)
+            {
+                this.ResultColumns.Columns.Add(column);
+            }
+        }
+
+        var list = this.Results;
+        AutomationProperties.SetName(list, this.IsSearch ? "Investigation results" : "Investigation items");
+        list.ItemContainerStyle = (Style)Application.Current.Resources["ToolListItemStyle"];
+        list.DoubleTapped += this.Results_DoubleTapped;
+        list.PreviewKeyDown += this.Results_KeyDown;
+        list.SelectionChanged += this.Selection_Changed;
+        this.ResultColumns.ItemAutomationName = item => (item as InvestigationRow)?.AccessibleName;
+        if (layouts is not null)
+        {
+            var listId = this.IsSearch ? "SearchResults" : this.IsWorkspace ? "Workspaces" : "SavedSearches";
+            layouts.Attach(this.ResultColumns, listId);
         }
     }
 
@@ -417,7 +421,9 @@ public sealed partial class InvestigationPage : Page, IPanelView
             else if (row.Source is SavedSearch search)
             {
                 this.Details.Show(
-                    search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty, (ToolComparison[])[
+                    search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty,
+                    (ToolComparison[])
+                    [
                         new ToolComparison(
                             string.Empty, search.Options.Text, ToolPresentation.SearchOptionsText(search.Options),
                             "Query", "Match options")
@@ -472,9 +478,6 @@ public sealed partial class InvestigationPage : Page, IPanelView
             this.Details, this.InspectorWidth, this.InspectorHeight, beside, visible,
             () => this.Collection.ActualWidth + this.InspectorWidth.ActualWidth);
     }
-
-    private bool IsWide => !this._docked &&
-                           this.Layout.ActualWidth - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
 
     private void InspectDetails_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
