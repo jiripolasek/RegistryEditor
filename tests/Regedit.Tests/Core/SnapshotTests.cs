@@ -160,7 +160,7 @@ internal static class SnapshotTests
             var text = File.ReadAllText(export);
             check(
                 text.Contains("[-HKEY_CURRENT_USER\\Software\\Snapshot tests\\Removed]") && text.Contains("@=-") &&
-                text.Contains("hex(63):00,ff,11") && text.Contains("\"Added\"=hex(4):01,00,00,00") &&
+                text.Contains("hex(63):00,ff,11") && text.Contains("\"Added\"=dword:00000001") &&
                 text.Contains("/reg:32"),
                 "Patch exports deletions, raw types, and explicit registry-view instructions");
             var changedValue = comparison.Differences.Single(change => change.Name == "name");

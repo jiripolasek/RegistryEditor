@@ -2,6 +2,7 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Security;
 using System.Text;
@@ -93,16 +94,37 @@ public static class RegistryExport
 
     internal static async Task WriteValueAsync(TextWriter writer, RegistryValue value, CancellationToken token)
     {
-        const int bytesPerLine = 24;
+        var name = ValueName(value.Name);
+        if (value.Type == RegistryValueType.String)
+        {
+            var text = value.EditText(false);
+            // Quoted strings must preserve the original UTF-16 bytes and fit on one line.
+            if (text.IndexOfAny(['\0', '\r', '\n']) < 0 &&
+                value.Data.AsSpan().SequenceEqual(RegistryValue.ParseData(value.Type, text)))
+            {
+                await writer.WriteLineAsync(
+                    $"{name}=\"{text.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"".AsMemory(), token);
+                return;
+            }
+        }
+        else if (value.Type == RegistryValueType.DWord && value.Data.Length == 4)
+        {
+            await writer.WriteLineAsync(
+                $"{name}=dword:{BinaryPrimitives.ReadUInt32LittleEndian(value.Data):x8}".AsMemory(), token);
+            return;
+        }
+
+        const int wrapColumn = 76;
         const string hex = "0123456789abcdef";
-        var line = new StringBuilder($"{ValueName(value.Name)}=hex({(uint)value.Type:x}):");
+        var type = value.Type == RegistryValueType.Binary ? "hex:" : $"hex({(uint)value.Type:x}):";
+        var line = new StringBuilder($"{name}={type}");
         for (var i = 0; i < value.Data.Length; i++)
         {
-            if (i != 0 && i % bytesPerLine == 0)
+            if (i != 0 && line.Length >= wrapColumn)
             {
-                line.Append(",\\\r\n  ");
+                line.Append(",\\\r\n");
                 await writer.WriteAsync(line, token);
-                line.Clear();
+                line.Clear().Append("  ");
             }
             else if (i != 0)
             {

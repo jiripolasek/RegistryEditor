@@ -110,6 +110,7 @@ AddAsync("search-result-navigation", () => SearchResultNavigationTests.RunAsync(
 AddAsync("investigation-view-model", () => InvestigationViewModelTests.RunAsync(Check));
 AddAsync("branch-workflow", () => BranchWorkflowTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("large-value", () => LargeValueTests.RunAsync(Check, args.Contains("--registry")));
+AddAsync("registry-export", () => RegistryExportTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("clipboard-routing", () => ClipboardRoutingTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("notes-view-model", () => NotesViewModelTests.RunAsync(Check));
 AddAsync("notes-store", () => NotesStoreTests.RunAsync(Check));
@@ -417,12 +418,13 @@ if (args.Contains("--registry"))
                 Check(exportedText.Contains("Windows Registry Editor Version 5.00"), "Export header");
                 var expectedLines = string.Join(
                     ",\\\r\n  ",
-                    wrapped.Chunk(24).Select(chunk => string.Join(",", chunk.Select(b => b.ToString("x2")))));
+                    new[] { wrapped[..19], wrapped[19..44], wrapped[44..] }
+                        .Select(chunk => string.Join(",", chunk.Select(b => b.ToString("x2")))));
                 Check(
-                    exportedText.Contains("\"wrapped export\"=hex(3):" + expectedLines + "\r\n") &&
-                    exportedText.Contains("\"empty export\"=hex(3):\r\n") &&
+                    exportedText.Contains("\"wrapped export\"=hex:" + expectedLines + "\r\n") &&
+                    exportedText.Contains("\"empty export\"=hex:\r\n") &&
                     File.ReadAllBytes(export).AsSpan().StartsWith(System.Text.Encoding.Unicode.GetPreamble()),
-                    "Batched export preserves the UTF-16 BOM, empty data, lowercase bytes, 24-byte wrapping and CRLF");
+                    "Export preserves the UTF-16 BOM, empty data, lowercase bytes, Regedit-compatible wrapping and CRLF");
                 service.DeleteKey(fixture);
                 await RegistryService.RunRegAsync("import", export, "/reg:64");
                 Check(
