@@ -200,7 +200,7 @@ function Tool-Option([string] $Name) {
     $browserToolbar = (Read-Ui).automationId -contains 'QuickSearch'
     Press 'Tools'
     if ($Name -eq 'Right sidebar' -and -not $browserToolbar) { return }
-    $menu = Read-ContextMenu $Name
+    $menu = if ($browserToolbar) { Read-ToolbarTools } else { Read-ContextMenu $Name }
     $item = @($menu.Items | Where-Object name -eq $Name)
     if ($item.Count -ne 1) { throw "Expected one Tools option named '$Name'." }
     Ui @('invoke', $item[0].selector) -Window $menu.Window | Out-Null
@@ -502,6 +502,11 @@ function Read-ContextMenu([string] $Expected = '', [string[]] $Types = @('MenuIt
         Start-Sleep -Milliseconds 100
     } while ($timer.Elapsed.TotalSeconds -lt 15)
     throw "Expected context command '$Expected' did not appear."
+}
+function Read-ToolbarTools {
+    $menu = Read-ContextMenu 'Customize toolbar…' -Types @('MenuItem', 'Button')
+    $menu.Items = @($menu.Items | Where-Object { $_.type -eq 'MenuItem' -or $_.automationId -like 'ToolsMenuPin*' })
+    $menu
 }
 function File-Picker([string] $Action, [string] $Path) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -3284,6 +3289,7 @@ try {
 
     Test-Ui 'Toolbar context actions and application Tools stay in sync' {
         Browser
+        Set-TestWindowForeground
         if ((Read-Ui).automationId -contains 'ToolSelector') { Press 'Close tool panel' }
         if ((Read-Ui).automationId -contains 'BottomTabs') { Press 'Hide bottom panel' }
         $toolbarBefore = Pick 'Button' 'Tools'
@@ -3315,9 +3321,9 @@ try {
         Ui @('invoke', 'ToolbarBottomPanel') | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' -and $items.automationId -contains 'ToolSelector' }
         Press 'Tools'
-        $toolbarMenu = Read-ContextMenu 'Right sidebar'
-        $toolbarNames = @($toolbarMenu.Items.name)
-        Close-ContextMenu $toolbarMenu
+        $toolbarMenu = Read-ToolbarTools
+        $toolbarNames = @($toolbarMenu.Items | Where-Object automationId -notlike 'ToolsMenuPin*' | ForEach-Object name)
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
         Press 'Application menu'
         $applicationMenu = Read-ContextMenu 'Tools'
         $tools = @($applicationMenu.Items | Where-Object name -eq 'Tools')[0]
@@ -3369,29 +3375,65 @@ try {
         Press 'Close tool panel'
     }
 
+    Test-Ui 'Toolbar Tools pins save from a narrow window with mouse and keyboard' {
+        Browser
+        if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 900, 900, 0x16)) { throw 'Could not narrow the toolbar fixture.' }
+        Wait-Ui { param($items) $items.automationId -contains 'ToolsButton' -and $items.automationId -notcontains 'ToolbarShortcuts' }
+        Set-TestWindowForeground
+        Press 'Tools'
+        $menu = Read-ToolbarTools
+        $favorites = @($menu.Items | Where-Object automationId -eq 'ToolsMenuFavorites')[0]
+        $pin = @($menu.Items | Where-Object automationId -eq 'ToolsMenuPinFavorites')[0]
+        if ($pin.name -ne 'Pin Favorites to toolbar' -or $pin.x -le $favorites.x + $favorites.width / 2 -or
+            $pin.x + $pin.width -gt $favorites.x + $favorites.width) {
+            throw 'Favorites needs a separate pin button to the right of its action.'
+        }
+        $pinPoint = "$([int]($pin.x + $pin.width / 2)),$([int]($pin.y + $pin.height / 2))"
+        Ui @('click', '--at', $pinPoint) | Out-Null
+        $menu = Read-ToolbarTools
+        $pin = @($menu.Items | Where-Object automationId -eq 'ToolsMenuPinFavorites')[0]
+        if ($pin.name -ne 'Unpin Favorites from toolbar' -or (Get-Content $settingsFile -Raw | ConvertFrom-Json).ToolbarButtons -ne 1) {
+            throw 'Pinning Favorites did not update the open flyout and save the shortcut.'
+        }
+        Wait-Ui { param($items) $items.automationId -contains 'ToolbarFavorites' -and $items.automationId -notcontains 'ToolSelector' } -All
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
+        Ui @('send-keys', 'enter', '--target', 'ToolsButton', '--via', 'send-input') | Out-Null
+        Read-ToolbarTools | Out-Null
+        Ui @('send-keys', 'right', '--via', 'send-input') | Out-Null
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        $menu = Read-ToolbarTools
+        if ($menu.Items.name -notcontains 'Pin Favorites to toolbar' -or (Get-Content $settingsFile -Raw | ConvertFrom-Json).ToolbarButtons -ne 0) {
+            throw 'Unpinning Favorites did not update the open flyout and save the shortcut.'
+        }
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'ToolbarShortcuts' }
+        if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1280, 900, 0x16)) { throw 'Could not restore the toolbar fixture.' }
+    }
+
     Test-Ui 'Toolbar feature shortcuts and panel toggles are optional and independent' {
         Browser
+        Set-TestWindowForeground
         if ((Read-Ui).automationId -contains 'ToolSelector') { Press 'Close tool panel' }
         if ((Read-Ui).automationId -contains 'BottomTabs') { Press 'Hide bottom panel' }
         if ((Read-Ui).automationId -contains 'ToolbarShortcuts') { throw 'Optional toolbar buttons should start hidden.' }
         Press 'Tools'
-        $menu = Read-ContextMenu 'Right sidebar'
+        $menu = Read-ToolbarTools
         foreach ($name in @('Favorites', 'Notes', 'Watches', 'Change journal', 'Saved searches', 'Workspaces', 'Right sidebar', 'Bottom panel', 'Customize toolbar…')) {
             if ($menu.Items.name -notcontains $name) { throw "Missing Tools option: $name" }
         }
-        Close-ContextMenu $menu
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
         Tool-Option 'Right sidebar'
         if ((Read-Ui).name -contains 'Pin tool panel') { Press 'Pin tool panel' }
         Tool-Option 'Bottom panel'
         Wait-Ui { param($items) $items.automationId -contains 'ToolSelector' -and $items.automationId -contains 'BottomTabs' }
         Press 'Tools'
-        $menu = Read-ContextMenu 'Right sidebar'
+        $menu = Read-ToolbarTools
         foreach ($name in 'Right sidebar', 'Bottom panel') {
             $item = @($menu.Items | Where-Object name -eq $name)[0]
             $state = Ui @('get-property', $item.selector, '--property', 'ToggleState', '--json') -Window $menu.Window | ConvertFrom-Json
             if ([string]$state.properties.ToggleState -notmatch '^(?:ToggleState_)?On$|^1$') { throw "$name does not reflect its open state." }
         }
-        Close-ContextMenu $menu
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
         Tool-Option 'Bottom panel'
         Wait-Ui { param($items) $items.automationId -contains 'ToolSelector' -and $items.automationId -notcontains 'BottomTabs' }
         Tool-Option 'Right sidebar'
@@ -3436,6 +3478,7 @@ try {
         $narrowTools = @($narrowToolbar | Where-Object automationId -eq 'ToolsButton')[0]
         $shortcutsMore = @($narrowToolbar | Where-Object { $_.automationId -eq 'MoreButton' -and [Math]::Abs($_.y - $narrowTools.y) -le 1 })
         if ($shortcutsMore.Count -ne 1) { throw 'The narrow shortcut strip lost its overflow button.' }
+        Set-TestWindowForeground
         Ui @('click', '--at', "$([int]($shortcutsMore[0].x + $shortcutsMore[0].width / 2)),$([int]($shortcutsMore[0].y + $shortcutsMore[0].height / 2))") | Out-Null
         $shortcutMenu = Read-ContextMenu 'Favorites'
         foreach ($name in 'Favorites', 'Notes', 'Watches', 'Change journal', 'Saved searches', 'Workspaces', 'Right sidebar', 'Bottom panel') {
@@ -3445,10 +3488,11 @@ try {
         Ui @('invoke', $favoriteShortcut.selector) -Window $shortcutMenu.Window | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'FavoriteTree' }
         Press 'Close tool panel'
-        Press 'Tools'
-        $menu = Read-ContextMenu 'Favorites'
+        Wait-Ui { param($items) $items.automationId -notcontains 'ToolSelector' }
+        Ui @('send-keys', 'enter', '--target', 'ToolsButton', '--via', 'send-input') | Out-Null
+        $menu = Read-ToolbarTools
         if ($menu.Items.name -notcontains 'Bottom panel') { throw 'Narrow layout lost panel commands.' }
-        Close-ContextMenu $menu
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'toolbar-narrow.png')) | Out-Null
         if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1280, 900, 0x16)) { throw 'Could not restore the toolbar fixture.' }
         Open-Menu 'Settings'

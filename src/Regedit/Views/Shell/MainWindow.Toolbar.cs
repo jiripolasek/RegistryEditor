@@ -16,9 +16,9 @@ namespace JPSoftworks.Regedit.Views.Shell;
 
 public sealed partial class MainWindow
 {
-    internal (ToolbarButtons Button, ToolCommand Command)[] ToolbarCommands { get; private set; } = [];
-
     private readonly List<(ToolCommand Command, ToggleMenuFlyoutItem Item)> _toolMenuToggles = [];
+
+    internal (ToolbarButtons Button, ToolCommand Command)[] ToolbarCommands { get; private set; } = [];
 
     private void InitializeToolbarCommands()
     {
@@ -124,7 +124,7 @@ public sealed partial class MainWindow
         }
     }
 
-    internal void FillToolsMenu(IList<MenuFlyoutItemBase> items)
+    internal void FillToolsMenu(IList<MenuFlyoutItemBase> items, Action<ToolbarButtons, ToolCommand, MenuFlyoutItem>? attach = null)
     {
         this.UpdateToolbarCommands();
         items.Clear();
@@ -151,6 +151,7 @@ public sealed partial class MainWindow
                 this._toolMenuToggles.Add((command, toggle));
             }
 
+            attach?.Invoke(button, command, item);
             items.Add(item);
         }
 
