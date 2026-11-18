@@ -19,6 +19,126 @@
             <Setter Property="Background" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
             <Setter Property="BorderBrush" Value="{ThemeResource SubtleFillColorTransparentBrush}" />
         </Style>
+        <Style
+            x:Key="ToolsMenuPinButtonStyle"
+            BasedOn="{StaticResource SubtleButtonStyle}"
+            TargetType="Button">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <ControlTemplate x:Key="PinnableToolsMenuItemTemplate" TargetType="MenuFlyoutItem">
+            <Grid
+                x:Name="Row"
+                Margin="{StaticResource MenuFlyoutItemMargin}"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                ColumnDefinitions="*,Auto"
+                CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid
+                    x:Name="ActionContent"
+                    Padding="{TemplateBinding Padding}"
+                    ColumnDefinitions="28,28,*,Auto">
+                    <FontIcon
+                        x:Name="CheckGlyph"
+                        HorizontalAlignment="Left"
+                        FontSize="12"
+                        Foreground="{TemplateBinding Foreground}"
+                        Glyph="&#xE73E;"
+                        Opacity="0" />
+                    <Viewbox
+                        Grid.Column="1"
+                        Width="16"
+                        Height="16"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                        <ContentPresenter
+                            x:Name="ToolIcon"
+                            Content="{TemplateBinding Icon}"
+                            Foreground="{TemplateBinding Foreground}" />
+                    </Viewbox>
+                    <TextBlock
+                        x:Name="Label"
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        Foreground="{TemplateBinding Foreground}"
+                        Text="{TemplateBinding Text}"
+                        TextTrimming="{ThemeResource MenuFlyoutItemTextTrimming}" />
+                    <TextBlock
+                        x:Name="KeyboardAcceleratorTextBlock"
+                        Grid.Column="3"
+                        Margin="24,0,0,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.AccessibilityView="Raw"
+                        Foreground="{ThemeResource MenuFlyoutItemKeyboardAcceleratorTextForeground}"
+                        Style="{ThemeResource CaptionTextBlockStyle}"
+                        Text="{TemplateBinding KeyboardAcceleratorTextOverride}"
+                        Visibility="Collapsed" />
+                </Grid>
+                <ContentPresenter
+                    Grid.Column="1"
+                    Margin="0,0,4,0"
+                    VerticalAlignment="Center"
+                    Content="{TemplateBinding Tag}" />
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup x:Name="CommonStates">
+                        <VisualState x:Name="Normal" />
+                        <VisualState x:Name="PointerOver">
+                            <VisualState.Setters>
+                                <Setter Target="Row.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}" />
+                                <Setter Target="Label.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
+                                <Setter Target="ToolIcon.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
+                                <Setter Target="CheckGlyph.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
+                                <Setter Target="KeyboardAcceleratorTextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemKeyboardAcceleratorTextForegroundPointerOver}" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="Pressed">
+                            <VisualState.Setters>
+                                <Setter Target="Row.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPressed}" />
+                                <Setter Target="Label.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
+                                <Setter Target="ToolIcon.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
+                                <Setter Target="CheckGlyph.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
+                                <Setter Target="KeyboardAcceleratorTextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemKeyboardAcceleratorTextForegroundPressed}" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="Disabled">
+                            <VisualState.Setters>
+                                <Setter Target="Row.Background" Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}" />
+                                <Setter Target="Label.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
+                                <Setter Target="ToolIcon.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
+                                <Setter Target="CheckGlyph.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
+                                <Setter Target="KeyboardAcceleratorTextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemKeyboardAcceleratorTextForegroundDisabled}" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                    <VisualStateGroup x:Name="CheckStates">
+                        <VisualState x:Name="UncheckedWithIcon" />
+                        <VisualState x:Name="CheckedWithIcon">
+                            <VisualState.Setters>
+                                <Setter Target="CheckGlyph.Opacity" Value="1" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                    <VisualStateGroup x:Name="PaddingSizeStates">
+                        <VisualState x:Name="DefaultPadding" />
+                        <VisualState x:Name="NarrowPadding">
+                            <VisualState.Setters>
+                                <Setter Target="ActionContent.Padding" Value="{StaticResource MenuFlyoutItemThemePaddingNarrow}" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                    <VisualStateGroup x:Name="KeyboardAcceleratorTextVisibility">
+                        <VisualState x:Name="KeyboardAcceleratorTextCollapsed" />
+                        <VisualState x:Name="KeyboardAcceleratorTextVisible">
+                            <VisualState.Setters>
+                                <Setter Target="KeyboardAcceleratorTextBlock.Visibility" Value="Visible" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+            </Grid>
+        </ControlTemplate>
         <MenuFlyout x:Key="ListToolbarMenu" Placement="BottomEdgeAlignedLeft">
             <ToggleMenuFlyoutItem IsChecked="{x:Bind Preferences.ShowListToolbar, Mode=TwoWay}" Text="List toolbar" />
         </MenuFlyout>
@@ -610,7 +730,7 @@
                     Style="{StaticResource ToolbarButtonStyle}"
                     ToolTipService.ToolTip="Tools and panel visibility">
                     <Button.Flyout>
-                        <MenuFlyout Opening="ToolsMenu_Opening" Placement="BottomEdgeAlignedLeft" />
+                        <MenuFlyout Opening="ToolsMenu_Opening" Placement="BottomEdgeAlignedRight" />
                     </Button.Flyout>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon
