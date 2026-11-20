@@ -14,8 +14,7 @@ public sealed partial class ToolRowResources : ResourceDictionary
     // WinUI cannot share one path geometry between multiple rendered icons.
     public static IconSource BinaryIcon => new PathIconSource
     {
-        Data = (Geometry)XamlBindingHelper.ConvertValue(
-            typeof(Geometry), Application.Current.Resources["RegistryBinaryIconData"])
+        Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), Application.Current.Resources["RegistryBinaryIconData"])
     };
 
     public ToolRowResources()

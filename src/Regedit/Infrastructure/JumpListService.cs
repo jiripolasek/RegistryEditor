@@ -33,8 +33,7 @@ internal sealed class JumpListService(
                     entries, removed =>
                     {
                         // Persist removals before the backend replaces Windows' removal records.
-                        settings.HideJumpListFavorites(
-                            JumpListEntries.RemovedFavoriteIds(entries, removed), settingsPath);
+                        settings.HideJumpListFavorites(JumpListEntries.RemovedFavoriteIds(entries, removed), settingsPath);
                     }).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -52,8 +51,7 @@ internal sealed class JumpListService(
         {
             try
             {
-                return new FileStream(
-                    settingsPath + ".jumplist.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                return new FileStream(settingsPath + ".jumplist.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
             catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33)
             {

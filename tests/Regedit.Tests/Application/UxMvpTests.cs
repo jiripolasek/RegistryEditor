@@ -28,23 +28,17 @@ internal static class UxMvpTests
 
         var value = Text(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"));
         check(
-            RegistryFileReveal.Resolve(location, Text(@"%SystemRoot%\explorer.exe", RegistryValueType.ExpandString)) ==
-            Path.Combine(Environment.GetEnvironmentVariable("SystemRoot")!, "explorer.exe"),
-            "Reveal expands REG_EXPAND_SZ paths");
+            RegistryFileReveal.Resolve(location, Text(@"%SystemRoot%\explorer.exe", RegistryValueType.ExpandString))
+            == Path.Combine(Environment.GetEnvironmentVariable("SystemRoot")!, "explorer.exe"), "Reveal expands REG_EXPAND_SZ paths");
         foreach (var rejected in new[]
                  {
-                     Text(@"relative\file"), Text(@"\\server\share\file"), Text("\"C:\\app.exe --argument"),
-                     Text("\"\" --argument"), Text("C:\\file\0other"),
-                     new RegistryValue("Number", RegistryValueType.DWord, [1, 0, 0, 0]),
+                     Text(@"relative\file"), Text(@"\\server\share\file"), Text("\"C:\\app.exe --argument"), Text("\"\" --argument"),
+                     Text("C:\\file\0other"), new RegistryValue("Number", RegistryValueType.DWord, [1, 0, 0, 0]),
                      new RegistryValue("Broken", RegistryValueType.String, [0, 216])
                  })
         {
-            check(
-                RegistryFileReveal.Resolve(location, rejected) is null,
-                "Reveal rejects unsupported or malformed path: " + rejected.Name);
-            check(
-                !RegistryFileReveal.CanResolve(location, rejected),
-                "Reveal availability rejects unsupported or malformed paths");
+            check(RegistryFileReveal.Resolve(location, rejected) is null, "Reveal rejects unsupported or malformed path: " + rejected.Name);
+            check(!RegistryFileReveal.CanResolve(location, rejected), "Reveal availability rejects unsupported or malformed paths");
         }
 
         check(
@@ -59,18 +53,14 @@ internal static class UxMvpTests
         {
             await File.WriteAllTextAsync(file, "fixture");
             await File.WriteAllTextAsync(shorter, "shorter fixture");
-            check(
-                RegistryFileReveal.Resolve(location, Text(file)) == file,
-                "Reveal preserves spaces and commas in an existing path");
+            check(RegistryFileReveal.Resolve(location, Text(file)) == file, "Reveal preserves spaces and commas in an existing path");
             foreach (var arguments in new[] { string.Empty, " --argument", " \"%1\"" })
             {
                 var command = Text("\"" + file + "\"" + arguments);
                 check(
                     RegistryFileReveal.Resolve(location, command) == file,
                     "Reveal accepts a quoted existing path followed by arguments: " + arguments);
-                check(
-                    RegistryFileReveal.CanResolve(location, command),
-                    "Reveal availability accepts a quoted command path: " + arguments);
+                check(RegistryFileReveal.CanResolve(location, command), "Reveal availability accepts a quoted command path: " + arguments);
             }
 
             check(
@@ -91,12 +81,8 @@ internal static class UxMvpTests
                 Path.GetFileName(start.FileName) == "explorer.exe" && start.Arguments == "/select,\"" + file + "\"",
                 "Reveal selects a file in Explorer without executing it");
             var directory = Path.GetDirectoryName(file)!;
-            check(
-                RegistryFileReveal.CreateStartInfo(directory).Arguments == "\"" + directory + "\"",
-                "Reveal opens directories directly");
-            check(
-                RegistryFileReveal.Resolve(location, Text(directory)) == directory,
-                "Reveal accepts existing directories");
+            check(RegistryFileReveal.CreateStartInfo(directory).Arguments == "\"" + directory + "\"", "Reveal opens directories directly");
+            check(RegistryFileReveal.Resolve(location, Text(directory)) == directory, "Reveal accepts existing directories");
         }
         finally
         {
@@ -104,12 +90,8 @@ internal static class UxMvpTests
             File.Delete(shorter);
         }
 
-        check(
-            RegistryFileReveal.Resolve(location, Text(file)) is null,
-            "Missing paths do not resolve to a reveal target");
-        check(
-            RegistryFileReveal.CanResolve(location, Text(file)),
-            "Reveal availability parses a path without requiring it to exist");
+        check(RegistryFileReveal.Resolve(location, Text(file)) is null, "Missing paths do not resolve to a reveal target");
+        check(RegistryFileReveal.CanResolve(location, Text(file)), "Reveal availability parses a path without requiring it to exist");
         try
         {
             RegistryFileReveal.CreateStartInfo(file);
@@ -136,19 +118,22 @@ internal static class UxMvpTests
         browser.SetSelection([first]);
         await browser.InspectCommand.ExecuteAsync(null);
         check(
-            !browser.IsInspectorOpen && browser.Inspector is null && dialogs.Count == 1 && dialogs[0].Name == "Path" &&
-            dialogs[0].CanRevealFile, "Inspect opens a dialog with the selected value when the detail panel is closed");
+            !browser.IsInspectorOpen
+            && browser.Inspector is null
+            && dialogs.Count == 1
+            && dialogs[0].Name == "Path"
+            && dialogs[0].CanRevealFile, "Inspect opens a dialog with the selected value when the detail panel is closed");
         check(
-            dialogs[0].HasLastWriteTime && dialogs[0].LastWriteText == modified.ToLocalTime().ToString("G") &&
-            dialogs[0].LastWriteHelp.Contains("containing key, shared by all its values", StringComparison.Ordinal),
+            dialogs[0].HasLastWriteTime
+            && dialogs[0].LastWriteText == modified.ToLocalTime().ToString("G")
+            && dialogs[0].LastWriteHelp.Contains("containing key, shared by all its values", StringComparison.Ordinal),
             "Dialog inspection shows the containing key's local last-write time and explains its scope");
         browser.IsInspectorOpen = true;
         check(
             browser.Inspector?.Name == "Path" && browser.Inspector.CanRevealFile,
             "Opening the detail panel inspects the current selection");
         check(
-            browser.Inspector is { HasLastWriteTime: true } &&
-            browser.Inspector.LastWriteText == dialogs[0].LastWriteText,
+            browser.Inspector is { HasLastWriteTime: true } && browser.Inspector.LastWriteText == dialogs[0].LastWriteText,
             "The inspector pane shares the dialog's modification metadata");
         await browser.InspectCommand.ExecuteAsync(null);
         check(
@@ -172,9 +157,11 @@ internal static class UxMvpTests
         }
 
         check(
-            ReferenceEquals(browser.SelectedEntry, second) && browser.EditValueCommand.CanExecute(null) &&
-            !browser.IsPreviewCurrent && ReferenceEquals(browser.Inspector, originalInspector) && inspectorUpdates == 0,
-            "Rapid navigation updates selection and commands immediately without rebuilding the stale preview");
+            ReferenceEquals(browser.SelectedEntry, second)
+            && browser.EditValueCommand.CanExecute(null)
+            && !browser.IsPreviewCurrent
+            && ReferenceEquals(browser.Inspector, originalInspector)
+            && inspectorUpdates == 0, "Rapid navigation updates selection and commands immediately without rebuilding the stale preview");
         await Task.WhenAll(previewUpdates);
         check(
             browser.IsPreviewCurrent && browser.Inspector?.Data.Length == 5000 && inspectorUpdates == 1,
@@ -197,17 +184,17 @@ internal static class UxMvpTests
             "Inspection without key metadata hides the timestamp instead of inventing a value update time");
         browser.SetSelection([first, second]);
         check(
-            browser.IsInspectorOpen && browser.Inspector is null,
-            "Multiple selection clears inspector contents without closing the pane");
+            browser.IsInspectorOpen && browser.Inspector is null, "Multiple selection clears inspector contents without closing the pane");
         var key = location.Child("Preview key");
         browser.SetSelection([new RegistryEntry(key, null)]);
         await browser.PendingPreview;
         check(
-            browser.Inspector is
-                { Name: "Preview key", Heading: "Key", HasNavigationIcon: true, HasStoredValue: false } &&
-            browser.Inspector.KeyLocation == key && browser.Inspector.KeyPath == key.Address &&
-            browser.Inspector.HasKeyPath && !browser.Inspector.HasText &&
-            !browser.Inspector.InterpretCommand.CanExecute(null),
+            browser.Inspector is { Name: "Preview key", Heading: "Key", HasNavigationIcon: true, HasStoredValue: false }
+            && browser.Inspector.KeyLocation == key
+            && browser.Inspector.KeyPath == key.Address
+            && browser.Inspector.HasKeyPath
+            && !browser.Inspector.HasText
+            && !browser.Inspector.InterpretCommand.CanExecute(null),
             "Key selection shows its own name path and navigation icon without byte controls");
         check(!browser.InspectCommand.CanExecute(null), "Inspect is unavailable for a key");
         browser.SetSelection([new RegistryEntry(null, null, IsDefaultPlaceholder: true)]);
@@ -217,30 +204,29 @@ internal static class UxMvpTests
             {
                 Name: "(Default)", Heading: "REG_SZ · Value not set", Data: "(value not set)",
                 HasText: true, HasStoredValue: false, HasKeyPath: false
-            } && browser.Inspector.Glyph == "\uE8EC" && !browser.Inspector.InterpretCommand.CanExecute(null) &&
-            !browser.InspectCommand.CanExecute(null),
-            "An unset default value has an explicit preview without inventing a stored value");
+            }
+            && browser.Inspector.Glyph == "\uE8EC"
+            && !browser.Inspector.InterpretCommand.CanExecute(null)
+            && !browser.InspectCommand.CanExecute(null), "An unset default value has an explicit preview without inventing a stored value");
         browser.Inspector!.InterpretCommand.Execute(null);
-        check(
-            browser.Inspector.Result.StartsWith("Choose a format"),
-            "An unset value cannot be interpreted programmatically");
+        check(browser.Inspector.Result.StartsWith("Choose a format"), "An unset value cannot be interpreted programmatically");
         browser.SetSelection([new RegistryEntry(null, new RegistryValue(string.Empty, RegistryValueType.String, []))]);
         await browser.PendingPreview;
         check(
-            browser.Inspector is { Name: "(Default)", Heading: "REG_SZ · 0 bytes", Data: "", HasStoredValue: true } &&
-            browser.Inspector.InterpretCommand.CanExecute(null) && browser.InspectCommand.CanExecute(null),
-            "A stored empty default remains distinct from the unset placeholder");
+            browser.Inspector is { Name: "(Default)", Heading: "REG_SZ · 0 bytes", Data: "", HasStoredValue: true }
+            && browser.Inspector.InterpretCommand.CanExecute(null)
+            && browser.InspectCommand.CanExecute(null), "A stored empty default remains distinct from the unset placeholder");
         browser.SetSelection([new RegistryEntry(null, null, ParentLocation: RegistryLocation.Parse("Computer"))]);
         await browser.PendingPreview;
         check(
-            browser.Inspector is { Heading: "Parent key", KeyPath: "Computer", HasStoredValue: false } &&
-            browser.Inspector.KeyLocation!.IsComputer,
+            browser.Inspector is { Heading: "Parent key", KeyPath: "Computer", HasStoredValue: false }
+            && browser.Inspector.KeyLocation!.IsComputer,
             "The virtual parent previews its destination without pretending to contain value bytes");
         browser.SetSelection([]);
         check(
-            browser.Inspector is { HasNavigationIcon: true, HasStoredValue: false } &&
-            browser.Inspector.KeyLocation == location && browser.Inspector.KeyPath == location.Address,
-            "Without a list selection the inspector previews the current tree key");
+            browser.Inspector is { HasNavigationIcon: true, HasStoredValue: false }
+            && browser.Inspector.KeyLocation == location
+            && browser.Inspector.KeyPath == location.Address, "Without a list selection the inspector previews the current tree key");
         var overview = new BrowserViewModel(registry, RegistryLocation.Parse("Computer")) { IsInspectorOpen = true };
         check(overview.Inspector is null, "The Computer overview without a selected entry keeps its selection prompt");
         browser.SetSelection([first]);
@@ -260,9 +246,7 @@ internal static class UxMvpTests
         check(
             !browser.IsInspectorOpen && dialogs.Count == 2 && dialogs[1].Data.Length == 5000,
             "Inspect after closing the detail panel opens a dialog with full current contents");
-        check(
-            dialogs[0].Data == first.Data,
-            "Dialog inspection retains its original value after browser selection changes");
+        check(dialogs[0].Data == first.Data, "Dialog inspection retains its original value after browser selection changes");
 
         var closingBrowser = new BrowserViewModel(registry, location) { IsInspectorOpen = true };
         var lastInspector = closingBrowser.Inspector;
@@ -277,9 +261,7 @@ internal static class UxMvpTests
         browser.SetSelection([new RegistryEntry(null, Text(file))]);
         Exception? revealFailure = null;
         browser.FileRevealFailed += error => revealFailure = error;
-        check(
-            browser.RevealFileCommand.CanExecute(null),
-            "A syntactically valid path offers reveal without a filesystem probe");
+        check(browser.RevealFileCommand.CanExecute(null), "A syntactically valid path offers reveal without a filesystem probe");
         await browser.RevealFileCommand.ExecuteAsync(null);
         check(
             revealFailure is FileNotFoundException && browser.Error == revealFailure.Message,
@@ -289,9 +271,8 @@ internal static class UxMvpTests
 
         var settings = new AppSettings();
         var shell = new MainWindowViewModel(
-            settings, new InvestigationStore(settings, () => { }), registry,
-            target => new BrowserViewModel(registry, target), NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(settings, () => { }));
+            settings, new InvestigationStore(settings, () => { }), registry, target => new BrowserViewModel(registry, target),
+            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings, () => { }));
         shell.Initialize(location);
         check(!shell.ReopenClosedTabCommand.CanExecute(null), "Reopen is disabled before any registry tab closes");
         var closed = shell.OpenBrowser(RegistryLocation.Parse(@"\\server\HKLM\Software", RegistryView.Registry32));
@@ -301,9 +282,12 @@ internal static class UxMvpTests
         shell.ReopenClosedTabCommand.Execute(null);
         var restored = (BrowserTab)shell.ActiveTab!;
         check(
-            restored != closed && restored.Browser != closed.Browser &&
-            restored.Browser.Location == closed.Browser.Location && restored.Browser.Layout.TreeWidth == 432 &&
-            restored.Browser.Layout.SortColumn == "Data" && restored.InitialValue == "",
+            restored != closed
+            && restored.Browser != closed.Browser
+            && restored.Browser.Location == closed.Browser.Location
+            && restored.Browser.Layout.TreeWidth == 432
+            && restored.Browser.Layout.SortColumn == "Data"
+            && restored.InitialValue == "",
             "Reopen recreates the browser with its computer, registry view, layout and default-value selection");
         check(!shell.ReopenClosedTabCommand.CanExecute(null), "Reopening consumes closed-tab history");
         for (var index = 0; index < 25; index++)
@@ -327,9 +311,7 @@ internal static class UxMvpTests
         var c = shell.OpenBrowser(location.Child("C"));
         shell.CloseTabsToRight(restored);
         shell.ReopenClosedTabCommand.Execute(null);
-        check(
-            ((BrowserTab)shell.ActiveTab!).Browser.Location == c.Browser.Location,
-            "Bulk-close actions also populate reopen history");
+        check(((BrowserTab)shell.ActiveTab!).Browser.Location == c.Browser.Location, "Bulk-close actions also populate reopen history");
         shell.WindowClosed();
     }
 }

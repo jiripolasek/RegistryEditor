@@ -14,10 +14,7 @@ internal static class ValueEditorInputTests
     {
         var original = new RegistryValue("Number", RegistryValueType.DWord, [255, 0, 0, 0]);
         var number = new RegistryValueEditorViewModel(original, RegistryValueType.DWord, false, false);
-        foreach (var type in new RegistryValueType[]
-                 {
-                     RegistryValueType.DWord, RegistryValueType.DWordBigEndian, RegistryValueType.QWord
-                 })
+        foreach (var type in new RegistryValueType[] { RegistryValueType.DWord, RegistryValueType.DWordBigEndian, RegistryValueType.QWord })
         {
             var size = type == RegistryValueType.QWord ? 8 : 4;
             foreach (var length in new[] { 0, size - 1, size + 1 })
@@ -25,18 +22,20 @@ internal static class ValueEditorInputTests
                 var value = new RegistryValue("Malformed", type, Enumerable.Repeat((byte)255, length).ToArray());
                 var editor = new RegistryValueEditorViewModel(value, type, false, false);
                 check(
-                    editor.IsRaw && !editor.IsNumeric && editor.HasRawFallback &&
-                    editor.RawFallbackMessage.Contains($"{value.TypeName} requires {size} bytes") &&
-                    editor.RawFallbackMessage.Contains($"contains {length:N0}") && editor.Validate() &&
-                    editor.Value.SameData(value),
+                    editor.IsRaw
+                    && !editor.IsNumeric
+                    && editor.HasRawFallback
+                    && editor.RawFallbackMessage.Contains($"{value.TypeName} requires {size} bytes")
+                    && editor.RawFallbackMessage.Contains($"contains {length:N0}")
+                    && editor.Validate()
+                    && editor.Value.SameData(value),
                     $"Malformed {value.TypeName} explains the binary fallback and preserves all {length} bytes");
                 check(
                     !new RegistryValueEditorViewModel(value, type, true, false).HasRawFallback,
                     "Explicit binary editing does not report an automatic fallback");
             }
 
-            var valid = new RegistryValueEditorViewModel(
-                new RegistryValue("Valid", type, new byte[size]), type, false, false);
+            var valid = new RegistryValueEditorViewModel(new RegistryValue("Valid", type, new byte[size]), type, false, false);
             var created = new RegistryValueEditorViewModel(null, type, false, true);
             check(
                 valid.IsNumeric && !valid.HasRawFallback && created.IsNumeric && !created.HasRawFallback,
@@ -51,8 +50,8 @@ internal static class ValueEditorInputTests
         foreach (var type in new RegistryValueType[] { RegistryValueType.Binary, (RegistryValueType)99 })
         {
             check(
-                !new RegistryValueEditorViewModel(new RegistryValue("Raw", type, [1]), type, false, false)
-                    .HasRawFallback, "Values normally edited as bytes do not report an automatic fallback");
+                !new RegistryValueEditorViewModel(new RegistryValue("Raw", type, [1]), type, false, false).HasRawFallback,
+                "Values normally edited as bytes do not report an automatic fallback");
         }
 
         check(
@@ -78,9 +77,7 @@ internal static class ValueEditorInputTests
         {
             BaseIndex = 1, Data = "18446744073709551616"
         };
-        check(
-            qword.DataHelp.Contains("18446744073709551615") && !qword.Validate(),
-            "QWORD range guidance uses the unsigned 64-bit limit");
+        check(qword.DataHelp.Contains("18446744073709551615") && !qword.Validate(), "QWORD range guidance uses the unsigned 64-bit limit");
 
         foreach (var (type, numberBase, literal, text, bytes) in new (RegistryValueType, int, string, string, byte[])[]
                  {
@@ -92,18 +89,20 @@ internal static class ValueEditorInputTests
                          [255, 255, 255, 255, 255, 255, 255, 255])
                  })
         {
-            var editor = new RegistryValueEditorViewModel(null, type, false, true)
-            {
-                BaseIndex = numberBase, Data = literal
-            };
+            var editor = new RegistryValueEditorViewModel(null, type, false, true) { BaseIndex = numberBase, Data = literal };
             check(
-                editor.CanApplyDataCorrection && editor.ApplyDataCorrectionCommand.CanExecute(null) &&
-                editor.Data == literal && editor.Value.Data.All(value => value == 0),
-                "Recognizing pasted numeric data only offers a correction: " + literal);
+                editor.CanApplyDataCorrection
+                && editor.ApplyDataCorrectionCommand.CanExecute(null)
+                && editor.Data == literal
+                && editor.Value.Data.All(value => value == 0), "Recognizing pasted numeric data only offers a correction: " + literal);
             editor.ApplyDataCorrectionCommand.Execute(null);
             check(
-                editor.Data == text && editor.BaseIndex == numberBase && !editor.CanApplyDataCorrection &&
-                editor.Validate() && editor.Value.Type == type && editor.Value.Data.SequenceEqual(bytes),
+                editor.Data == text
+                && editor.BaseIndex == numberBase
+                && !editor.CanApplyDataCorrection
+                && editor.Validate()
+                && editor.Value.Type == type
+                && editor.Value.Data.SequenceEqual(bytes),
                 "Explicit conversion preserves the numeric value, selected base, type and byte order: " + literal);
         }
 
@@ -111,24 +110,23 @@ internal static class ValueEditorInputTests
             new RegistryValue("Bytes", RegistryValueType.Binary, [1, 2]), RegistryValueType.Binary, false, false);
         binary.Data = "01A4FF";
         check(
-            binary.Validate() && !binary.CanApplyDataCorrection &&
-            binary.PreviewBytes.SequenceEqual(new byte[] { 1, 164, 255 }),
+            binary.Validate() && !binary.CanApplyDataCorrection && binary.PreviewBytes.SequenceEqual(new byte[] { 1, 164, 255 }),
             "Already-valid compact hexadecimal input stays accepted without conversion");
         binary.Data = "01 A";
         check(
-            binary.DataHelp.Contains("two hexadecimal digits") && binary.DataHelp.Contains("last valid") &&
-            !binary.HasError && binary.PreviewBytes.SequenceEqual(new byte[] { 1, 164, 255 }),
+            binary.DataHelp.Contains("two hexadecimal digits")
+            && binary.DataHelp.Contains("last valid")
+            && !binary.HasError
+            && binary.PreviewBytes.SequenceEqual(new byte[] { 1, 164, 255 }),
             "Incomplete input keeps the last valid preview and explains that it is stale without blocking typing");
         foreach (var literal in new[] { "01,A4,FF", "hex:01, A4, FF", "HEX:01A4FF" })
         {
             binary.Data = literal;
             check(
-                binary.Data == literal && binary.CanApplyDataCorrection,
-                "Pasted binary data waits for an explicit conversion: " + literal);
+                binary.Data == literal && binary.CanApplyDataCorrection, "Pasted binary data waits for an explicit conversion: " + literal);
             binary.ApplyDataCorrectionCommand.Execute(null);
             check(
-                binary.Data == "01 A4 FF" && binary.Validate() &&
-                binary.Value.Data.SequenceEqual(new byte[] { 1, 164, 255 }),
+                binary.Data == "01 A4 FF" && binary.Validate() && binary.Value.Data.SequenceEqual(new byte[] { 1, 164, 255 }),
                 "Converting a validated byte list retains every byte: " + literal);
         }
 
@@ -151,20 +149,19 @@ internal static class ValueEditorInputTests
         number.Data = "0x10";
         number.ApplyDataCorrectionCommand.Execute(null);
         check(
-            number.Data == "16" && ReferenceEquals(number.Failure, denied) &&
-            ReferenceEquals(number.Recovery, recovery) && number.Error == denied.Message,
-            "Typing and applying help preserve the existing write failure and permission recovery");
+            number.Data == "16"
+            && ReferenceEquals(number.Failure, denied)
+            && ReferenceEquals(number.Recovery, recovery)
+            && number.Error == denied.Message, "Typing and applying help preserve the existing write failure and permission recovery");
 
         foreach (var name in new[] { string.Empty, "@", "(Default)", "  named  ", @"a\b" })
         {
             RegistryService.ValidateValueName(name);
             var value = new RegistryValue(
-                name, RegistryValueType.String,
-                RegistryValue.ParseData(RegistryValueType.String, @"  ""\\server\share""  "));
+                name, RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, @"  ""\\server\share""  "));
             var editor = new RegistryValueEditorViewModel(value, RegistryValueType.String, false, false);
             check(
-                !editor.HasDataHelp && !editor.CanApplyDataCorrection && editor.Validate() &&
-                editor.Value.SameData(value),
+                !editor.HasDataHelp && !editor.CanApplyDataCorrection && editor.Validate() && editor.Value.SameData(value),
                 "Help preserves legal names, whitespace, quotes and literal UNC paths: " + name);
         }
 

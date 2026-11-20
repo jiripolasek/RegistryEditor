@@ -59,18 +59,24 @@ internal static class LargeValueTests
             ReferenceEquals(fullData, row.Data) && allocated < 1024,
             "Repeated filter sort and copy data requests reuse the full decoded snapshot");
         check(
-            row != otherRow && !row.Equals(otherRow) && !Equals(row, otherRow) && row.GetHashCode() == originalHash &&
-            selected.Contains(row) && !selected.Contains(otherRow),
+            row != otherRow
+            && !row.Equals(otherRow)
+            && !Equals(row, otherRow)
+            && row.GetHashCode() == originalHash
+            && selected.Contains(row)
+            && !selected.Contains(otherRow),
             "Rows with identical data have separate identities and cached presentation preserves hash lookups");
         var changed = row with
         {
-            Value = new RegistryValue(
-                "Changed", RegistryValueType.String, Encoding.Unicode.GetBytes("new contents\0"))
+            Value = new RegistryValue("Changed", RegistryValueType.String, Encoding.Unicode.GetBytes("new contents\0"))
         };
         check(
-            changed.NamePreview == "Changed" && changed.DataPreview == "new contents" &&
-            changed.Data == "new contents" && changed.AccessibleName.Contains("Changed") && row.Data == contents &&
-            changed != row, "Record copies rebuild caches for their changed value without changing the original row");
+            changed.NamePreview == "Changed"
+            && changed.DataPreview == "new contents"
+            && changed.Data == "new contents"
+            && changed.AccessibleName.Contains("Changed")
+            && row.Data == contents
+            && changed != row, "Record copies rebuild caches for their changed value without changing the original row");
         allocated = GC.GetAllocatedBytesForCurrentThread();
         for (var index = 0; index < 1000; index++)
         {
@@ -89,36 +95,29 @@ internal static class LargeValueTests
             new("Empty", RegistryValueType.String, []), new("Nuls", RegistryValueType.String, new byte[6000]),
             new("Unterminated", RegistryValueType.ExpandString, Encoding.Unicode.GetBytes("unexpanded %PATH%")),
             new("Link", RegistryValueType.Link, Encoding.Unicode.GetBytes("link\0")),
-            new("Odd", RegistryValueType.String, [65, 0, 0, 0, 255]),
-            new("Surrogate", RegistryValueType.String, [0, 216, 65, 0]),
+            new("Odd", RegistryValueType.String, [65, 0, 0, 0, 255]), new("Surrogate", RegistryValueType.String, [0, 216, 65, 0]),
             new("Multi", RegistryValueType.MultiString, Encoding.Unicode.GetBytes("one\0\0two\0\0")),
             new(
                 "LongMulti", RegistryValueType.MultiString,
                 Encoding.Unicode.GetBytes(string.Join('\0', Enumerable.Repeat("a", 400)) + "\0\0")),
-            new(
-                "PairBoundary", RegistryValueType.String,
-                Encoding.Unicode.GetBytes(new string('a', 255) + "😀tail")),
+            new("PairBoundary", RegistryValueType.String, Encoding.Unicode.GetBytes(new string('a', 255) + "😀tail")),
             new("Unknown", (RegistryValueType)99, Enumerable.Range(0, 400).Select(index => (byte)index).ToArray()),
-            new("MalformedNumber", RegistryValueType.DWord, [1, 2, 3]),
-            new("Number", RegistryValueType.DWord, [1, 0, 0, 0])
+            new("MalformedNumber", RegistryValueType.DWord, [1, 2, 3]), new("Number", RegistryValueType.DWord, [1, 0, 0, 0])
         };
         foreach (var sample in cases)
         {
             var full = sample.DisplayData;
             var length = full.Length > 256 && char.IsHighSurrogate(full[255]) ? 255 : 256;
-            var expected
-                = sample.Type is not (RegistryValueType.String or RegistryValueType.ExpandString
-                    or RegistryValueType.Link or RegistryValueType.MultiString) || full.Length <= 256
-                    ? full
-                    : full[..length] + "…";
+            var expected = sample.Type is not (RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.Link
+                               or RegistryValueType.MultiString)
+                           || full.Length <= 256
+                ? full
+                : full[..length] + "…";
             check(sample.DisplayPreview == expected, "Preview matches existing display semantics: " + sample.Name);
         }
 
         const string multiline = "one\r\ntwo\rthree\nfour\ffive\u0085six\u2028seven\u2029eight";
-        foreach (var type in new RegistryValueType[]
-                 {
-                     RegistryValueType.String, RegistryValueType.ExpandString, RegistryValueType.Link
-                 })
+        foreach (var type in new RegistryValueType[] { RegistryValueType.String, RegistryValueType.ExpandString, RegistryValueType.Link })
         {
             var text = new RegistryValue("Multiline", type, Encoding.Unicode.GetBytes(multiline + "\0"));
             var textRow = new RegistryEntry(null, text);
@@ -135,11 +134,9 @@ internal static class LargeValueTests
             "Resolved link previews separate lines with spaces without changing the stored target path");
 
         var multilineMulti = new RegistryValue(
-            "MultilineMulti", RegistryValueType.MultiString,
-            Encoding.Unicode.GetBytes("one\r\ntwo\0three\rfour\nfive\0\0"));
+            "MultilineMulti", RegistryValueType.MultiString, Encoding.Unicode.GetBytes("one\r\ntwo\0three\rfour\nfive\0\0"));
         check(
-            multilineMulti.DisplayPreview == "one two · three four five" &&
-            multilineMulti.DisplayData == "one\r\ntwo · three\rfour\nfive",
+            multilineMulti.DisplayPreview == "one two · three four five" && multilineMulti.DisplayData == "one\r\ntwo · three\rfour\nfive",
             "Multi-string previews flatten embedded line breaks with spaces and retain entry separators");
         var newlinePrefix = new RegistryValue(
             "NewlinePrefix", RegistryValueType.String, Encoding.Unicode.GetBytes(new string('\n', 524_288) + "tail\0"));
@@ -154,19 +151,22 @@ internal static class LargeValueTests
         var binaryInspector = new ValueInspectorViewModel(binary);
         var numberInspector = new ValueInspectorViewModel(cases.Single(sample => sample.Name == "Number"));
         check(
-            binary.DisplayPreview == binary.DisplayData && binary.DisplayPreview.EndsWith("FF …") &&
-            binary.DisplayPreview.Split(' ').Length == 257,
+            binary.DisplayPreview == binary.DisplayData
+            && binary.DisplayPreview.EndsWith("FF …")
+            && binary.DisplayPreview.Split(' ').Length == 257,
             "Binary and unknown previews retain 256 complete bytes and their existing continuation indicator");
         check(
-            !binaryInspector.HasText && binaryInspector.Data == string.Empty &&
-            binaryInspector.RawBytes.Length == 800 &&
-            binaryInspector.Heading.EndsWith($"{binary.Data.Length:N0} bytes") && !numberInspector.HasText &&
-            numberInspector.HasNumber && numberInspector.Data == string.Empty,
+            !binaryInspector.HasText
+            && binaryInspector.Data == string.Empty
+            && binaryInspector.RawBytes.Length == 800
+            && binaryInspector.Heading.EndsWith($"{binary.Data.Length:N0} bytes")
+            && !numberInspector.HasText
+            && numberInspector.HasNumber
+            && numberInspector.Data == string.Empty,
             "Non-text inspection preserves byte counts raw bytes and numeric controls without a partial full-text field");
         var longName = new RegistryEntry(null, value with { Name = new string('n', 16_000) });
         check(
-            longName.Name.Length == 16_000 && longName.NamePreview.Length == 257 &&
-            longName.AccessibleName.Length < 600,
+            longName.Name.Length == 16_000 && longName.NamePreview.Length == 257 && longName.AccessibleName.Length < 600,
             "Long value names are bounded in row text tooltips and automation without changing identity");
         check(
             new ValueInspectorViewModel(longName.Value!).Name == longName.Name,
@@ -183,10 +183,8 @@ internal static class LargeValueTests
         try
         {
             var prefix = new string('x', 524_288 - 1);
-            service.Write(
-                location, value with { Name = "ZSortFirst", Data = Encoding.Unicode.GetBytes(prefix + "a\0") }, null);
-            service.Write(
-                location, value with { Name = "ASortLast", Data = Encoding.Unicode.GetBytes(prefix + "z\0") }, null);
+            service.Write(location, value with { Name = "ZSortFirst", Data = Encoding.Unicode.GetBytes(prefix + "a\0") }, null);
+            service.Write(location, value with { Name = "ASortLast", Data = Encoding.Unicode.GetBytes(prefix + "z\0") }, null);
             service.Write(location, value, null);
             var clipboard = new RegistryEntryClipboard();
             var browser = new BrowserViewModel(service, location, clipboard);

@@ -10,8 +10,9 @@ public sealed record KeyNote(RegistryLocation Location, string Text)
 {
     public bool Matches(RegistryLocation location)
     {
-        return this.Location.Hive == location.Hive && this.Location.View == location.View &&
-               this.Location.SubKey.Equals(location.SubKey, StringComparison.OrdinalIgnoreCase) && string.Equals(
-                   this.Location.Machine, location.Machine, StringComparison.OrdinalIgnoreCase);
+        return this.Location.Hive == location.Hive
+               && this.Location.View == location.View
+               && this.Location.SubKey.Equals(location.SubKey, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(this.Location.Machine, location.Machine, StringComparison.OrdinalIgnoreCase);
     }
 }

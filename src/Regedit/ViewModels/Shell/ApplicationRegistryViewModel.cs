@@ -35,8 +35,7 @@ internal sealed partial class ApplicationRegistryViewModel(
 
     private readonly Action<ProcessStartInfo> _startProcess = startProcess ?? (info => Process.Start(info));
 
-    private readonly Action<string, RegistryLocation> _startStandardAccess
-        = startStandardAccess ?? RegistryLaunch.StartStandardAccess;
+    private readonly Action<string, RegistryLocation> _startStandardAccess = startStandardAccess ?? RegistryLaunch.StartStandardAccess;
 
     internal Func<string, RegistryView, Task>? OpenFilePreviewAsync { get; set; }
 
@@ -83,8 +82,7 @@ internal sealed partial class ApplicationRegistryViewModel(
 
     internal RegistryFilePreviewViewModel CreateFilePreview(RegistryView view, IRegistryFileDialogs fileDialogs)
     {
-        var model = new RegistryFilePreviewViewModel(
-            view, window.RegistryFileLayout, fileDialogs, this.ImportPreviewAsync, logger);
+        var model = new RegistryFilePreviewViewModel(view, window.RegistryFileLayout, fileDialogs, this.ImportPreviewAsync, logger);
         model.OpenKeyRequested += location => window.OpenBrowser(location);
         model.SettingsRequested += () => window.OpenRegistryFileEditorSettingsCommand.Execute(null);
         return model;
@@ -97,10 +95,8 @@ internal sealed partial class ApplicationRegistryViewModel(
         {
             await Task.Run(() => journal.Journal.RecordActivity(
                 "Import registry file", location,
-                source +
-                "\nWindows imports may affect any branch. Previous values are not retained for automatic revert.",
-                () => RegistryService.RunRegAsync(
-                        "import", snapshot, view == RegistryView.Registry32 ? "/reg:32" : "/reg:64").GetAwaiter()
+                source + "\nWindows imports may affect any branch. Previous values are not retained for automatic revert.",
+                () => RegistryService.RunRegAsync("import", snapshot, view == RegistryView.Registry32 ? "/reg:32" : "/reg:64").GetAwaiter()
                     .GetResult()));
         }
         finally
@@ -111,8 +107,7 @@ internal sealed partial class ApplicationRegistryViewModel(
 
     internal async Task RefreshAfterImportAsync()
     {
-        foreach (var tab in window.Tabs.OfType<BrowserTab>().Where(tab => tab.Browser.Location.Machine is null)
-                     .ToArray())
+        foreach (var tab in window.Tabs.OfType<BrowserTab>().Where(tab => tab.Browser.Location.Machine is null).ToArray())
         {
             try
             {
@@ -171,7 +166,9 @@ internal sealed partial class ApplicationRegistryViewModel(
                                 {
                                     using var key = registry.Open(location);
                                 }));
-                        }) && !window.IsClosing && !window.CanCloseWindow)
+                        })
+                        && !window.IsClosing
+                        && !window.CanCloseWindow)
                     {
                         window.OpenBrowser(target!.GetComputer());
                     }
@@ -221,11 +218,7 @@ internal sealed partial class ApplicationRegistryViewModel(
             });
     }
 
-    private async Task GuardAsync(
-        string failureTitle,
-        string canceledTitle,
-        Func<Task> action,
-        [CallerMemberName] string operation = "")
+    private async Task GuardAsync(string failureTitle, string canceledTitle, Func<Task> action, [CallerMemberName] string operation = "")
     {
         try
         {

@@ -60,8 +60,8 @@ public static class RegistryValueInspector
             return new Guid(bytes, format == ByteInterpretation.Rfc4122Guid).ToString("D");
         }
 
-        if (format is ByteInterpretation.UnixSecondsInt64LittleEndian
-            or ByteInterpretation.UnixMillisecondsInt64LittleEndian or ByteInterpretation.FileTimeLittleEndian)
+        if (format is ByteInterpretation.UnixSecondsInt64LittleEndian or ByteInterpretation.UnixMillisecondsInt64LittleEndian
+            or ByteInterpretation.FileTimeLittleEndian)
         {
             if (length != 8)
             {

@@ -29,22 +29,20 @@ public sealed partial class AppSettings
     {
         return JsonSerializer.SerializeToNode(
             new SavedSettings(
-                this.Favorites.ToArray(), this.Tabs, this.Theme, this.FontFamily, this.FontSize, this.ShowStatusBar,
-                this.Searches, this.Notes, this.Workspaces, this.ShowKeysInList, this.ShowValuePreview,
-                this.ToolPanePinned, this.ToolPaneWidth, this.SelectedTool, this.FavoriteFolders.ToArray(),
-                this.ShowParentKeyInList, this.AutoSyncTree, this._sessions, this.DataFont, this.ShowListToolbar,
-                this.ListColumns.Select(column => column.ToString()).ToArray(), this.ListRowPadding,
+                this.Favorites.ToArray(), this.Tabs, this.Theme, this.FontFamily, this.FontSize, this.ShowStatusBar, this.Searches,
+                this.Notes, this.Workspaces, this.ShowKeysInList, this.ShowValuePreview, this.ToolPanePinned, this.ToolPaneWidth,
+                this.SelectedTool, this.FavoriteFolders.ToArray(), this.ShowParentKeyInList, this.AutoSyncTree, this._sessions,
+                this.DataFont, this.ShowListToolbar, this.ListColumns.Select(column => column.ToString()).ToArray(), this.ListRowPadding,
                 this.ToolbarButtons, this.PanelTabsAtBottom,
                 new Dictionary<string, ColumnLayout>(this.ColumnLayouts, StringComparer.Ordinal), this.ShowBackButton,
-                this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText,
-                this.Backdrop, this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl, this.RegistryFileLayout,
-                this.EditorFont), SettingsJsonContext.Default.SavedSettings)!.AsObject();
+                this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop,
+                this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl, this.RegistryFileLayout, this.EditorFont),
+            SettingsJsonContext.Default.SavedSettings)!.AsObject();
     }
 
     private static string ReadSettingsFile(string filePath)
     {
-        using var stream = new FileStream(
-            filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
@@ -69,8 +67,8 @@ public sealed partial class AppSettings
                 if (favorites[index] is JsonObject favorite && favorite["Id"] is null)
                 {
                     // Every process derives the same identity until a legacy bookmark is next saved.
-                    favorite["Id"] = Convert.ToHexString(
-                        SHA256.HashData(Encoding.UTF8.GetBytes(index + ":" + favorite.ToJsonString())))[..32];
+                    favorite["Id"]
+                        = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(index + ":" + favorite.ToJsonString())))[..32];
                 }
             }
         }
@@ -78,11 +76,7 @@ public sealed partial class AppSettings
         return document.Deserialize(SettingsJsonContext.Default.SavedSettings);
     }
 
-    internal void SaveSession(
-        List<SavedTab> tabs,
-        bool replaceRestored,
-        string? filePath = null,
-        WindowLayout? layout = null)
+    internal void SaveSession(List<SavedTab> tabs, bool replaceRestored, string? filePath = null, WindowLayout? layout = null)
     {
         var previous = this.Tabs;
         var previousLayout = this._windowLayout;
@@ -107,14 +101,12 @@ public sealed partial class AppSettings
         if (captureSession || !JsonNode.DeepEquals(local["Tabs"], this._baseline["Tabs"]))
         {
             sessions = this._sessions
-                .Where(session => session.Id != this._sessionId &&
-                                  (!replaceRestored || !this._restoredSessionIds.Contains(session.Id))).Concat(
+                .Where(session => session.Id != this._sessionId && (!replaceRestored || !this._restoredSessionIds.Contains(session.Id)))
+                .Concat(
                     this.Tabs.Count == 0 && this._windowLayout is null
                         ? []
-                        : new[] { new SavedWindowSession(this._sessionId, this.Tabs.ToArray(), this._windowLayout) })
-                .ToArray();
-            local["WindowSessions"] = JsonSerializer.SerializeToNode(
-                sessions, SettingsJsonContext.Default.SavedWindowSessionArray);
+                        : new[] { new SavedWindowSession(this._sessionId, this.Tabs.ToArray(), this._windowLayout) }).ToArray();
+            local["WindowSessions"] = JsonSerializer.SerializeToNode(sessions, SettingsJsonContext.Default.SavedWindowSessionArray);
         }
 
         ValidateSaved(local.Deserialize(SettingsJsonContext.Default.SavedSettings)!);
@@ -131,11 +123,10 @@ public sealed partial class AppSettings
             throw Conflict("unreadable settings file changed");
         }
 
-        if (current.LoadError is not null && !(this._preserveUnreadableFile && this._loadedContent is not null &&
-                                               current._loadedContent == this._loadedContent))
+        if (current.LoadError is not null
+            && !(this._preserveUnreadableFile && this._loadedContent is not null && current._loadedContent == this._loadedContent))
         {
-            throw new IOException(
-                "The current settings file cannot be read. It has not been overwritten. " + current.LoadError);
+            throw new IOException("The current settings file cannot be read. It has not been overwritten. " + current.LoadError);
         }
 
         var latest = current.LoadError is null ? current.Capture() : this._baseline;
@@ -159,8 +150,7 @@ public sealed partial class AppSettings
         catch (ArgumentException ex)
         {
             throw new IOException(
-                "The combined settings would be invalid. Reopen a window to load the latest settings before retrying. " +
-                ex.Message, ex);
+                "The combined settings would be invalid. Reopen a window to load the latest settings before retrying. " + ex.Message, ex);
         }
 
         var text = JsonSerializer.Serialize(saved, SettingsJsonContext.Default.SavedSettings);
@@ -181,8 +171,7 @@ public sealed partial class AppSettings
                     File.Move(temporary, filePath, true);
                     break;
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException &&
-                                           (ex.HResult & 0xffff) is 5 or 32 or 33)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && (ex.HResult & 0xffff) is 5 or 32 or 33)
                 {
                     // Readers and file-system filters can briefly retain the previous replacement.
                     if (Stopwatch.GetElapsedTime(started) >= TimeSpan.FromSeconds(3))
@@ -333,8 +322,7 @@ public sealed partial class AppSettings
             }
         }
 
-        var common = original.Keys.Where(key => changed.ContainsKey(key) && latest.ContainsKey(key))
-            .ToHashSet(StringComparer.Ordinal);
+        var common = original.Keys.Where(key => changed.ContainsKey(key) && latest.ContainsKey(key)).ToHashSet(StringComparer.Ordinal);
         var oldOrder = original.Keys.Where(common.Contains).ToArray();
         var localOrder = changed.Keys.Where(common.Contains).ToArray();
         var currentOrder = latest.Keys.Where(common.Contains).ToArray();
@@ -346,8 +334,7 @@ public sealed partial class AppSettings
 
         var order = reordered ? changed.Keys.Concat(latest.Keys) : latest.Keys.Concat(changed.Keys);
         return new JsonArray(
-            order.Distinct(StringComparer.Ordinal).Where(key => values[key] is not null)
-                .Select(key => values[key]!.DeepClone()).ToArray());
+            order.Distinct(StringComparer.Ordinal).Where(key => values[key] is not null).Select(key => values[key]!.DeepClone()).ToArray());
     }
 
     private static IOException Conflict(string name)
@@ -361,8 +348,7 @@ public sealed partial class AppSettings
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var session in sessions)
         {
-            if (session is null || string.IsNullOrWhiteSpace(session.Id) || !ids.Add(session.Id) ||
-                session.Tabs is null)
+            if (session is null || string.IsNullOrWhiteSpace(session.Id) || !ids.Add(session.Id) || session.Tabs is null)
             {
                 throw new ArgumentException("Saved window sessions have missing or duplicate identifiers or tabs.");
             }
@@ -376,10 +362,8 @@ public sealed partial class AppSettings
 
                 RegistryWorkspace.ValidateLocation(
                     RegistryLocation.Parse(
-                        tab.Address,
-                        tab.Is32Bit
-                            ? Microsoft.Win32.RegistryView.Registry32
-                            : Microsoft.Win32.RegistryView.Registry64), true);
+                        tab.Address, tab.Is32Bit ? Microsoft.Win32.RegistryView.Registry32 : Microsoft.Win32.RegistryView.Registry64),
+                    true);
             }
         }
     }

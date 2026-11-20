@@ -184,9 +184,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         {
             try
             {
-                this.OpenBrowser(
-                    RegistryLocation.Parse(
-                        tab.Address, tab.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64));
+                this.OpenBrowser(RegistryLocation.Parse(tab.Address, tab.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64));
                 ((BrowserTab)this.Tabs[^1]).Browser.RestoreLayout(tab.Layout);
             }
             catch (ArgumentException)
@@ -308,8 +306,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     {
         if (this.Tabs.Count > 0)
         {
-            this.ActiveTab
-                = this.Tabs[(this.Tabs.IndexOf(this.ActiveTab!) + offset + this.Tabs.Count) % this.Tabs.Count];
+            this.ActiveTab = this.Tabs[(this.Tabs.IndexOf(this.ActiveTab!) + offset + this.Tabs.Count) % this.Tabs.Count];
         }
     }
 
@@ -402,8 +399,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             this._recentBrowsers.Remove(browser);
             if (this._contextTab == tab)
             {
-                this.SetContextTab(
-                    this._recentBrowsers.LastOrDefault() ?? this.Tabs.OfType<BrowserTab>().FirstOrDefault());
+                this.SetContextTab(this._recentBrowsers.LastOrDefault() ?? this.Tabs.OfType<BrowserTab>().FirstOrDefault());
             }
         }
 
@@ -417,9 +413,9 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             this._searchDestinations.Remove(results);
             if (this._activeSearch == results)
             {
-                this._activeSearch = this.ActiveTab as SearchResultsViewModel ??
-                                     this.ActiveBottomTab as SearchResultsViewModel ?? this.BottomTabs.Concat(this.Tabs)
-                                         .OfType<SearchResultsViewModel>().LastOrDefault();
+                this._activeSearch = this.ActiveTab as SearchResultsViewModel
+                                     ?? this.ActiveBottomTab as SearchResultsViewModel
+                                     ?? this.BottomTabs.Concat(this.Tabs).OfType<SearchResultsViewModel>().LastOrDefault();
             }
         }
 
@@ -499,8 +495,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     {
         this.SelectedTool = tool;
         this.IsPaneOpen = true;
-        if (this._contextTab is { } tab &&
-            (note is null || new KeyNote(note, string.Empty).Matches(tab.Browser.Location)))
+        if (this._contextTab is { } tab && (note is null || new KeyNote(note, string.Empty).Matches(tab.Browser.Location)))
         {
             this.ActiveTab = tab;
         }
@@ -540,13 +535,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     {
         this.Placement = this.CapturePlacement?.Invoke() ?? this.Placement;
         var tabs = this.Tabs.OfType<BrowserTab>().Select(tab => new SavedTab(
-            tab.Browser.Location.Address, tab.Browser.Location.View == RegistryView.Registry32,
-            tab.Browser.CaptureLayout())).ToList();
+            tab.Browser.Location.Address, tab.Browser.Location.View == RegistryView.Registry32, tab.Browser.CaptureLayout())).ToList();
         this._settings.SaveSession(
             tabs, this._replaceRestored, filePath,
             new WindowLayout(
-                this.Placement, this.IsPaneOpen, this.IsPanePinned, this.PaneWidth, this.SelectedTool.ToString(),
-                this.IsBottomPaneOpen, this.BottomPaneHeight, (this.ActiveBottomTab as ToolTab)?.Tool.ToString()));
+                this.Placement, this.IsPaneOpen, this.IsPanePinned, this.PaneWidth, this.SelectedTool.ToString(), this.IsBottomPaneOpen,
+                this.BottomPaneHeight, (this.ActiveBottomTab as ToolTab)?.Tool.ToString()));
     }
 
     internal void StartSearch(SavedSearch search)
@@ -565,19 +559,14 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     {
         SearchResultsViewModel? tab = null;
         tab = new SearchResultsViewModel(
-            search, this._investigations,
-            (query, token) => Task.Run(() => RegistrySearch.FindAll(this._registry, query, token), token),
+            search, this._investigations, (query, token) => Task.Run(() => RegistrySearch.FindAll(this._registry, query, token), token),
             (match, select) => this.OpenBrowser(match.Location, match.ValueName, select),
             (match, token) => this.NavigateSearchResultAsync(tab!, match, token),
-            (query, progress, token) => Task.FromResult(
-                RegistrySearch.FindAll(this._registry, query, token, progress: progress)));
+            (query, progress, token) => Task.FromResult(RegistrySearch.FindAll(this._registry, query, token, progress: progress)));
         return tab;
     }
 
-    private async Task NavigateSearchResultAsync(
-        SearchResultsViewModel source,
-        RegistrySearchMatch match,
-        CancellationToken token)
+    private async Task NavigateSearchResultAsync(SearchResultsViewModel source, RegistrySearchMatch match, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (!this.Tabs.Contains(source) && !this.BottomTabs.Contains(source))
@@ -585,8 +574,9 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        if (!this._searchDestinations.TryGetValue(source, out var destination) ||
-            !this.Tabs.Contains(destination.Tab) || destination.Tab.Browser.NavigationVersion != destination.Navigation)
+        if (!this._searchDestinations.TryGetValue(source, out var destination)
+            || !this.Tabs.Contains(destination.Tab)
+            || destination.Tab.Browser.NavigationVersion != destination.Navigation)
         {
             var opened = this.OpenBrowser(match.Location, match.ValueName);
             this._searchDestinations[source] = (opened, opened.Browser.NavigationVersion);
@@ -609,16 +599,16 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     private void OpenSavedSearches()
     {
         this.SelectTab(
-            this.Tabs.OfType<SavedSearchesViewModel>().FirstOrDefault() ??
-            new SavedSearchesViewModel(this._investigations, this.StartSearch));
+            this.Tabs.OfType<SavedSearchesViewModel>().FirstOrDefault()
+            ?? new SavedSearchesViewModel(this._investigations, this.StartSearch));
     }
 
     [RelayCommand]
     private void OpenWorkspaces()
     {
         this.SelectTab(
-            this.Tabs.OfType<WorkspacesViewModel>().FirstOrDefault() ?? new WorkspacesViewModel(
-                this._investigations, this.CaptureWorkspace, this.RestoreWorkspaceAsync));
+            this.Tabs.OfType<WorkspacesViewModel>().FirstOrDefault()
+            ?? new WorkspacesViewModel(this._investigations, this.CaptureWorkspace, this.RestoreWorkspaceAsync));
     }
 
     internal async Task<WorkspaceRestoreResult> RestoreWorkspaceAsync(
@@ -627,8 +617,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         CancellationToken token)
     {
         workspace.Validate();
-        var originalTabs = this.Tabs.Concat(this.BottomTabs).Where(tab => tab is BrowserTab or SearchResultsViewModel)
-            .ToArray();
+        var originalTabs = this.Tabs.Concat(this.BottomTabs).Where(tab => tab is BrowserTab or SearchResultsViewModel).ToArray();
         var source = this.ActiveTab;
         var stagedBrowsers = new List<BrowserTab>();
         var stagedSearches = new List<SearchResultsViewModel>();
@@ -706,8 +695,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
                 catch (Exception error)
                 {
                     errors.Add(
-                        "Search: " + search.Name + " · " +
-                        string.Join(", ", search.Roots.Select(WorkspacesViewModel.Target)) + " · " + error.Message);
+                        "Search: "
+                        + search.Name
+                        + " · "
+                        + string.Join(", ", search.Roots.Select(WorkspacesViewModel.Target))
+                        + " · "
+                        + error.Message);
                 }
             }
 
@@ -717,8 +710,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
                 {
                     try
                     {
-                        var watch = this.Watches.Concat(preparedWatches).FirstOrDefault(candidate =>
-                            MatchesWatch(candidate, definition.Location, definition.ValueName));
+                        var watch = this.Watches.Concat(preparedWatches).FirstOrDefault(candidate => MatchesWatch(
+                            candidate, definition.Location, definition.ValueName));
                         if (watch is null)
                         {
                             watch = new WatchSession(this._registry, definition, this.DispatchWatchUpdate);
@@ -740,8 +733,10 @@ internal sealed partial class MainWindowViewModel : ObservableObject
                     catch (Exception error)
                     {
                         errors.Add(
-                            "Watch: " + WatchSurfaceViewModel.FormatTarget(definition.Location, definition.ValueName) +
-                            " · " + error.Message);
+                            "Watch: "
+                            + WatchSurfaceViewModel.FormatTarget(definition.Location, definition.ValueName)
+                            + " · "
+                            + error.Message);
                     }
                 }
             }
@@ -755,9 +750,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
             foreach (var watch in preparedWatches.Where(watch => !watch.IsRunning))
             {
-                errors.Add(
-                    "Watch: " + watch.Target + " · " +
-                    (watch.Error?.Message ?? "The watch stopped during preparation."));
+                errors.Add("Watch: " + watch.Target + " · " + (watch.Error?.Message ?? "The watch stopped during preparation."));
             }
 
             foreach (var browser in stagedBrowsers)
@@ -825,8 +818,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             }
 
             return new WorkspaceRestoreResult(
-                stagedBrowsers.Count + stagedSearches.Count, options.StartInvestigations ? stagedSearches.Count : 0,
-                watches, replaced, errors.ToArray());
+                stagedBrowsers.Count + stagedSearches.Count, options.StartInvestigations ? stagedSearches.Count : 0, watches, replaced,
+                errors.ToArray());
         }
         finally
         {
@@ -923,8 +916,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
     private void ReportWatchFailure(WatchSession session)
     {
-        if (!session.IsRunning && session.Error is { } error && !this.IsClosing &&
-            this._reportedWatchFailures.Add(session))
+        if (!session.IsRunning && session.Error is { } error && !this.IsClosing && this._reportedWatchFailures.Add(session))
         {
             this._logger.LogFailure(LogLevel.Warning, "Watch stopped unexpectedly", error);
             this.WatchFailed?.Invoke(session);
@@ -957,8 +949,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     {
         if (this.IsClosing || this.CanCloseWindow)
         {
-            throw new InvalidOperationException(
-                "Wait until the window has finished closing or cancel closing before starting a watch.");
+            throw new InvalidOperationException("Wait until the window has finished closing or cancel closing before starting a watch.");
         }
 
         var existing = this.Watches.FirstOrDefault(watch => MatchesWatch(watch, location, valueName));
@@ -974,8 +965,9 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
     private static bool MatchesWatch(WatchSession watch, RegistryLocation location, string? valueName)
     {
-        return watch.IsRunning && new KeyNote(watch.Definition.Location, string.Empty).Matches(location) &&
-               string.Equals(watch.Definition.ValueName, valueName, StringComparison.OrdinalIgnoreCase);
+        return watch.IsRunning
+               && new KeyNote(watch.Definition.Location, string.Empty).Matches(location)
+               && string.Equals(watch.Definition.ValueName, valueName, StringComparison.OrdinalIgnoreCase);
     }
 
     private void AttachWatch(WatchSession session)
@@ -1050,15 +1042,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
             {
                 if (files.Any(model => !model.CanCompleteClose))
                 {
-                    throw new InvalidOperationException(
-                        "A registry file changed while closing. Review your changes and close again.");
+                    throw new InvalidOperationException("A registry file changed while closing. Review your changes and close again.");
                 }
 
-                if (this.Notes.Any(note =>
-                        note.IsDirty && (!discarded.TryGetValue(note, out var text) || text != note.Text)))
+                if (this.Notes.Any(note => note.IsDirty && (!discarded.TryGetValue(note, out var text) || text != note.Text)))
                 {
-                    throw new InvalidOperationException(
-                        "Notes changed while closing. Review your changes and close again.");
+                    throw new InvalidOperationException("Notes changed while closing. Review your changes and close again.");
                 }
             }
 

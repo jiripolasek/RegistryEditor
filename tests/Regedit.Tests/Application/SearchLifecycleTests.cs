@@ -24,26 +24,21 @@ internal static class SearchLifecycleTests
         var settings = new AppSettings();
         var store = new InvestigationStore(settings, () => { });
         var firstMatch = new RegistrySearchMatch(
-            root.Child("First"), string.Empty, new RegistryValue(string.Empty, RegistryValueType.Binary, [1]), "Data",
-            "needle");
+            root.Child("First"), string.Empty, new RegistryValue(string.Empty, RegistryValueType.Binary, [1]), "Data", "needle");
         var secondMatch = firstMatch with { Location = root.Child("Second"), ValueName = "Named" };
         {
-            var batches = Enumerable.Range(0, 16).Select(batch => Enumerable.Range(batch * 64, 64).Select(index =>
-                new RegistrySearchMatch(
-                    root, "Value" + index,
-                    new RegistryValue((index % 2 == 0 ? "Even" : "Odd") + index, RegistryValueType.String, []), "Name",
-                    "match")).ToArray()).ToArray();
+            var batches = Enumerable.Range(0, 16).Select(batch => Enumerable.Range(batch * 64, 64).Select(index => new RegistrySearchMatch(
+                root, "Value" + index, new RegistryValue((index % 2 == 0 ? "Even" : "Odd") + index, RegistryValueType.String, []), "Name",
+                "match")).ToArray()).ToArray();
             var streamed = new SearchResultsViewModel(
-                query, store, (_, _) => throw new InvalidOperationException(), (_, _) => { },
-                findProgressively: (_, publish, _) =>
+                query, store, (_, _) => throw new InvalidOperationException(), (_, _) => { }, findProgressively: (_, publish, _) =>
                 {
                     foreach (var batch in batches)
                     {
                         publish(batch);
                     }
 
-                    return Task.FromResult(
-                        new RegistrySearchResults(batches.SelectMany(batch => batch).ToArray(), 0, false));
+                    return Task.FromResult(new RegistrySearchResults(batches.SelectMany(batch => batch).ToArray(), 0, false));
                 });
             streamed.Filter = "Even";
             var resets = 0;
@@ -102,18 +97,19 @@ internal static class SearchLifecycleTests
                 streamed.Rows.Count == 1024 && streamed.DisplayRows.Count == 512,
                 "Large progressive batches retain every result and apply the live filter");
             check(
-                resets == 1 && filteredResets == 1 && replacements == 1 && restorations == 1 &&
-                notifications == 1 + (15 * 64) && filteredNotifications == 1 + (15 * 32),
+                resets == 1
+                && filteredResets == 1
+                && replacements == 1
+                && restorations == 1
+                && notifications == 1 + (15 * 64)
+                && filteredNotifications == 1 + (15 * 32),
                 "Only the first progressive batch resets lists and restores selection; appends notify item additions");
-            check(
-                titleChanges == batches.Length && titlesCurrent,
-                "Each progressive batch reports its final filtered header count once");
+            check(titleChanges == batches.Length && titlesCurrent, "Each progressive batch reports its final filtered header count once");
             check(
                 emptyChanges == batches.Length + 1 && countChanges == batches.Length + 2,
                 "Appended batches update only counts and empty state without replaying selection");
             check(
-                ReferenceEquals(streamed.Selected, selection) && ReferenceEquals(
-                    streamed.Selected.Single(), streamed.DisplayRows[0]),
+                ReferenceEquals(streamed.Selected, selection) && ReferenceEquals(streamed.Selected.Single(), streamed.DisplayRows[0]),
                 "Incremental search appends keep the selection without replaying it");
         }
         {
@@ -121,8 +117,7 @@ internal static class SearchLifecycleTests
             var textMatch = firstMatch with
             {
                 Value = new RegistryValue(
-                    "TextValue", RegistryValueType.String,
-                    System.Text.Encoding.Unicode.GetBytes("Displayed data\0"))
+                    "TextValue", RegistryValueType.String, System.Text.Encoding.Unicode.GetBytes("Displayed data\0"))
             };
             var filtered = new SearchResultsViewModel(
                 query, store, (_, _) =>
@@ -143,12 +138,12 @@ internal static class SearchLifecycleTests
 
             filtered.Filter = "second";
             check(
-                filtered.DisplayRows.Count == 1 && filtered.DisplayRows[0].Path.EndsWith("Second") &&
-                filtered.Selected.Count == 0, "Result filter matches paths and clears hidden selection");
+                filtered.DisplayRows.Count == 1 && filtered.DisplayRows[0].Path.EndsWith("Second") && filtered.Selected.Count == 0,
+                "Result filter matches paths and clears hidden selection");
             filtered.Filter = "absent";
             check(
-                filtered.IsEmpty && filtered.DisplayEmptyTitle == "No results match the filter" &&
-                filtered.Rows.Count == 3, "Empty filter view retains the complete search result set");
+                filtered.IsEmpty && filtered.DisplayEmptyTitle == "No results match the filter" && filtered.Rows.Count == 3,
+                "Empty filter view retains the complete search result set");
             filtered.Filter = string.Empty;
             check(
                 filtered.DisplayRows.Count == 3 && scans == 1 && !filtered.IsEmpty,
@@ -215,9 +210,7 @@ internal static class SearchLifecycleTests
             }
 
             await scan.WaitAsync(TimeSpan.FromSeconds(3));
-            check(
-                !view.IsBusy && view.Rows.Count == 2,
-                "Streaming " + finish + " retains displayed results and stops progress");
+            check(!view.IsBusy && view.Rows.Count == 2, "Streaming " + finish + " retains displayed results and stops progress");
         }
 
         {
@@ -230,13 +223,10 @@ internal static class SearchLifecycleTests
                         publish([firstMatch]);
                     }
 
-                    return Task.FromResult(
-                        new RegistrySearchResults(Enumerable.Repeat(firstMatch, 5).ToArray(), 0, false));
+                    return Task.FromResult(new RegistrySearchResults(Enumerable.Repeat(firstMatch, 5).ToArray(), 0, false));
                 });
             await synchronous.RunCommand.ExecuteAsync(null).WaitAsync(TimeSpan.FromSeconds(3));
-            check(
-                synchronous.Rows.Count == 5,
-                "Synchronous producers cannot block the UI while bounded batches wait for consumption");
+            check(synchronous.Rows.Count == 5, "Synchronous producers cannot block the UI while bounded batches wait for consumption");
         }
         foreach (var late in new[] { "success", "canceled", "error" })
         {
@@ -300,8 +290,7 @@ internal static class SearchLifecycleTests
             await pending;
             check(
                 view.Rows.Count == 0 && view.Description == description && notices == 0,
-                "Closing a results tab suppresses late " + (fail ? "failure" : "success and cancellation") +
-                " presentation");
+                "Closing a results tab suppresses late " + (fail ? "failure" : "success and cancellation") + " presentation");
         }
 
         {
@@ -316,8 +305,8 @@ internal static class SearchLifecycleTests
             gate.SetException(new IOException("provider failed after cancellation"));
             await pending;
             check(
-                view.Description.StartsWith("Search canceled") && ReferenceEquals(view.Rows.Single(), retained) &&
-                notices == 0, "Cancel preserves prior rows and suppresses a provider's later error");
+                view.Description.StartsWith("Search canceled") && ReferenceEquals(view.Rows.Single(), retained) && notices == 0,
+                "Cancel preserves prior rows and suppresses a provider's later error");
         }
         {
             var firstOpen = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -331,17 +320,13 @@ internal static class SearchLifecycleTests
             view.Selected = [new InvestigationRow(firstMatch)];
             var older = view.OpenCommand.ExecuteAsync(null);
             view.Selected = [new InvestigationRow(secondMatch)];
-            check(
-                view.OpenCommand.CanExecute(null),
-                "Another result stays actionable while the earlier destination is loading");
+            check(view.OpenCommand.CanExecute(null), "Another result stays actionable while the earlier destination is loading");
             var newer = view.OpenCommand.ExecuteAsync(null);
             lastOpen.SetResult();
             await newer;
             firstOpen.SetException(new IOException("superseded destination error"));
             await older;
-            check(
-                calls == 2 && notices == 0,
-                "A newer result can open concurrently and suppresses the earlier navigation's late error");
+            check(calls == 2 && notices == 0, "A newer result can open concurrently and suppresses the earlier navigation's late error");
         }
         var opened = new List<(RegistrySearchMatch Match, bool Select)>();
         var navigated = new List<RegistrySearchMatch>();
@@ -357,8 +342,9 @@ internal static class SearchLifecycleTests
         commands.OpenNewTabCommand.Execute(null);
         commands.OpenInBackgroundCommand.Execute(commands.Selected[0]);
         check(
-            navigated.SequenceEqual([firstMatch]) && opened is [{ Select: true }, { Select: false }] &&
-            opened.All(item => ReferenceEquals(item.Match, firstMatch) && item.Match.ValueName == string.Empty),
+            navigated.SequenceEqual([firstMatch])
+            && opened is [{ Select: true }, { Select: false }]
+            && opened.All(item => ReferenceEquals(item.Match, firstMatch) && item.Match.ValueName == string.Empty),
             "Ordinary, explicit foreground and background commands retain exact unnamed-value targets");
         commands.Close();
         await commands.OpenCommand.ExecuteAsync(null);
@@ -379,8 +365,7 @@ internal static class SearchLifecycleTests
     private static async Task RunRegistryAsync(Action<bool, string> check)
     {
         var registry = new RegistryService();
-        var root = RegistryLocation.Parse(
-            @"HKCU\Software\Regedit.SearchNavigationTests." + Guid.NewGuid().ToString("N"));
+        var root = RegistryLocation.Parse(@"HKCU\Software\Regedit.SearchNavigationTests." + Guid.NewGuid().ToString("N"));
         registry.CreateKey(root.Parent!, root.Name);
         foreach (var name in new[] { "First", "Second", "Repurposed" })
         {
@@ -391,23 +376,19 @@ internal static class SearchLifecycleTests
         registry.Write(root.Child("Second"), new RegistryValue("Named", RegistryValueType.Binary, [2]), null);
         var settings = new AppSettings();
         var shell = new MainWindowViewModel(
-            settings, new InvestigationStore(settings, () => { }), registry,
-            target => new BrowserViewModel(registry, target), NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(settings));
+            settings, new InvestigationStore(settings, () => { }), registry, target => new BrowserViewModel(registry, target),
+            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
         try
         {
             shell.StartSearch(
-                new SavedSearch(
-                    "Native navigation", [root],
-                    new SearchOptions(Guid.NewGuid().ToString("N"), Values: false, Data: false)));
+                new SavedSearch("Native navigation", [root], new SearchOptions(Guid.NewGuid().ToString("N"), Values: false, Data: false)));
             var source = (SearchResultsViewModel)shell.ActiveBottomTab!;
             await source.RunCommand.ExecutionTask!;
             var first = new RegistrySearchMatch(
                 root.Child("First") with { View = RegistryView.Registry32 }, string.Empty,
                 new RegistryValue(string.Empty, RegistryValueType.Binary, [1]), "Data", "one");
             var second = new RegistrySearchMatch(
-                root.Child("Second"), "Named", new RegistryValue("Named", RegistryValueType.Binary, [2]), "Data",
-                "two");
+                root.Child("Second"), "Named", new RegistryValue("Named", RegistryValueType.Binary, [2]), "Data", "two");
             source.Rows.ReplaceAll([new InvestigationRow(first), new InvestigationRow(second)]);
             source.Selected = [source.Rows[0]];
             await source.OpenCommand.ExecuteAsync(null);
@@ -419,16 +400,17 @@ internal static class SearchLifecycleTests
             source.Selected = [source.Rows[1]];
             await source.OpenCommand.ExecuteAsync(null);
             check(
-                ReferenceEquals(shell.ActiveTab, destination) && shell.Tabs.Count == count &&
-                destination.Browser.Location == second.Location && selected is ["Named"],
-                "Ordinary result activation reuses its owned browser and selects the exact named value and view");
+                ReferenceEquals(shell.ActiveTab, destination)
+                && shell.Tabs.Count == count
+                && destination.Browser.Location == second.Location
+                && selected is ["Named"], "Ordinary result activation reuses its owned browser and selects the exact named value and view");
             shell.SelectTab(source);
             source.Selected = [source.Rows[0]];
             await source.OpenCommand.ExecuteAsync(null);
             check(
-                ReferenceEquals(shell.ActiveTab, destination) && destination.Browser.Location == first.Location &&
-                selected[^1] == string.Empty,
-                "Reused result destination selects the unnamed value in the original 32-bit view");
+                ReferenceEquals(shell.ActiveTab, destination)
+                && destination.Browser.Location == first.Location
+                && selected[^1] == string.Empty, "Reused result destination selects the unnamed value in the original 32-bit view");
             await destination.Browser.NavigateAsync(root.Child("Repurposed"));
             await destination.Browser.NavigateAsync(first.Location);
             shell.SelectTab(source);
@@ -448,16 +430,16 @@ internal static class SearchLifecycleTests
             source.OpenNewTabCommand.Execute(null);
             var foreground = (BrowserTab)shell.ActiveTab!;
             check(
-                !ReferenceEquals(foreground, replacement) && foreground.InitialValue == "Named" &&
-                foreground.Browser.Location == second.Location,
+                !ReferenceEquals(foreground, replacement)
+                && foreground.InitialValue == "Named"
+                && foreground.Browser.Location == second.Location,
                 "Explicit foreground new-tab opening does not replace the search's ordinary destination");
             shell.SelectTab(source);
             source.OpenInBackgroundCommand.Execute(source.Rows[0]);
             check(
-                ReferenceEquals(shell.ActiveBottomTab, source) &&
-                shell.Tabs[^1] is BrowserTab { InitialValue: "" } background &&
-                background.Browser.Location == first.Location,
-                "Middle-open retains source selection, unnamed value and registry view");
+                ReferenceEquals(shell.ActiveBottomTab, source)
+                && shell.Tabs[^1] is BrowserTab { InitialValue: "" } background
+                && background.Browser.Location == first.Location, "Middle-open retains source selection, unnamed value and registry view");
             await source.OpenCommand.ExecuteAsync(null);
             check(
                 ReferenceEquals(shell.ActiveTab, replacement),
@@ -476,14 +458,12 @@ internal static class SearchLifecycleTests
             source.Selected = [source.Rows[0]];
             await source.OpenCommand.ExecuteAsync(null);
             check(
-                shell.ActiveTab == nextDestination && shell.Tabs.Count == afterNext &&
-                nextDestination.Browser.Location == first.Location,
+                shell.ActiveTab == nextDestination && shell.Tabs.Count == afterNext && nextDestination.Browser.Location == first.Location,
                 "Ordinary result activation reuses the current browser destination established by F3");
 
             shell.StartSearch(
                 new SavedSearch(
-                    "Real cancel",
-                    [new RegistryLocation(RegistryHive.LocalMachine), new RegistryLocation(RegistryHive.Users)],
+                    "Real cancel", [new RegistryLocation(RegistryHive.LocalMachine), new RegistryLocation(RegistryHive.Users)],
                     new SearchOptions(Guid.NewGuid().ToString("N"))));
             var scan = (SearchResultsViewModel)shell.ActiveBottomTab!;
             await Task.Delay(75);
@@ -491,8 +471,7 @@ internal static class SearchLifecycleTests
             scan.RunCancelCommand.Execute(null);
             await scan.RunCommand.ExecutionTask!.WaitAsync(TimeSpan.FromSeconds(10));
             check(
-                scan.Description.StartsWith("Search canceled") && scan.Rows.Count == 0 &&
-                !scan.RunCancelCommand.CanExecute(null),
+                scan.Description.StartsWith("Search canceled") && scan.Rows.Count == 0 && !scan.RunCancelCommand.CanExecute(null),
                 "The results Cancel command stops a real local registry scan and leaves stable canceled state");
         }
         finally

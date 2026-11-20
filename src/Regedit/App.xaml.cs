@@ -42,8 +42,7 @@ public partial class App : Application
                 this._logger.LogFailure(LogLevel.Critical, "Unhandled process exception", ex);
             }
         };
-        this.UnhandledException += (_, args) => this._logger.LogFailure(
-            LogLevel.Critical, "Unhandled UI exception", args.Exception);
+        this.UnhandledException += (_, args) => this._logger.LogFailure(LogLevel.Critical, "Unhandled UI exception", args.Exception);
         this._logger.LogInformation("Registry Editor started");
         this.InitializeComponent();
 #if DEBUG
@@ -73,8 +72,9 @@ public partial class App : Application
             {
                 var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
                 var arguments
-                    = JumpListNative.IsPackaged && activation.Kind == ExtendedActivationKind.Launch &&
-                      activation.Data is ILaunchActivatedEventArgs launch
+                    = JumpListNative.IsPackaged
+                      && activation.Kind == ExtendedActivationKind.Launch
+                      && activation.Data is ILaunchActivatedEventArgs launch
                         ? RegistryLaunch.SplitArguments(launch.Arguments)
                         : Environment.GetCommandLineArgs().Skip(1).ToArray();
                 if (JumpListEntries.IsAdministratorTask(arguments))
@@ -83,9 +83,8 @@ public partial class App : Application
                     {
                         using var process
                             = Process.Start(
-                                  RegistryLaunch.CreateElevationStartInfo(
-                                      Environment.ProcessPath!, RegistryLocation.Parse("Computer"))) ??
-                              throw new InvalidOperationException("Couldn't open an administrator window.");
+                                  RegistryLaunch.CreateElevationStartInfo(Environment.ProcessPath!, RegistryLocation.Parse("Computer")))
+                              ?? throw new InvalidOperationException("Couldn't open an administrator window.");
                         this.StopServices();
                         this.Exit();
                         return;
@@ -105,8 +104,7 @@ public partial class App : Application
                 }
                 else
                 {
-                    location = activation.Kind == ExtendedActivationKind.Protocol &&
-                               activation.Data is IProtocolActivatedEventArgs protocol
+                    location = activation.Kind == ExtendedActivationKind.Protocol && activation.Data is IProtocolActivatedEventArgs protocol
                         ? RegistryLaunch.ParseUri(protocol.Uri.OriginalString)
                         : RegistryLaunch.ParseArguments(arguments);
                 }
@@ -121,8 +119,7 @@ public partial class App : Application
 #if !REGEDIT_UI_TESTS
             try
             {
-                if (!JumpListNative.IsPackaged &&
-                    !RegistryLaunch.IsProtocolRegisteredForExecutable(Environment.ProcessPath))
+                if (!JumpListNative.IsPackaged && !RegistryLaunch.IsProtocolRegisteredForExecutable(Environment.ProcessPath))
                 {
                     ActivationRegistrationManager.RegisterForProtocolActivation(
                         RegistryLaunch.Scheme, Environment.ProcessPath + ",0", "Modern Registry Editor", string.Empty);
@@ -154,9 +151,8 @@ public partial class App : Application
             var favorites = services.GetRequiredService<FavoritesStore>();
             window = new MainWindow(
                 services.GetRequiredService<ILogger<MainWindow>>(), services.GetRequiredService<AppSettings>(),
-                services.GetRequiredService<RegistryService>(), services.GetRequiredService<JournalViewModel>(),
-                favorites, services.GetRequiredService<SettingsViewModel>(),
-                services.GetRequiredService<MainWindowViewModel>(),
+                services.GetRequiredService<RegistryService>(), services.GetRequiredService<JournalViewModel>(), favorites,
+                services.GetRequiredService<SettingsViewModel>(), services.GetRequiredService<MainWindowViewModel>(),
                 services.GetRequiredService<Func<WatchSurfaceViewModel>>(), location, startupError);
             this._windows.Add(window);
 #if !REGEDIT_UI_TESTS

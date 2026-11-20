@@ -60,12 +60,12 @@ public sealed record RegistryBranchSnapshot(
             {
                 continue;
             }
-            catch (Exception ex) when (skipMissingDescendants && (path.Length != 0 || allowMissingRoot) &&
-                                       ex is Win32Exception { NativeErrorCode: RegistryNative.ErrorKeyDeleted }
-                                           or IOException
-                                           {
-                                               HResult: RegistryNative.ErrorKeyDeleted or unchecked((int)0x800703FA)
-                                           })
+            catch (Exception ex) when (skipMissingDescendants
+                                       && (path.Length != 0 || allowMissingRoot)
+                                       && ex is Win32Exception { NativeErrorCode: RegistryNative.ErrorKeyDeleted } or IOException
+                                       {
+                                           HResult: RegistryNative.ErrorKeyDeleted or unchecked((int)0x800703FA)
+                                       })
             {
                 continue;
             }
@@ -76,8 +76,7 @@ public sealed record RegistryBranchSnapshot(
 
         token.ThrowIfCancellationRequested();
         return new RegistryBranchSnapshot(
-            CurrentVersion, root, started, DateTimeOffset.UtcNow, keys.ToArray(),
-            root.Machine ?? Environment.MachineName);
+            CurrentVersion, root, started, DateTimeOffset.UtcNow, keys.ToArray(), root.Machine ?? Environment.MachineName);
     }
 
     public async Task SaveAsync(string file, CancellationToken token = default)
@@ -86,11 +85,9 @@ public sealed record RegistryBranchSnapshot(
         var temporary = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            await using (var stream = new FileStream(
-                             temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true))
+            await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true))
             {
-                await JsonSerializer.SerializeAsync(
-                    stream, this, SnapshotJsonContext.Default.RegistryBranchSnapshot, token);
+                await JsonSerializer.SerializeAsync(stream, this, SnapshotJsonContext.Default.RegistryBranchSnapshot, token);
                 if (stream.Length > MaximumFileBytes)
                 {
                     throw new IOException("Snapshots are limited to 256 MiB. Capture a smaller branch.");
@@ -117,10 +114,8 @@ public sealed record RegistryBranchSnapshot(
             throw new IOException("This snapshot exceeds the 256 MiB file limit.");
         }
 
-        var snapshot
-            = await JsonSerializer.DeserializeAsync(
-                  stream, SnapshotJsonContext.Default.RegistryBranchSnapshot, token) ??
-              throw new InvalidDataException("The snapshot is empty.");
+        var snapshot = await JsonSerializer.DeserializeAsync(stream, SnapshotJsonContext.Default.RegistryBranchSnapshot, token)
+                       ?? throw new InvalidDataException("The snapshot is empty.");
         snapshot.Validate();
         return snapshot;
     }
@@ -132,10 +127,14 @@ public sealed record RegistryBranchSnapshot(
             throw new InvalidDataException("This snapshot format version is not supported.");
         }
 
-        if (this.Root is null || this.Root.SubKey is null || this.Keys is null ||
-            string.IsNullOrWhiteSpace(this.Computer) || this.Started == default || this.Completed < this.Started ||
-            this.Root.View is not (RegistryView.Registry32 or RegistryView.Registry64) ||
-            !RegistryLocation.Roots.Any(root => root.Hive == this.Root.Hive))
+        if (this.Root is null
+            || this.Root.SubKey is null
+            || this.Keys is null
+            || string.IsNullOrWhiteSpace(this.Computer)
+            || this.Started == default
+            || this.Completed < this.Started
+            || this.Root.View is not (RegistryView.Registry32 or RegistryView.Registry64)
+            || !RegistryLocation.Roots.Any(root => root.Hive == this.Root.Hive))
         {
             throw new InvalidDataException("The snapshot metadata is invalid.");
         }
@@ -198,7 +197,6 @@ public sealed record RegistryBranchSnapshot(
     }
 }
 
-[JsonSourceGenerationOptions(
-    MaxDepth = 32, IgnoreReadOnlyProperties = true, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
+[JsonSourceGenerationOptions(MaxDepth = 32, IgnoreReadOnlyProperties = true, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(RegistryBranchSnapshot))]
 internal sealed partial class SnapshotJsonContext : JsonSerializerContext;

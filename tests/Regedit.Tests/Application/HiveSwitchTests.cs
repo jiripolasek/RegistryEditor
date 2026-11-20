@@ -23,11 +23,8 @@ internal static class HiveSwitchTests
                     var target = source.GetAlternateHiveLocation()!;
                     check(
                         target.Hive != hive && target.SubKey == path && target.View == view && target.Machine is null,
-                        "Switching hives preserves the exact subkey path and registry view: " + source.Address + " / " +
-                        view);
-                    check(
-                        target.GetAlternateHiveLocation() == source,
-                        "Switching hives twice returns to the original location");
+                        "Switching hives preserves the exact subkey path and registry view: " + source.Address + " / " + view);
+                    check(target.GetAlternateHiveLocation() == source, "Switching hives twice returns to the original location");
                 }
             }
         }
@@ -36,9 +33,8 @@ internal static class HiveSwitchTests
         var browser = new BrowserViewModel(new RegistryService(), computer);
         foreach (var source in new[]
                  {
-                     computer, new RegistryLocation(RegistryHive.ClassesRoot),
-                     new RegistryLocation(RegistryHive.Users), new RegistryLocation(RegistryHive.CurrentConfig),
-                     new RegistryLocation(Machine: "server"),
+                     computer, new RegistryLocation(RegistryHive.ClassesRoot), new RegistryLocation(RegistryHive.Users),
+                     new RegistryLocation(RegistryHive.CurrentConfig), new RegistryLocation(Machine: "server"),
                      new RegistryLocation(RegistryHive.LocalMachine, "Software", "server"),
                      new RegistryLocation(RegistryHive.Users, "Software", "server")
                  })
@@ -48,8 +44,7 @@ internal static class HiveSwitchTests
                 "Unsupported hives and remote locations cannot switch: " + source.Address);
             await browser.SwitchHiveCommand.ExecuteAsync(source);
             check(
-                browser.Location == computer && browser.Error is null,
-                "Executing an unsupported hive switch leaves the browser unchanged");
+                browser.Location == computer && browser.Error is null, "Executing an unsupported hive switch leaves the browser unchanged");
         }
 
         var software = new RegistryLocation(RegistryHive.CurrentUser, "Software");
@@ -63,9 +58,11 @@ internal static class HiveSwitchTests
         current.CancelPending();
         await current.SwitchHiveCommand.ExecuteAsync(null);
         check(
-            commandChanges > 0 && !current.SwitchHiveCommand.CanExecute(null) &&
-            !current.SwitchHiveCommand.CanExecute(software) && current.Location == software && current.Error is null,
-            "Closing a tab disables hive switching and ignores a captured switch command");
+            commandChanges > 0
+            && !current.SwitchHiveCommand.CanExecute(null)
+            && !current.SwitchHiveCommand.CanExecute(software)
+            && current.Location == software
+            && current.Error is null, "Closing a tab disables hive switching and ignores a captured switch command");
         browser.CancelPending();
 
         if (!registryTests)
@@ -96,8 +93,7 @@ internal static class HiveSwitchTests
 
                 var context = target with
                 {
-                    SubKey = string.Empty,
-                    View = view == RegistryView.Registry32 ? RegistryView.Registry64 : RegistryView.Registry32
+                    SubKey = string.Empty, View = view == RegistryView.Registry32 ? RegistryView.Registry64 : RegistryView.Registry32
                 };
                 await tab.SwitchHiveCommand.ExecuteAsync(context);
                 check(
@@ -110,9 +106,11 @@ internal static class HiveSwitchTests
                 var missing = source.Child("RegeditHiveSwitchMissing." + Guid.NewGuid().ToString("N"));
                 await tab.SwitchHiveCommand.ExecuteAsync(missing);
                 check(
-                    tab.Error is not null && tab.Error.Contains(missing.GetAlternateHiveLocation()!.Address) &&
-                    tab.Location == location && ReferenceEquals(tab.Entries, entries) &&
-                    history.SequenceEqual(tab.GetHistory(false)),
+                    tab.Error is not null
+                    && tab.Error.Contains(missing.GetAlternateHiveLocation()!.Address)
+                    && tab.Location == location
+                    && ReferenceEquals(tab.Entries, entries)
+                    && history.SequenceEqual(tab.GetHistory(false)),
                     "A missing destination reports its path and preserves the current key, rows, and history");
             }
             finally

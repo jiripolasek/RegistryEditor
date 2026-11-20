@@ -23,11 +23,28 @@ public sealed record RegistryLocation(
 
     public bool IsComputer => this.Hive is null;
 
+    public string RootName =>
+        this.IsComputer ? this.Machine ?? "Computer" : Roots.First(root => root.Hive == this.Hive).Name;
+
+    public string Path => this.RootName + (this.SubKey.Length == 0 ? string.Empty : "\\" + this.SubKey);
+
+    public string Address => this.IsComputer
+        ? this.Machine is null ? "Computer" : $"\\\\{this.Machine}"
+        : (this.Machine is null ? string.Empty : $"\\\\{this.Machine}\\") + this.Path;
+
+    public string Name => this.SubKey.Length == 0 ? this.RootName : this.SubKey[(this.SubKey.LastIndexOf('\\') + 1)..];
+
+    public RegistryLocation? Parent => this.SubKey.Length == 0
+        ? null
+        : this with { SubKey = this.SubKey.Contains('\\') ? this.SubKey[..this.SubKey.LastIndexOf('\\')] : string.Empty };
+
     public bool IsSameLocation(RegistryLocation? other)
     {
-        return other is not null && this.Hive == other.Hive && this.View == other.View &&
-               string.Equals(this.Machine, other.Machine, StringComparison.OrdinalIgnoreCase) && string.Equals(
-                   this.SubKey, other.SubKey, StringComparison.OrdinalIgnoreCase);
+        return other is not null
+               && this.Hive == other.Hive
+               && this.View == other.View
+               && string.Equals(this.Machine, other.Machine, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(this.SubKey, other.SubKey, StringComparison.OrdinalIgnoreCase);
     }
 
     public RegistryLocation GetComputer()
@@ -54,20 +71,13 @@ public sealed record RegistryLocation(
 
     internal bool IsAtOrBelow(RegistryLocation root)
     {
-        return this.Hive == root.Hive && this.View == root.View &&
-               string.Equals(this.Machine, root.Machine, StringComparison.OrdinalIgnoreCase) &&
-               (root.SubKey.Length == 0 || this.SubKey.Equals(root.SubKey, StringComparison.OrdinalIgnoreCase) ||
-                this.SubKey.StartsWith(root.SubKey + "\\", StringComparison.OrdinalIgnoreCase));
+        return this.Hive == root.Hive
+               && this.View == root.View
+               && string.Equals(this.Machine, root.Machine, StringComparison.OrdinalIgnoreCase)
+               && (root.SubKey.Length == 0
+                   || this.SubKey.Equals(root.SubKey, StringComparison.OrdinalIgnoreCase)
+                   || this.SubKey.StartsWith(root.SubKey + "\\", StringComparison.OrdinalIgnoreCase));
     }
-
-    public string RootName =>
-        this.IsComputer ? this.Machine ?? "Computer" : Roots.First(root => root.Hive == this.Hive).Name;
-
-    public string Path => this.RootName + (this.SubKey.Length == 0 ? string.Empty : "\\" + this.SubKey);
-
-    public string Address => this.IsComputer
-        ? this.Machine is null ? "Computer" : $"\\\\{this.Machine}"
-        : (this.Machine is null ? string.Empty : $"\\\\{this.Machine}\\") + this.Path;
 
     public override string ToString()
     {
@@ -87,21 +97,10 @@ public sealed record RegistryLocation(
                 ? Roots.First(root => root.Hive == this.Hive).Alias + ":\\" + this.SubKey
                 : null,
             RegistryPathFormat.PowerShellProvider => "Registry::" + this.Path,
-            RegistryPathFormat.RegFileHeader => this.SubKey.Contains('\r') || this.SubKey.Contains('\n')
-                ? null
-                : $"[{this.Path}]",
+            RegistryPathFormat.RegFileHeader => this.SubKey.Contains('\r') || this.SubKey.Contains('\n') ? null : $"[{this.Path}]",
             _ => throw new ArgumentOutOfRangeException(nameof(format))
         };
     }
-
-    public string Name => this.SubKey.Length == 0 ? this.RootName : this.SubKey[(this.SubKey.LastIndexOf('\\') + 1)..];
-
-    public RegistryLocation? Parent => this.SubKey.Length == 0
-        ? null
-        : this with
-        {
-            SubKey = this.SubKey.Contains('\\') ? this.SubKey[..this.SubKey.LastIndexOf('\\')] : string.Empty
-        };
 
     public RegistryLocation Child(string name)
     {
@@ -135,8 +134,7 @@ public sealed record RegistryLocation(
     {
         if (string.IsNullOrEmpty(name) || name.Length > 255 || name.Contains('\\') || name.Contains('\0'))
         {
-            throw new ArgumentException(
-                "A key name must contain 1 to 255 characters and cannot contain a backslash or a null character.");
+            throw new ArgumentException("A key name must contain 1 to 255 characters and cannot contain a backslash or a null character.");
         }
     }
 
@@ -212,8 +210,8 @@ public sealed record RegistryLocation(
         }
 
         var subKey = split < 0 ? string.Empty : address[(split + 1)..];
-        var match = Roots.FirstOrDefault(r => r.Name.Equals(root, StringComparison.OrdinalIgnoreCase) ||
-                                              r.Alias.Equals(root, StringComparison.OrdinalIgnoreCase));
+        var match = Roots.FirstOrDefault(r =>
+            r.Name.Equals(root, StringComparison.OrdinalIgnoreCase) || r.Alias.Equals(root, StringComparison.OrdinalIgnoreCase));
         if (match.Name is null)
         {
             throw new ArgumentException("Start the address with a registry hive, for example HKCU\\Software.");

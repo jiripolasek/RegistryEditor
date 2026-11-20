@@ -39,15 +39,13 @@ public sealed partial class MainWindow
                 menu, "Duplicate tab", () => this.ViewModel.DuplicateTab(browser),
                 iconSource: new FontIconSource
                 {
-                    FontFamily = new("/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"),
-                    Glyph = "\uEBE9"
+                    FontFamily = new("/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"), Glyph = "\uEBE9"
                 });
             menu.Items.Add(new MenuFlyoutSeparator());
         }
         else if (tab is SearchResultsViewModel or ToolTab { Tool: ToolKind.Journal or ToolKind.Watches })
         {
-            ListContextMenu.Add(
-                menu, "Move to bottom panel", () => this.ViewModel.DockTab(tab), icon: Symbol.DockBottom);
+            ListContextMenu.Add(menu, "Move to bottom panel", () => this.ViewModel.DockTab(tab), icon: Symbol.DockBottom);
             menu.Items.Add(new MenuFlyoutSeparator());
         }
 
@@ -55,11 +53,8 @@ public sealed partial class MainWindow
             menu, "Reopen closed tab", () => this.ViewModel.ReopenClosedTabCommand.Execute(null),
             this.ViewModel.ReopenClosedTabCommand.CanExecute(null), icon: Symbol.Undo);
         ListContextMenu.Add(menu, "Close tab", () => this.ViewModel.CloseTab(tab), icon: Symbol.Cancel);
-        ListContextMenu.Add(
-            menu, "Close other tabs", () => this.ViewModel.CloseOtherTabs(tab), this.ViewModel.Tabs.Count > 1);
-        ListContextMenu.Add(
-            menu, "Close tabs to the right", () => this.ViewModel.CloseTabsToRight(tab),
-            this.ViewModel.Tabs[^1] != tab);
+        ListContextMenu.Add(menu, "Close other tabs", () => this.ViewModel.CloseOtherTabs(tab), this.ViewModel.Tabs.Count > 1);
+        ListContextMenu.Add(menu, "Close tabs to the right", () => this.ViewModel.CloseTabsToRight(tab), this.ViewModel.Tabs[^1] != tab);
         if (args.TryGetPosition(item, out var point))
         {
             menu.ShowAt(item, new FlyoutShowOptions { Position = point });

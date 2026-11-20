@@ -20,13 +20,11 @@ internal static class WatchDeliveryTests
         RegistryBranchSnapshot Snapshot(byte value)
         {
             return new RegistryBranchSnapshot(
-                1, root, now, now,
-                [new SnapshotKey(string.Empty, [new RegistryValue("value", RegistryValueType.Binary, [value])])],
+                1, root, now, now, [new SnapshotKey(string.Empty, [new RegistryValue("value", RegistryValueType.Binary, [value])])],
                 Environment.MachineName);
         }
 
-        var pending = Channel.CreateBounded<byte>(
-            new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
+        var pending = Channel.CreateBounded<byte>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var baseline = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var first = new TaskCompletionSource<RegistryComparison>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -82,8 +80,8 @@ internal static class WatchDeliveryTests
                 "A burst coalesces to exact observed baseline and final bytes");
             var followup = await second.Task.WaitAsync(cancellation.Token);
             check(
-                followup.Before.Keys[0].Values[0].Data[0] == 7 && followup.After.Keys[0].Values[0].Data[0] == 9 &&
-                captures == 3, "A notification during capture schedules one later final-state observation");
+                followup.Before.Keys[0].Values[0].Data[0] == 7 && followup.After.Keys[0].Values[0].Data[0] == 9 && captures == 3,
+                "A notification during capture schedules one later final-state observation");
         }
         finally
         {
@@ -100,8 +98,7 @@ internal static class WatchDeliveryTests
         check(captures == 3, "Canceled idle delivery does not perform a late capture");
 
         using var sustained = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var stream = Channel.CreateBounded<byte>(
-            new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
+        var stream = Channel.CreateBounded<byte>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
         var sustainedResult = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var current = 0;
         var baselineReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -124,9 +121,7 @@ internal static class WatchDeliveryTests
         try
         {
             await sustainedResult.Task.WaitAsync(TimeSpan.FromSeconds(2));
-            check(
-                !producer.IsCompleted,
-                "Fixed coalescing delivers during sustained notifications without waiting for quiet");
+            check(!producer.IsCompleted, "Fixed coalescing delivers during sustained notifications without waiting for quiet");
         }
         finally
         {
@@ -200,8 +195,8 @@ internal static class WatchDeliveryTests
         try
         {
             await RegistryWatcher.ObserveAsync(
-                Channel.CreateBounded<byte>(1).Reader, () => throw denied, _ => Snapshot(0), _ => Task.CompletedTask,
-                null, CancellationToken.None);
+                Channel.CreateBounded<byte>(1).Reader, () => throw denied, _ => Snapshot(0), _ => Task.CompletedTask, null,
+                CancellationToken.None);
             check(false, "Failed native registration must propagate");
         }
         catch (Win32Exception actual) when (ReferenceEquals(actual, denied))

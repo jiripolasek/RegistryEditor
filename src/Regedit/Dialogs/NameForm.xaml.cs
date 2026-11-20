@@ -24,12 +24,7 @@ public sealed partial class NameForm : UserControl
 
     internal TextBox Input => this.NameInput;
 
-    internal NameForm(
-        string header,
-        string value = "",
-        string? context = null,
-        string? hint = null,
-        string placeholder = "")
+    internal NameForm(string header, string value = "", string? context = null, string? hint = null, string placeholder = "")
     {
         this.Header = header;
         this.Value = value;

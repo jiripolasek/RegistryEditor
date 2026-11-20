@@ -16,6 +16,15 @@ internal sealed class WindowPlacementController
     private readonly nint _handle;
     private WindowPlacement _normal;
 
+    private double Scale
+    {
+        get
+        {
+            var dpi = WindowPlacementNative.GetDpiForWindow(this._handle);
+            return dpi > 0 ? dpi / 96d : 1;
+        }
+    }
+
     internal WindowPlacementController(AppWindow window, nint handle, WindowPlacement? saved)
     {
         this._window = window;
@@ -29,8 +38,7 @@ internal sealed class WindowPlacementController
         var scale = this.Scale;
         saved = saved is { IsValid: true }
             ? saved
-            : new WindowPlacement(
-                new WindowBounds(work.X + 40, work.Y + 40, (int)(1380 * scale), (int)(900 * scale)), work, scale);
+            : new WindowPlacement(new WindowBounds(work.X + 40, work.Y + 40, (int)(1380 * scale), (int)(900 * scale)), work, scale);
         var restored = saved.Restore(work, scale);
         window.MoveAndResize(Rect(restored));
         this._normal = new WindowPlacement(restored, work, scale, saved.Maximized);
@@ -42,19 +50,9 @@ internal sealed class WindowPlacementController
         }
     }
 
-    private double Scale
-    {
-        get
-        {
-            var dpi = WindowPlacementNative.GetDpiForWindow(this._handle);
-            return dpi > 0 ? dpi / 96d : 1;
-        }
-    }
-
     internal WindowPlacement Capture()
     {
-        var placement
-            = new WindowPlacementNative.Placement { Length = (uint)Marshal.SizeOf<WindowPlacementNative.Placement>() };
+        var placement = new WindowPlacementNative.Placement { Length = (uint)Marshal.SizeOf<WindowPlacementNative.Placement>() };
         if (WindowPlacementNative.GetWindowPlacement(this._handle, ref placement) == 0)
         {
             return this._normal;
@@ -69,9 +67,9 @@ internal sealed class WindowPlacementController
             placement.Bottom - placement.Top);
         if (bounds.IsValid)
         {
-            var maximized = placement.ShowCommand == WindowPlacementNative.ShowMaximized ||
-                            placement.ShowCommand == WindowPlacementNative.ShowMinimized &&
-                            (placement.Flags & WindowPlacementNative.RestoreToMaximized) != 0;
+            var maximized = placement.ShowCommand == WindowPlacementNative.ShowMaximized
+                            || placement.ShowCommand == WindowPlacementNative.ShowMinimized
+                            && (placement.Flags & WindowPlacementNative.RestoreToMaximized) != 0;
             this._normal = new WindowPlacement(bounds, Bounds(work), this.Scale, maximized);
         }
 

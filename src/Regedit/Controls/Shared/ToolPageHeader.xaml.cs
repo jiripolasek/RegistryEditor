@@ -11,11 +11,6 @@ namespace JPSoftworks.Regedit.Controls.Shared;
 
 public sealed partial class ToolPageHeader : UserControl
 {
-    public ToolPageHeader()
-    {
-        this.InitializeComponent();
-    }
-
     internal Button MenuButton => this.GlobalMenuButton;
 
     public string Title
@@ -37,6 +32,11 @@ public sealed partial class ToolPageHeader : UserControl
             this.DescriptionText.Visibility = ToolView.TextVisibility(value);
             ToolTipService.SetToolTip(this.DescriptionText, value);
         }
+    }
+
+    public ToolPageHeader()
+    {
+        this.InitializeComponent();
     }
 
     internal void SetAction(string label, string automationId, Action<Button> action, Symbol icon)

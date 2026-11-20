@@ -6,13 +6,7 @@ using JPSoftworks.Regedit.Models.Registry;
 
 namespace JPSoftworks.Regedit.Models.Files;
 
-public sealed partial record RegistryFilePreviewRow(
-    string Operation,
-    string Name,
-    string Type,
-    string Data,
-    int Line,
-    RegistryEntry Entry)
+public sealed partial record RegistryFilePreviewRow(string Operation, string Name, string Type, string Data, int Line, RegistryEntry Entry)
 {
     public bool IsDeletion => this.Operation.StartsWith("Delete", StringComparison.Ordinal);
 
@@ -32,8 +26,7 @@ public sealed partial record RegistryFilePreviewRow(
 
     public bool HasDataIcon => !this.IsDeletion && this.Entry.HasDataIcon;
 
-    public string Summary => string.Join(
-        " · ", new[] { this.Operation, this.Type, this.Data }.Where(text => text.Length > 0));
+    public string Summary => string.Join(" · ", new[] { this.Operation, this.Type, this.Data }.Where(text => text.Length > 0));
 
     public string AccessibleName => $"{this.Operation}, {this.Name}, {this.Type}, {this.Data}, line {this.Line}";
 

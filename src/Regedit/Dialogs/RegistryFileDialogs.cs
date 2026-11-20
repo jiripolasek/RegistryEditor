@@ -55,8 +55,8 @@ internal sealed class RegistryFileDialogs : IRegistryFileDialogs
     {
         var dialog = new AppDialog(
             "Import registry file?",
-            $"Import the current editor contents of {fileName} into this computer's {(view == RegistryView.Registry32 ? "32" : "64")}-bit registry?\n\n" +
-            "This can add, replace, or delete keys and values anywhere on this computer. Import can partially succeed before an error and cannot be automatically undone. The original file is not changed.",
+            $"Import the current editor contents of {fileName} into this computer's {(view == RegistryView.Registry32 ? "32" : "64")}-bit registry?\n\n"
+            + "This can add, replace, or delete keys and values anywhere on this computer. Import can partially succeed before an error and cannot be automatically undone. The original file is not changed.",
             "Import", defaultButton: ContentDialogButton.Close);
         return await this.ShowAsync(dialog) == ContentDialogResult.Primary;
     }

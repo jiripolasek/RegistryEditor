@@ -16,18 +16,21 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed partial class SearchResultsViewModel : InvestigationViewModel
 {
+    internal event Action? RunStarted;
+
+    internal event Action<InvestigationRow>? ResultSelected;
+
     private readonly IDisposable _connection;
     private readonly InvestigationStore _store;
     private readonly Func<SavedSearch, CancellationToken, Task<RegistrySearchResults>> _find;
 
-    private readonly Func<SavedSearch, Action<RegistrySearchMatch[]>, CancellationToken, Task<RegistrySearchResults>>?
-        _findProgressively;
+    private readonly Func<SavedSearch, Action<RegistrySearchMatch[]>, CancellationToken, Task<RegistrySearchResults>>? _findProgressively;
 
     private readonly Func<RegistrySearchMatch, CancellationToken, Task> _navigate;
     private readonly Action<RegistrySearchMatch, bool> _open;
+    private readonly BulkObservableCollection<InvestigationRow> _filteredRows = [];
     private int _run;
     private int _navigation;
-    private readonly BulkObservableCollection<InvestigationRow> _filteredRows = [];
     private string _filterText = string.Empty;
 
     [ObservableProperty]
@@ -36,13 +39,72 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
     public override BulkObservableCollection<InvestigationRow> DisplayRows =>
         this._filterText.Length == 0 ? this.Rows : this._filteredRows;
 
-    public override string DisplayEmptyTitle => this._filterText.Length == 0
-        ? this.EmptyTitle
-        : "No results match the filter";
+    public override string DisplayEmptyTitle => this._filterText.Length == 0 ? this.EmptyTitle : "No results match the filter";
 
     public override string DisplayEmptyDescription => this._filterText.Length == 0
         ? this.EmptyDescription
         : "Try a different name, path or data text.";
+
+    public override string HeaderTitle => this._filterText.Length == 0
+        ? $"{this.Title} ({this.Rows.Count:N0})"
+        : $"{this.Title} ({this.DisplayRows.Count:N0}/{this.Rows.Count:N0})";
+
+    public override string Tooltip => this.Description;
+
+    public override bool IsBusy => this.RunCommand.IsRunning;
+
+    public bool IsIdle => !this.IsBusy;
+
+    internal SavedSearch Search { get; }
+
+    public string ScopeDescription => Scope(this.Search);
+
+    internal override IRelayCommand ActivateCommand => this.OpenCommand;
+
+    internal SearchResultsViewModel(
+        SavedSearch search,
+        InvestigationStore store,
+        Func<SavedSearch, CancellationToken, Task<RegistrySearchResults>> find,
+        Action<RegistrySearchMatch, bool> open,
+        Func<RegistrySearchMatch, CancellationToken, Task>? navigate = null,
+        Func<SavedSearch, Action<RegistrySearchMatch[]>, CancellationToken, Task<RegistrySearchResults>>? findProgressively = null)
+        : base("Find: " + search.Options.Text, "Scope: " + Scope(search), "Ready to search", "Choose Run search to scan the saved scope.")
+    {
+        this.Search = search;
+        this._connection = RemoteRegistryCredentials.Retain(search.Roots.Select(root => root.Machine));
+        this._store = store;
+        this._find = find;
+        this._findProgressively = findProgressively;
+        this._open = open;
+        this._navigate = navigate
+                         ?? ((match, _) =>
+                         {
+                             open(match, true);
+                             return Task.CompletedTask;
+                         });
+        ((INotifyPropertyChanged)this.Rows).PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == "Item[]")
+            {
+                this.OnPropertyChanged(nameof(this.HeaderTitle));
+            }
+        };
+        this.RunCommand.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(this.RunCommand.IsRunning))
+            {
+                this.OnPropertyChanged(nameof(this.IsBusy));
+                this.OnPropertyChanged(nameof(this.IsIdle));
+            }
+        };
+        this.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(this.Description))
+            {
+                this.OnPropertyChanged(nameof(this.Tooltip));
+            }
+        };
+    }
 
     partial void OnFilterChanged(string value)
     {
@@ -59,9 +121,9 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
 
     private bool MatchesFilter(InvestigationRow row)
     {
-        return row.Title.Contains(this._filterText, StringComparison.OrdinalIgnoreCase) ||
-               row.Path.Contains(this._filterText, StringComparison.OrdinalIgnoreCase) || row.TableSummary.Contains(
-                   this._filterText, StringComparison.OrdinalIgnoreCase);
+        return row.Title.Contains(this._filterText, StringComparison.OrdinalIgnoreCase)
+               || row.Path.Contains(this._filterText, StringComparison.OrdinalIgnoreCase)
+               || row.TableSummary.Contains(this._filterText, StringComparison.OrdinalIgnoreCase);
     }
 
     private void PublishRows(InvestigationRow[] rows, bool append = false)
@@ -88,71 +150,6 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
         });
     }
 
-    internal SearchResultsViewModel(
-        SavedSearch search,
-        InvestigationStore store,
-        Func<SavedSearch, CancellationToken, Task<RegistrySearchResults>> find,
-        Action<RegistrySearchMatch, bool> open,
-        Func<RegistrySearchMatch, CancellationToken, Task>? navigate = null,
-        Func<SavedSearch, Action<RegistrySearchMatch[]>, CancellationToken, Task<RegistrySearchResults>>?
-            findProgressively = null)
-        : base(
-            "Find: " + search.Options.Text, "Scope: " + Scope(search), "Ready to search",
-            "Choose Run search to scan the saved scope.")
-    {
-        this.Search = search;
-        this._connection = RemoteRegistryCredentials.Retain(search.Roots.Select(root => root.Machine));
-        this._store = store;
-        this._find = find;
-        this._findProgressively = findProgressively;
-        this._open = open;
-        this._navigate = navigate ?? ((match, _) =>
-        {
-            open(match, true);
-            return Task.CompletedTask;
-        });
-        ((INotifyPropertyChanged)this.Rows).PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == "Item[]")
-            {
-                this.OnPropertyChanged(nameof(this.HeaderTitle));
-            }
-        };
-        this.RunCommand.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(this.RunCommand.IsRunning))
-            {
-                this.OnPropertyChanged(nameof(this.IsBusy));
-                this.OnPropertyChanged(nameof(this.IsIdle));
-            }
-        };
-        this.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(this.Description))
-            {
-                this.OnPropertyChanged(nameof(this.Tooltip));
-            }
-        };
-    }
-
-    public override string HeaderTitle => this._filterText.Length == 0
-        ? $"{this.Title} ({this.Rows.Count:N0})"
-        : $"{this.Title} ({this.DisplayRows.Count:N0}/{this.Rows.Count:N0})";
-
-    public override string Tooltip => this.Description;
-
-    public override bool IsBusy => this.RunCommand.IsRunning;
-
-    public bool IsIdle => !this.IsBusy;
-
-    internal SavedSearch Search { get; }
-
-    public string ScopeDescription => Scope(this.Search);
-
-    internal event Action? RunStarted;
-
-    internal event Action<InvestigationRow>? ResultSelected;
-
     internal RegistrySearchMatch? SelectNext()
     {
         var index = this.Selected.Count == 0 ? 0 : this.DisplayRows.IndexOf(this.Selected[^1]) + 1;
@@ -167,14 +164,11 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
         return (RegistrySearchMatch)row.Source;
     }
 
-    internal override IRelayCommand ActivateCommand => this.OpenCommand;
-
     private static string Scope(SavedSearch query)
     {
         return string.Join(
             ", ",
-            query.Roots.Select(root =>
-                root.Address + (root.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit")));
+            query.Roots.Select(root => root.Address + (root.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit")));
     }
 
     private bool IsCurrent(int run)
@@ -230,15 +224,14 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
                 return;
             }
 
-            this.Description
-                = $"{result.Matches.Length:N0} matches · {result.SkippedKeys:N0} inaccessible keys skipped · {scope}";
+            this.Description = $"{result.Matches.Length:N0} matches · {result.SkippedKeys:N0} inaccessible keys skipped · {scope}";
             this.EmptyTitle = "No matches found";
             this.EmptyDescription = "Try different search text or adjust the scope and filters.";
             if (result.Truncated)
             {
                 this.Report(
-                    "Result limit reached",
-                    "Showing the first 100,000 matches. Narrow the search scope or type filters.", NoticeKind.Warning);
+                    "Result limit reached", "Showing the first 100,000 matches. Narrow the search scope or type filters.",
+                    NoticeKind.Warning);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -294,8 +287,7 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
             try
             {
                 return await this._findProgressively(
-                    this.Search,
-                    batch => batches.Writer.WriteAsync(batch, producer.Token).AsTask().GetAwaiter().GetResult(),
+                    this.Search, batch => batches.Writer.WriteAsync(batch, producer.Token).AsTask().GetAwaiter().GetResult(),
                     producer.Token);
             }
             finally

@@ -23,8 +23,7 @@ internal sealed class WindowsJumpListBackend : IJumpListBackend
         }
 
         var list = await JumpList.LoadCurrentAsync();
-        var removed = list.Items.Where(item => item.RemovedByUser).Select(item => item.Arguments)
-            .ToHashSet(StringComparer.Ordinal);
+        var removed = list.Items.Where(item => item.RemovedByUser).Select(item => item.Arguments).ToHashSet(StringComparer.Ordinal);
         saveRemovedArguments(removed);
         list.Items.Clear();
         list.SystemGroupKind = JumpListSystemGroupKind.None;
@@ -44,8 +43,7 @@ internal sealed class WindowsJumpListBackend : IJumpListBackend
         {
             await list.SaveAsync();
         }
-        catch (Exception ex) when (ex.HResult == unchecked((int)0x80070005) &&
-                                   list.Items.Any(item => item.GroupName.Length > 0))
+        catch (Exception ex) when (ex.HResult == unchecked((int)0x80070005) && list.Items.Any(item => item.GroupName.Length > 0))
         {
             // Match the native backend when Windows privacy settings prohibit custom categories.
             foreach (var item in list.Items.Where(item => item.GroupName.Length > 0).ToArray())

@@ -31,18 +31,16 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
 
     public string DisplayData => this.Type switch
     {
-        RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.Link => Encoding.Unicode
-            .GetString(this.Data).TrimEnd('\0'),
-        RegistryValueType.MultiString => string.Join(
-            " · ", Encoding.Unicode.GetString(this.Data).TrimEnd('\0').Split('\0')),
+        RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.Link => Encoding.Unicode.GetString(this.Data)
+            .TrimEnd('\0'),
+        RegistryValueType.MultiString => string.Join(" · ", Encoding.Unicode.GetString(this.Data).TrimEnd('\0').Split('\0')),
         RegistryValueType.DWord when this.Data.Length == 4 =>
             $"0x{BinaryPrimitives.ReadUInt32LittleEndian(this.Data):x8} ({BinaryPrimitives.ReadUInt32LittleEndian(this.Data)})",
         RegistryValueType.DWordBigEndian when this.Data.Length == 4 =>
             $"0x{BinaryPrimitives.ReadUInt32BigEndian(this.Data):x8} ({BinaryPrimitives.ReadUInt32BigEndian(this.Data)})",
         RegistryValueType.QWord when this.Data.Length == 8 =>
             $"0x{BinaryPrimitives.ReadUInt64LittleEndian(this.Data):x16} ({BinaryPrimitives.ReadUInt64LittleEndian(this.Data)})",
-        _ => string.Join(" ", this.Data.Take(256).Select(b => b.ToString("X2"))) +
-             (this.Data.Length > 256 ? " …" : string.Empty)
+        _ => string.Join(" ", this.Data.Take(256).Select(b => b.ToString("X2"))) + (this.Data.Length > 256 ? " …" : string.Empty)
     };
 
     public string DisplayPreview
@@ -100,9 +98,9 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
 
     public string EditText(bool hex, bool binary = false)
     {
-        if (binary || this.Type is not (RegistryValueType.String or RegistryValueType.ExpandString
-                or RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.MultiString
-                or RegistryValueType.QWord))
+        if (binary
+            || this.Type is not (RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.DWord
+                or RegistryValueType.DWordBigEndian or RegistryValueType.MultiString or RegistryValueType.QWord))
         {
             return Convert.ToHexString(this.Data);
         }
@@ -120,8 +118,7 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
         ulong number = this.Type switch
         {
             RegistryValueType.DWord when this.Data.Length == 4 => BinaryPrimitives.ReadUInt32LittleEndian(this.Data),
-            RegistryValueType.DWordBigEndian when this.Data.Length == 4 => BinaryPrimitives.ReadUInt32BigEndian(
-                this.Data),
+            RegistryValueType.DWordBigEndian when this.Data.Length == 4 => BinaryPrimitives.ReadUInt32BigEndian(this.Data),
             RegistryValueType.QWord when this.Data.Length == 8 => BinaryPrimitives.ReadUInt64LittleEndian(this.Data),
             _ => throw new FormatException("This value has a nonstandard size. Use Modify binary data to preserve it.")
         };
@@ -130,7 +127,8 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
 
     public static byte[] ParseData(RegistryValueType type, string text, bool hex = true, bool binary = false)
     {
-        if (binary || type is not (RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.DWord
+        if (binary
+            || type is not (RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.DWord
                 or RegistryValueType.DWordBigEndian or RegistryValueType.MultiString or RegistryValueType.QWord))
         {
             return Convert.FromHexString(string.Concat(text.Where(c => !char.IsWhiteSpace(c))));
@@ -138,8 +136,7 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
 
         if (text.Contains('\0'))
         {
-            throw new FormatException(
-                "Data cannot contain embedded null characters. Use the binary editor for raw data.");
+            throw new FormatException("Data cannot contain embedded null characters. Use the binary editor for raw data.");
         }
 
         if (type is RegistryValueType.String or RegistryValueType.ExpandString)
@@ -169,8 +166,7 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
             text = text[2..];
         }
 
-        var number = ulong.Parse(
-            text, hex ? NumberStyles.AllowHexSpecifier : NumberStyles.None, CultureInfo.InvariantCulture);
+        var number = ulong.Parse(text, hex ? NumberStyles.AllowHexSpecifier : NumberStyles.None, CultureInfo.InvariantCulture);
         var result = new byte[type == RegistryValueType.QWord ? 8 : 4];
         if (type == RegistryValueType.QWord)
         {

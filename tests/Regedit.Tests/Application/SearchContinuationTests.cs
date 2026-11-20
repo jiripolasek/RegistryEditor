@@ -38,16 +38,10 @@ internal static class SearchContinuationTests
             key.DeleteValue(string.Empty);
             check(Next(first) == new SearchHit(root, "A"), "F3 resumes after an externally deleted unnamed value");
             registry.RenameValue(root, registry.ReadValue(root, "A")!, "0");
-            check(
-                Next(new SearchHit(root, "a")) == new SearchHit(root, "C"),
-                "F3 skips a renamed value that moved before the cursor");
+            check(Next(new SearchHit(root, "a")) == new SearchHit(root, "C"), "F3 skips a renamed value that moved before the cursor");
             registry.RenameValue(root, registry.ReadValue(root, "C")!, "D");
-            check(
-                Next(new SearchHit(root, "C")) == new SearchHit(root, "D"),
-                "F3 includes a renamed value that moved after the cursor");
-            check(
-                Next(new SearchHit(root, "D")) == new SearchHit(child, null),
-                "F3 visits child keys after their parent's values");
+            check(Next(new SearchHit(root, "C")) == new SearchHit(root, "D"), "F3 includes a renamed value that moved after the cursor");
+            check(Next(new SearchHit(root, "D")) == new SearchHit(child, null), "F3 visits child keys after their parent's values");
             check(
                 Next(new SearchHit(child, null)) == new SearchHit(child.Child("MatchChild"), null),
                 "F3 visits a subtree before a sibling with a common prefix");

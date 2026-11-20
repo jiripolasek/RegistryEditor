@@ -15,14 +15,14 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 /// <summary>Copy and script actions for the selected journal entries or watch observations.</summary>
 internal sealed partial class ToolResultActionsViewModel(Action<string> copy) : ObservableObject
 {
+    internal event Action<string, string, NoticeKind>? Notice;
+
+    internal event Action<string, Exception>? ActionFailed;
+
     private readonly JournalDifferenceCache _differences = new();
 
     /// <summary>The selected rows in display order.</summary>
     internal IReadOnlyList<InvestigationRow> Selected { get; private set; } = [];
-
-    internal event Action<string, string, NoticeKind>? Notice;
-
-    internal event Action<string, Exception>? ActionFailed;
 
     internal bool HasSelection => this.Selected.Count > 0;
 
@@ -85,8 +85,8 @@ internal sealed partial class ToolResultActionsViewModel(Action<string> copy) : 
     private void CopyScript(Func<IReadOnlyList<RegistryDifference>, string> format)
     {
         this.Copy(
-            () => format(this.SelectedChanges()), "Script copied",
-            "Review it before running. Copying does not change the registry.", "Could not copy script");
+            () => format(this.SelectedChanges()), "Script copied", "Review it before running. Copying does not change the registry.",
+            "Could not copy script");
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -104,9 +104,7 @@ internal sealed partial class ToolResultActionsViewModel(Action<string> copy) : 
     [RelayCommand]
     private void CopyExactBytes(RegistryValue value)
     {
-        this.Copy(
-            () => ResultText.Hex(value), "Exact bytes copied", ResultText.BytesCopied(value),
-            "Could not copy exact bytes");
+        this.Copy(() => ResultText.Hex(value), "Exact bytes copied", ResultText.BytesCopied(value), "Could not copy exact bytes");
     }
 
     private void Copy(Func<string> text, string? successTitle, string? successMessage, string failureTitle)

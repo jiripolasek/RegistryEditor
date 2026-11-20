@@ -49,9 +49,8 @@ internal static class JournalRevertTests
             raw.CopyKey(source, alias, "Sibling");
             check(raw.SubKeys(shared).Contains("Sibling"), "Alias paste permits an independent sibling");
             check(
-                RegistryJournal.Overlaps(
-                    new JournalScope(source), new JournalScope(aliasSource.Child("Missing"), ["value"])) &&
-                !RegistryJournal.Overlaps(new JournalScope(source, ["A"]), new JournalScope(aliasSource, ["B"])),
+                RegistryJournal.Overlaps(new JournalScope(source), new JournalScope(aliasSource.Child("Missing"), ["value"]))
+                && !RegistryJournal.Overlaps(new JournalScope(source, ["A"]), new JournalScope(aliasSource, ["B"])),
                 "Alias conflict checks cover descendants and distinguish independent values");
             await CheckCommandsAsync(shared, Path.Combine(folder.FullName, "commands"), check);
 
@@ -70,12 +69,7 @@ internal static class JournalRevertTests
                 throw new InvalidOperationException("The key copy guard accepted its own descendant.");
             }
 
-            void CheckHistory(
-                RegistryLocation first,
-                RegistryLocation later,
-                string name,
-                bool sharedValue,
-                bool legacy = false)
+            void CheckHistory(RegistryLocation first, RegistryLocation later, string name, bool sharedValue, bool legacy = false)
             {
                 var zero = Number(0);
                 var one = Number(1);
@@ -121,9 +115,9 @@ internal static class JournalRevertTests
                 }
 
                 check(
-                    blocked == sharedValue && raw.ReadValue(first, name)!.Data[0] == (sharedValue ? 1 : 0) &&
-                    raw.ReadValue(later, name)!.Data[0] == 1,
-                    name + " protects newer edits and permits independent Revert");
+                    blocked == sharedValue
+                    && raw.ReadValue(first, name)!.Data[0] == (sharedValue ? 1 : 0)
+                    && raw.ReadValue(later, name)!.Data[0] == 1, name + " protects newer edits and permits independent Revert");
 
                 RegistryValue Number(byte value)
                 {
@@ -162,21 +156,18 @@ internal static class JournalRevertTests
         await model.SetSelectionAsync(panel, first);
         await model.SetSelectionAsync(tab, second);
         check(
-            !model.RevertCommand.CanExecute(null) && model.RevertCommand.CanExecute(first) &&
-            model.RevertCommand.CanExecute(second),
+            !model.RevertCommand.CanExecute(null) && model.RevertCommand.CanExecute(first) && model.RevertCommand.CanExecute(second),
             "One window command accepts each surface's selected entry independently");
         model.ConfirmRevert = _ => Task.FromResult(false);
         await model.RevertCommand.ExecuteAsync(first);
-        check(
-            raw.ReadValue(root, "First") is not null && refreshed == 0,
-            "Cancel leaves history and selection targets untouched");
+        check(raw.ReadValue(root, "First") is not null && refreshed == 0, "Cancel leaves history and selection targets untouched");
 
         var bad = Path.Combine(folder, "damaged-fixture.json");
         File.WriteAllText(bad, "{");
         await model.RefreshAsync();
         check(
-            model.Entries.Length == 2 && model.Error!.Contains("damaged-fixture.json") &&
-            !model.RevertCommand.CanExecute(first), "Damaged history preserves readable entries and disables Revert");
+            model.Entries.Length == 2 && model.Error!.Contains("damaged-fixture.json") && !model.RevertCommand.CanExecute(first),
+            "Damaged history preserves readable entries and disables Revert");
         var refused = false;
         try
         {
@@ -200,8 +191,7 @@ internal static class JournalRevertTests
             EditFile(firstFile, json => json["After"]![0]!["Scope"]!.AsObject().Remove("ValueNames"));
             var mismatched = journal.ReadHistory();
             check(
-                mismatched.DamagedFiles.Contains(Path.GetFileName(firstFile)) &&
-                mismatched.Entries.Single().Id == second.Id,
+                mismatched.DamagedFiles.Contains(Path.GetFileName(firstFile)) && mismatched.Entries.Single().Id == second.Id,
                 "A record with different before and after target scopes cannot become eligible for Revert");
         }
         finally
@@ -211,15 +201,14 @@ internal static class JournalRevertTests
 
         await model.RefreshAsync();
         await model.SetSelectionAsync(tab, second);
-        check(
-            model.Error is null && model.RevertCommand.CanExecute(second),
-            "Refreshing intact history restores eligibility");
+        check(model.Error is null && model.RevertCommand.CanExecute(second), "Refreshing intact history restores eligibility");
         model.ConfirmRevert = selected => Task.FromResult(selected.Id == second.Id);
         await model.RevertCommand.ExecuteAsync(second);
         check(
-            raw.ReadValue(root, "First") is not null && raw.ReadValue(root, "Second") is null &&
-            !model.RevertCommand.CanExecute(second) && refreshed == 1,
-            "Revert acts on the captured selection and disables the original");
+            raw.ReadValue(root, "First") is not null
+            && raw.ReadValue(root, "Second") is null
+            && !model.RevertCommand.CanExecute(second)
+            && refreshed == 1, "Revert acts on the captured selection and disables the original");
         var rejected = false;
         model.Notice += (_, _, kind) => rejected |= kind == NoticeKind.Error;
         await model.SetSelectionAsync(panel, first);
@@ -230,24 +219,22 @@ internal static class JournalRevertTests
         };
         await model.RevertCommand.ExecuteAsync(first);
         check(
-            rejected && !model.RevertCommand.CanExecute(first) &&
-            journal.ReadEntries().Count(e => e.Reverts == first.Id) == 1,
+            rejected && !model.RevertCommand.CanExecute(first) && journal.ReadEntries().Count(e => e.Reverts == first.Id) == 1,
             "A Revert in another window during confirmation is checked under the writer lock");
         var undoFirst = journal.ReadEntries().Single(e => e.Reverts == first.Id);
         journal.Revert(undoFirst.Id);
         await model.RefreshAsync();
         await model.SetSelectionAsync(panel, first);
         check(
-            model.RevertCommand.CanExecute(first) && !model.RevertCommand.CanExecute(undoFirst) &&
-            raw.ReadValue(root, "First") is not null, "Reverting a Revert restores the original entry's eligibility");
+            model.RevertCommand.CanExecute(first) && !model.RevertCommand.CanExecute(undoFirst) && raw.ReadValue(root, "First") is not null,
+            "Reverting a Revert restores the original entry's eligibility");
         NoticeKind? notice = null;
         model.Notice += (_, _, kind) => notice = kind;
         model.ConfirmRevert = _ => Task.FromResult(true);
         model.RefreshBrowser = () => Task.FromException(new IOException("Refresh fixture"));
         await model.RevertCommand.ExecuteAsync(first);
         check(
-            notice == NoticeKind.Warning && raw.ReadValue(root, "First") is null &&
-            !model.RevertCommand.CanExecute(first),
+            notice == NoticeKind.Warning && raw.ReadValue(root, "First") is null && !model.RevertCommand.CanExecute(first),
             "A failed browser refresh reports the successful Revert accurately");
 
         foreach (var legacy in new[] { false, true })
@@ -263,8 +250,7 @@ internal static class JournalRevertTests
                     if (legacy)
                     {
                         json.Remove("Kind");
-                        json["Differences"]
-                            = new JsonArray(new JsonObject { ["Untrusted derived content"] = "ignored" });
+                        json["Differences"] = new JsonArray(new JsonObject { ["Untrusted derived content"] = "ignored" });
                     }
                     else
                     {
@@ -285,11 +271,11 @@ internal static class JournalRevertTests
         await model.RefreshAsync();
         var unknown = model.Entries.Single(e => e.Id == future.Id);
         check(
-            !model.RevertCommand.CanExecute(unknown) && unknown.Differences.Count == 1 &&
-            (unknown with { Kind = null, Operation = "Future operation" }).RevertUnavailableReason(new HashSet<Guid>())
-            is not null &&
-            (first with { Error = "partial" }).RevertUnavailableReason(new HashSet<Guid>()) is not null &&
-            (first with { Activity = "external action" }).RevertUnavailableReason(new HashSet<Guid>()) is not null,
+            !model.RevertCommand.CanExecute(unknown)
+            && unknown.Differences.Count == 1
+            && (unknown with { Kind = null, Operation = "Future operation" }).RevertUnavailableReason(new HashSet<Guid>()) is not null
+            && (first with { Error = "partial" }).RevertUnavailableReason(new HashSet<Guid>()) is not null
+            && (first with { Activity = "external action" }).RevertUnavailableReason(new HashSet<Guid>()) is not null,
             "Unknown, failed and activity records remain inspectable without automatic Revert");
         var unknownBlocked = false;
         try
@@ -301,9 +287,7 @@ internal static class JournalRevertTests
             unknownBlocked = true;
         }
 
-        check(
-            unknownBlocked && raw.ReadValue(root, "Future")!.Data[0] == 7,
-            "Core also refuses an unknown operation identifier");
+        check(unknownBlocked && raw.ReadValue(root, "Future")!.Data[0] == 7, "Core also refuses an unknown operation identifier");
     }
 
     private static void EditFile(string path, Action<JsonObject> edit)

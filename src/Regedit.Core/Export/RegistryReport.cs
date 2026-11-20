@@ -31,8 +31,7 @@ public static class RegistryReport
                 {
                     snapshot = service.Read(location);
                 }
-                catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException
-                                               or Win32Exception)
+                catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException or Win32Exception)
                 {
                     report.AppendLine("[Unavailable: " + ex.Message + "]").AppendLine();
                     continue;
@@ -47,8 +46,8 @@ public static class RegistryReport
                 {
                     report.AppendLine($"  {value.DisplayName}  [{value.TypeName}]");
                     report.AppendLine(
-                        value.Type is RegistryValueType.String or RegistryValueType.ExpandString
-                            or RegistryValueType.Link or RegistryValueType.MultiString
+                        value.Type is RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.Link
+                            or RegistryValueType.MultiString
                             ? value.DisplayData
                             : value.EditText(false, true));
                     report.AppendLine();

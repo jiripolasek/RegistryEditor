@@ -21,15 +21,11 @@ internal static class NotesViewModelTests
             var file = Path.Combine(directory.FullName, "settings.json");
             var key64 = RegistryLocation.Parse(@"HKCU\Software", RegistryView.Registry64);
             var key32 = RegistryLocation.Parse(@"HKCU\Software", RegistryView.Registry32);
-            var settings = new AppSettings
-            {
-                Notes = [new KeyNote(key64, "64-bit note"), new KeyNote(key32, "32-bit note")]
-            };
+            var settings = new AppSettings { Notes = [new KeyNote(key64, "64-bit note"), new KeyNote(key32, "32-bit note")] };
             settings.Save(file);
             var failSave = false;
             var blocked = Directory.CreateDirectory(Path.Combine(directory.FullName, "blocked"));
-            using var notes = NotesStoreTests.CreateStore(
-                settings, () => settings.Save(failSave ? blocked.FullName : file));
+            using var notes = NotesStoreTests.CreateStore(settings, () => settings.Save(failSave ? blocked.FullName : file));
 
             var opened = new List<(RegistryLocation Location, bool NewTab)>();
 
@@ -42,10 +38,8 @@ internal static class NotesViewModelTests
             var background = new List<RegistryLocation>();
             var copied = new List<string>();
             var confirmDelete = true;
-            var panel = new NotesViewModel(
-                notes, Navigate, background.Add, true, copied.Add, _ => Task.FromResult(confirmDelete));
-            var tab = new NotesViewModel(
-                notes, Navigate, background.Add, false, copied.Add, _ => Task.FromResult(confirmDelete));
+            var panel = new NotesViewModel(notes, Navigate, background.Add, true, copied.Add, _ => Task.FromResult(confirmDelete));
+            var tab = new NotesViewModel(notes, Navigate, background.Add, false, copied.Add, _ => Task.FromResult(confirmDelete));
             check(
                 panel.Title == "Select a registry key" && !panel.Path.Contains("New note"),
                 "An empty contextual sidebar guides registry navigation without offering collection-page actions");
@@ -56,36 +50,42 @@ internal static class NotesViewModelTests
             tab.CurrentLocation = key32;
             tab.Selected = notes.Get(key32);
             check(
-                panel.Text == "64-bit note" && tab.Text == "32-bit note" &&
-                !ReferenceEquals(panel.Selected, tab.Selected),
+                panel.Text == "64-bit note" && tab.Text == "32-bit note" && !ReferenceEquals(panel.Selected, tab.Selected),
                 "Notes surfaces keep independent selection and exact registry views");
             var changes = new List<string?>();
             tab.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
             tab.Text = "Changed 32-bit note";
             check(
-                tab.SaveCommand.CanExecute(null) && tab.Status == "Unsaved changes" &&
-                changes.Count(name => name == nameof(NotesViewModel.Text)) == 1 &&
-                !changes.Contains(nameof(NotesViewModel.Title)) && !changes.Contains(nameof(NotesViewModel.Path)),
+                tab.SaveCommand.CanExecute(null)
+                && tab.Status == "Unsaved changes"
+                && changes.Count(name => name == nameof(NotesViewModel.Text)) == 1
+                && !changes.Contains(nameof(NotesViewModel.Title))
+                && !changes.Contains(nameof(NotesViewModel.Path)),
                 "Typing notifies text and dirty state once without re-announcing selection details");
             panel.CurrentLocation = key32;
             check(
-                ReferenceEquals(panel.Selected, tab.Selected) && panel.Text == tab.Text &&
-                ReferenceEquals(notes.Get(key32), tab.Selected),
+                ReferenceEquals(panel.Selected, tab.Selected) && panel.Text == tab.Text && ReferenceEquals(notes.Get(key32), tab.Selected),
                 "Surfaces share the window-owned draft without copying editor state");
             var before = settings.Notes.ToArray();
             failSave = true;
             tab.SaveCommand.Execute(null);
             check(
-                tab.Error is not null && panel.Error is not null && panel.Status == "Couldn’t save" &&
-                tab.Selected?.IsDirty == true && panel.SaveCommand.CanExecute(null) &&
-                settings.Notes.SequenceEqual(before),
+                tab.Error is not null
+                && panel.Error is not null
+                && panel.Status == "Couldn’t save"
+                && tab.Selected?.IsDirty == true
+                && panel.SaveCommand.CanExecute(null)
+                && settings.Notes.SequenceEqual(before),
                 "A failed note save rolls back persisted state and leaves both shared editors retryable");
             failSave = false;
             tab.SaveCommand.Execute(null);
             check(
-                tab.Error is null && !tab.SaveCommand.CanExecute(null) && !panel.SaveCommand.CanExecute(null) &&
-                tab.Status == "Saved" && panel.Status == "Saved" &&
-                AppSettings.Load(file).Notes.Single(note => note.Matches(key32)).Text == "Changed 32-bit note",
+                tab.Error is null
+                && !tab.SaveCommand.CanExecute(null)
+                && !panel.SaveCommand.CanExecute(null)
+                && tab.Status == "Saved"
+                && panel.Status == "Saved"
+                && AppSettings.Load(file).Notes.Single(note => note.Matches(key32)).Text == "Changed 32-bit note",
                 "A successful retry updates every shared editor and persists the exact view");
             panel.CurrentLocation = key64;
             tab.CurrentLocation = key64;
@@ -93,9 +93,7 @@ internal static class NotesViewModelTests
                 panel.Selected?.Matches(key64) == true && tab.Selected?.Matches(key32) == true,
                 "The panel follows browser context while the standalone tab retains its selected note");
             tab.UseCurrentKeyCommand.Execute(null);
-            check(
-                ReferenceEquals(panel.Selected, tab.Selected),
-                "Note for current key explicitly changes the standalone selection");
+            check(ReferenceEquals(panel.Selected, tab.Selected), "Note for current key explicitly changes the standalone selection");
             tab.Selected = notes.Get(key32);
             panel.Selected = tab.Selected;
             check(
@@ -109,8 +107,10 @@ internal static class NotesViewModelTests
             tab.Text = string.Empty;
             tab.SaveCommand.Execute(null);
             check(
-                !tab.SaveCommand.CanExecute(null) && settings.Notes.Count == 1 && settings.Notes[0].Matches(key64) &&
-                AppSettings.Load(file).Notes.All(note => !note.Matches(key32)),
+                !tab.SaveCommand.CanExecute(null)
+                && settings.Notes.Count == 1
+                && settings.Notes[0].Matches(key64)
+                && AppSettings.Load(file).Notes.All(note => !note.Matches(key32)),
                 "Saving an empty note removes only its exact registry view");
             panel.Deactivate();
             var inactiveNotifications = 0;
@@ -130,9 +130,7 @@ internal static class NotesViewModelTests
                 !panel.ShowOpenKey && !panel.ShowUseCurrentKey && tab.ShowOpenKey && tab.ShowUseCurrentKey,
                 "Only the following panel hides redundant note navigation actions");
             panel.Selected = notes.Get(key32);
-            check(
-                panel.ShowOpenKey && panel.ShowUseCurrentKey,
-                "A detached panel keeps its route back to the note and current key");
+            check(panel.ShowOpenKey && panel.ShowUseCurrentKey, "A detached panel keeps its route back to the note and current key");
             var empty = notes.Get(key32.Child("Empty"));
             tab.Selected = empty;
             check(
@@ -161,13 +159,14 @@ internal static class NotesViewModelTests
             failSave = false;
             await tab.DeleteCommand.ExecuteAsync(null);
             check(
-                !empty.HasContent && !empty.IsDirty && tab.CanUndoDelete &&
-                !settings.Notes.Any(note => note.Matches(empty.Location)),
+                !empty.HasContent && !empty.IsDirty && tab.CanUndoDelete && !settings.Notes.Any(note => note.Matches(empty.Location)),
                 "Confirmed Delete persists removal and exposes Undo without losing the text");
             tab.UndoDeleteCommand.Execute(null);
             check(
-                tab.Text == beforeDelete && !empty.IsDirty && !tab.CanUndoDelete && AppSettings.Load(file).Notes
-                    .Any(note => note.Matches(empty.Location) && note.Text == beforeDelete),
+                tab.Text == beforeDelete
+                && !empty.IsDirty
+                && !tab.CanUndoDelete
+                && AppSettings.Load(file).Notes.Any(note => note.Matches(empty.Location) && note.Text == beforeDelete),
                 "Undo restores and saves the complete deleted note");
             var confirmation = new TaskCompletionSource<bool>();
             var guarded = new NotesViewModel(notes, Navigate, background.Add, false, copied.Add, _ => confirmation.Task)
@@ -183,14 +182,15 @@ internal static class NotesViewModelTests
                 "A stale Delete confirmation cannot remove a newer shared draft");
             tab.Selected = notes.Get(key64);
             check(
-                !empty.IsDirty && AppSettings.Load(file).Notes.Single(note => note.Matches(empty.Location)).Text ==
-                "A newer edit while confirming", "Switching notes flushes the previous shared draft immediately");
+                !empty.IsDirty
+                && AppSettings.Load(file).Notes.Single(note => note.Matches(empty.Location)).Text == "A newer edit while confirming",
+                "Switching notes flushes the previous shared draft immediately");
             notes.Pause();
             guarded.Text = "Discarded during window closure";
             guarded.Deactivate();
             check(
-                empty.IsDirty && AppSettings.Load(file).Notes.Single(note => note.Matches(empty.Location)).Text ==
-                "A newer edit while confirming",
+                empty.IsDirty
+                && AppSettings.Load(file).Notes.Single(note => note.Matches(empty.Location)).Text == "A newer edit while confirming",
                 "Unloading a Notes surface cannot save a draft discarded during window closure");
             panel.Deactivate();
             tab.Deactivate();

@@ -20,15 +20,13 @@ internal static class TestSuiteRunner
 
             if (++index == args.Length || args[index].StartsWith("--", StringComparison.Ordinal))
             {
-                throw new ArgumentException(
-                    "--suite requires an exact suite name. Use --list-suites to discover names.");
+                throw new ArgumentException("--suite requires an exact suite name. Use --list-suites to discover names.");
             }
 
             names.Add(args[index]);
         }
 
-        var unknown = names
-            .Where(name => !suites.Any(suite => StringComparer.OrdinalIgnoreCase.Equals(suite.Name, name))).ToArray();
+        var unknown = names.Where(name => !suites.Any(suite => StringComparer.OrdinalIgnoreCase.Equals(suite.Name, name))).ToArray();
         if (unknown.Length != 0)
         {
             throw new ArgumentException(

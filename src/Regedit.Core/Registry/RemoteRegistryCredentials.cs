@@ -83,8 +83,7 @@ public static class RemoteRegistryCredentials
 
     internal static T Run<T>(string? computer, Func<T> action)
     {
-        if (computer is null || string.Equals(
-                AuthenticatingComputer.Value, computer, StringComparison.OrdinalIgnoreCase))
+        if (computer is null || string.Equals(AuthenticatingComputer.Value, computer, StringComparison.OrdinalIgnoreCase))
         {
             return action();
         }

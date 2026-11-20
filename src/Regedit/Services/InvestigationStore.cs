@@ -11,28 +11,27 @@ namespace JPSoftworks.Regedit.Services;
 
 internal sealed class InvestigationStore(AppSettings settings, Action save)
 {
-    internal IReadOnlyList<SavedSearch> Searches => settings.Searches;
-
-    internal IReadOnlyList<RegistryWorkspace> Workspaces => settings.Workspaces;
-
     internal event Action? SearchesChanged;
 
     internal event Action? WorkspacesChanged;
+
+    internal IReadOnlyList<SavedSearch> Searches => settings.Searches;
+
+    internal IReadOnlyList<RegistryWorkspace> Workspaces => settings.Workspaces;
 
     internal void SaveSearch(SavedSearch search)
     {
         RegistrySearch.Validate(search);
         this.Update(
-            settings.Searches, item => item.Name.Equals(search.Name, StringComparison.OrdinalIgnoreCase), search,
-            this.SearchesChanged);
+            settings.Searches, item => item.Name.Equals(search.Name, StringComparison.OrdinalIgnoreCase), search, this.SearchesChanged);
     }
 
     internal void SaveWorkspace(RegistryWorkspace workspace)
     {
         workspace.Validate();
         this.Update(
-            settings.Workspaces, item => item.Name.Equals(workspace.Name, StringComparison.OrdinalIgnoreCase),
-            workspace, this.WorkspacesChanged);
+            settings.Workspaces, item => item.Name.Equals(workspace.Name, StringComparison.OrdinalIgnoreCase), workspace,
+            this.WorkspacesChanged);
     }
 
     internal void RemoveSearches(IReadOnlySet<SavedSearch> selected)

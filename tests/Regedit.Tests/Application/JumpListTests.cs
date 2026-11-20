@@ -19,8 +19,7 @@ internal static class JumpListTests
         check(
             RegistryLaunch.SplitArguments(RegistryLaunch.FormatArguments(arguments)).SequenceEqual(arguments),
             "Windows launch argument round-trip preserves empty tokens, whitespace, Unicode, quotes, and trailing slashes");
-        check(
-            RegistryLaunch.SplitArguments(string.Empty).Length == 0, "Empty packaged activation restores the session");
+        check(RegistryLaunch.SplitArguments(string.Empty).Length == 0, "Empty packaged activation restores the session");
         try
         {
             RegistryLaunch.SplitArguments("Computer\0 --jump-list-admin");
@@ -51,12 +50,12 @@ internal static class JumpListTests
                 RegistryLaunch.ParseArguments(RegistryLaunch.SplitArguments(entries[0].Arguments))!.IsComputer,
                 "New window opens Computer without restoring the previous session");
             check(
-                JumpListEntries.IsAdministratorTask(RegistryLaunch.SplitArguments(entries[1].Arguments)) &&
-                !JumpListEntries.IsAdministratorTask([entries[1].Arguments, "HKLM"]),
+                JumpListEntries.IsAdministratorTask(RegistryLaunch.SplitArguments(entries[1].Arguments))
+                && !JumpListEntries.IsAdministratorTask([entries[1].Arguments, "HKLM"]),
                 "Administrator task requires an exact standalone command");
             check(
-                RegistryLaunch.ParseArguments(RegistryLaunch.SplitArguments(entries[2].Arguments)) ==
-                RegistryLocation.Parse(remote.Address, RegistryView.Registry32),
+                RegistryLaunch.ParseArguments(RegistryLaunch.SplitArguments(entries[2].Arguments))
+                == RegistryLocation.Parse(remote.Address, RegistryView.Registry32),
                 "Favorite activation preserves remote paths, quotes, trailing spaces, and 32-bit view");
             var removed = JumpListEntries.RemovedFavoriteIds(
                 entries, new HashSet<string>([entries[2].Arguments, entries[0].Arguments], StringComparer.Ordinal));
@@ -66,14 +65,13 @@ internal static class JumpListTests
             settings.HideJumpListFavorites(removed, file);
             var reloaded = AppSettings.Load(file);
             check(
-                reloaded.Favorites.Count == 3 &&
-                JumpListEntries.Create(reloaded.Favorites, reloaded.HiddenJumpListFavorites).Length == 3,
+                reloaded.Favorites.Count == 3 && JumpListEntries.Create(reloaded.Favorites, reloaded.HiddenJumpListFavorites).Length == 3,
                 "Removed Jump List entries stay hidden after restart while favorites remain saved");
             new FavoritesStore(stale, () => stale.Save(file)).Rename(new FavoriteItemId(remote.Id, false), "Renamed");
             reloaded = AppSettings.Load(file);
             check(
-                reloaded.Favorites[0].Name == "Renamed" && JumpListEntries.Create(
-                    reloaded.Favorites, reloaded.HiddenJumpListFavorites).Length == 3,
+                reloaded.Favorites[0].Name == "Renamed"
+                && JumpListEntries.Create(reloaded.Favorites, reloaded.HiddenJumpListFavorites).Length == 3,
                 "A stale window can rename a favorite without losing the user's Jump List removal");
             var otherWindow = AppSettings.Load(file);
             reloaded.HideJumpListFavorites(new HashSet<string>([reloaded.Favorites[2].Id]), file);
@@ -84,8 +82,7 @@ internal static class JumpListTests
                 "Independent Jump List removals merge across stale windows");
             try
             {
-                reloaded.HideJumpListFavorites(
-                    new HashSet<string>(["failed-removal"]), Path.Combine(file, "blocked.json"));
+                reloaded.HideJumpListFavorites(new HashSet<string>(["failed-removal"]), Path.Combine(file, "blocked.json"));
                 check(false, "A failed removal save reports its error");
             }
             catch (IOException)

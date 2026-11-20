@@ -72,15 +72,11 @@ internal static class NetworkRegistryConnection
             {
                 var info = new CREDUI_INFOW
                 {
-                    cbSize = (uint)sizeof(CREDUI_INFOW),
-                    hwndParent = (HWND)owner,
-                    pszMessageText = message,
-                    pszCaptionText = caption
+                    cbSize = (uint)sizeof(CREDUI_INFOW), hwndParent = (HWND)owner, pszMessageText = message, pszCaptionText = caption
                 };
                 uint package = 0;
                 var error = PInvoke.CredUIPromptForWindowsCredentials(
-                    &info, 5, &package, null, 0, &authentication, &authenticationSize, null,
-                    CREDUIWIN_FLAGS.CREDUIWIN_GENERIC);
+                    &info, 5, &package, null, 0, &authentication, &authenticationSize, null, CREDUIWIN_FLAGS.CREDUIWIN_GENERIC);
                 if (error == 1223)
                 {
                     return null;
@@ -104,15 +100,12 @@ internal static class NetworkRegistryConnection
         }
     }
 
-    private static unsafe SafeAccessTokenHandle UnpackCredentials(
-        string computer,
-        nint authentication,
-        uint authenticationSize)
+    private static unsafe SafeAccessTokenHandle UnpackCredentials(string computer, nint authentication, uint authenticationSize)
     {
         uint userSize = 0, domainSize = 0, passwordSize = 0;
         if (!PInvoke.CredUnPackAuthenticationBuffer(
-                0, (void*)authentication, authenticationSize, null, &userSize, null, &domainSize, null,
-                &passwordSize) && Marshal.GetLastPInvokeError() != 122)
+                0, (void*)authentication, authenticationSize, null, &userSize, null, &domainSize, null, &passwordSize)
+            && Marshal.GetLastPInvokeError() != 122)
         {
             throw new Win32Exception(Marshal.GetLastPInvokeError());
         }
@@ -127,8 +120,8 @@ internal static class NetworkRegistryConnection
             fixed (char* passwordPointer = password)
             {
                 if (!PInvoke.CredUnPackAuthenticationBuffer(
-                        0, (void*)authentication, authenticationSize, userPointer, &userSize, domainPointer,
-                        &domainSize, passwordPointer, &passwordSize))
+                        0, (void*)authentication, authenticationSize, userPointer, &userSize, domainPointer, &domainSize, passwordPointer,
+                        &passwordSize))
                 {
                     throw new Win32Exception(Marshal.GetLastPInvokeError());
                 }

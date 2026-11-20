@@ -25,11 +25,12 @@ internal static class SettingsTests
             check(new AppSettings().AutoSyncTree, "New settings keep automatic tree tracking enabled");
             File.WriteAllText(file, "{}");
             var settings = AppSettings.Load(file);
+            check(settings.AutoSyncTree, "Legacy settings retain automatic tree tracking when the preference is absent");
             check(
-                settings.AutoSyncTree, "Legacy settings retain automatic tree tracking when the preference is absent");
-            check(
-                settings.Theme == "Default" && settings.FontFamily == "Segoe UI Variable" && settings.FontSize == 14 &&
-                settings.ShowStatusBar, "Settings page retains existing appearance defaults");
+                settings.Theme == "Default"
+                && settings.FontFamily == "Segoe UI Variable"
+                && settings.FontSize == 14
+                && settings.ShowStatusBar, "Settings page retains existing appearance defaults");
             settings.Favorites.Add(new Favorite("Example", "HKCU\\Software"));
             settings.Tabs.Add(new SavedTab("HKCU"));
             settings.ToolPanePinned = true;
@@ -46,12 +47,17 @@ internal static class SettingsTests
             var loaded = AppSettings.Load(file);
             check(!loaded.AutoSyncTree, "Disabled automatic tree tracking survives saving and loading");
             check(
-                loaded.LoadError is null && loaded.Theme == "Dark" && loaded.FontFamily == "Consolas" &&
-                loaded.FontSize == 18 && !loaded.ShowStatusBar && loaded.ShowKeysInList && loaded.ShowParentKeyInList &&
-                loaded.ShowValuePreview, "Settings page preferences round-trip through the existing settings file");
+                loaded.LoadError is null
+                && loaded.Theme == "Dark"
+                && loaded.FontFamily == "Consolas"
+                && loaded.FontSize == 18
+                && !loaded.ShowStatusBar
+                && loaded.ShowKeysInList
+                && loaded.ShowParentKeyInList
+                && loaded.ShowValuePreview, "Settings page preferences round-trip through the existing settings file");
             check(
-                loaded.Favorites.SequenceEqual(settings.Favorites) && loaded.Tabs.SequenceEqual(settings.Tabs) &&
-                loaded.ToolPanePinned, "Changing preferences preserves favorites tabs and panel state");
+                loaded.Favorites.SequenceEqual(settings.Favorites) && loaded.Tabs.SequenceEqual(settings.Tabs) && loaded.ToolPanePinned,
+                "Changing preferences preserves favorites tabs and panel state");
 
             var saved = File.ReadAllBytes(file);
 
@@ -68,8 +74,11 @@ internal static class SettingsTests
                 }
 
                 check(
-                    rejected && settings.Theme == "Dark" && settings.FontFamily == "Consolas" &&
-                    settings.FontSize == 18 && saved.SequenceEqual(File.ReadAllBytes(file)), message);
+                    rejected
+                    && settings.Theme == "Dark"
+                    && settings.FontFamily == "Consolas"
+                    && settings.FontSize == 18
+                    && saved.SequenceEqual(File.ReadAllBytes(file)), message);
             }
 
             Reject(
@@ -107,13 +116,18 @@ internal static class SettingsTests
             }
 
             check(
-                failed && settings.Theme == "Dark" && settings.FontFamily == "Consolas" && settings.FontSize == 18 &&
-                !settings.ShowStatusBar && settings.ShowKeysInList && settings.ShowParentKeyInList &&
-                settings.ShowValuePreview && !settings.AutoSyncTree && saved.SequenceEqual(File.ReadAllBytes(file)),
+                failed
+                && settings.Theme == "Dark"
+                && settings.FontFamily == "Consolas"
+                && settings.FontSize == 18
+                && !settings.ShowStatusBar
+                && settings.ShowKeysInList
+                && settings.ShowParentKeyInList
+                && settings.ShowValuePreview
+                && !settings.AutoSyncTree
+                && saved.SequenceEqual(File.ReadAllBytes(file)),
                 "Failed settings writes restore every preference without replacing the file");
-            check(
-                !Directory.EnumerateFiles(folder, "*.tmp").Any(),
-                "Failed preference writes leave no temporary settings files");
+            check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "Failed preference writes leave no temporary settings files");
             settings.UpdatePreferences(
                 value =>
                 {
@@ -131,13 +145,11 @@ internal static class SettingsTests
             {
                 new RegistryLocation(RegistryHive.CurrentUser, "Software\\Tail "),
                 new RegistryLocation(RegistryHive.CurrentUser, "Software\\ ", View: RegistryView.Registry32),
-                new RegistryLocation(
-                    RegistryHive.LocalMachine, "Software\\ \t\\Tail\u2003", "SERVER", RegistryView.Registry32)
+                new RegistryLocation(RegistryHive.LocalMachine, "Software\\ \t\\Tail\u2003", "SERVER", RegistryView.Registry32)
             };
             foreach (var location in locations)
             {
-                settings.AddFavorite(
-                    "Exact " + location.Address, location.Address, location.View == RegistryView.Registry32, null);
+                settings.AddFavorite("Exact " + location.Address, location.Address, location.View == RegistryView.Registry32, null);
                 settings.Tabs.Add(new SavedTab(location.Address, location.View == RegistryView.Registry32));
                 settings.Notes.Add(new KeyNote(location, "Note for " + location.SubKey));
                 settings.Searches.Add(new SavedSearch("Exact", [location], new SearchOptions("Marker")));
@@ -146,25 +158,24 @@ internal static class SettingsTests
             settings.Workspaces.Add(
                 new RegistryWorkspace(
                     "Exact paths", locations, settings.Searches.ToArray(),
-                    locations.Where(location => location.Machine is null)
-                        .Select(location => new WatchDefinition(location)).ToArray()));
+                    locations.Where(location => location.Machine is null).Select(location => new WatchDefinition(location)).ToArray()));
             settings.Save(file);
             loaded = AppSettings.Load(file);
             check(loaded.LoadError is null, "Settings accept saved locations with significant whitespace");
             foreach (var location in locations)
             {
                 check(
-                    loaded.Favorites.Any(favorite => favorite.Matches(location)) && !loaded.Favorites.Any(favorite =>
-                        favorite.Matches(location with { SubKey = location.SubKey.TrimEnd() })),
+                    loaded.Favorites.Any(favorite => favorite.Matches(location))
+                    && !loaded.Favorites.Any(favorite => favorite.Matches(location with { SubKey = location.SubKey.TrimEnd() })),
                     "Favorite persistence never redirects a whitespace-suffixed key to its trimmed neighbor");
                 check(
                     loaded.Tabs.Any(tab => RegistryLocation.Parse(
-                        tab.Address, tab.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64) == location),
-                    "Saved tabs restore exact whitespace, computer, and view");
+                                               tab.Address, tab.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64)
+                                           == location), "Saved tabs restore exact whitespace, computer, and view");
                 check(
-                    loaded.Notes.Any(note => note.Location == location) &&
-                    loaded.Searches.Any(search => search.Roots.Contains(location)) &&
-                    loaded.Workspaces.Single().Tabs.Contains(location),
+                    loaded.Notes.Any(note => note.Location == location)
+                    && loaded.Searches.Any(search => search.Roots.Contains(location))
+                    && loaded.Workspaces.Single().Tabs.Contains(location),
                     "Notes, saved searches, and workspaces retain exact key identity");
             }
 

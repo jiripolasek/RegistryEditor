@@ -41,12 +41,8 @@ internal static unsafe partial class JumpListNative
         Marshal.ThrowExceptionForHR(SHGetPropertyStoreForWindow(window, in PropertyStoreId, out var pointer));
         using var store = new ComPointer(pointer);
         // Set relaunch information before the ID; null clears the properties before window destruction.
-        SetString(
-            store, new PropertyKey { FormatId = AppUserModelFormat, Id = 2 },
-            executable is null ? null : $"\"{executable}\"");
-        SetString(
-            store, new PropertyKey { FormatId = AppUserModelFormat, Id = 4 },
-            executable is null ? null : "Modern Registry Editor");
+        SetString(store, new PropertyKey { FormatId = AppUserModelFormat, Id = 2 }, executable is null ? null : $"\"{executable}\"");
+        SetString(store, new PropertyKey { FormatId = AppUserModelFormat, Id = 4 }, executable is null ? null : "Modern Registry Editor");
         SetString(store, new PropertyKey { FormatId = AppUserModelFormat, Id = 5 }, executable is null ? null : AppId);
     }
 
@@ -87,8 +83,7 @@ internal static unsafe partial class JumpListNative
         {
             fixed (char* id = appId)
             {
-                Marshal.ThrowExceptionForHR(
-                    ((delegate* unmanaged[Stdcall]<nint, char*, int>)list.Method(3))(list.Pointer, id));
+                Marshal.ThrowExceptionForHR(((delegate* unmanaged[Stdcall]<nint, char*, int>)list.Method(3))(list.Pointer, id));
             }
         }
 
@@ -106,13 +101,10 @@ internal static unsafe partial class JumpListNative
             var removedArguments = ReadRemovedArguments(removed);
             saveRemovedArguments(removedArguments);
             using var tasks = CreateCollection(executable, entries.Where(entry => entry.FavoriteId is null));
-            Marshal.ThrowExceptionForHR(
-                ((delegate* unmanaged[Stdcall]<nint, nint, int>)list.Method(7))(list.Pointer, tasks.Pointer));
+            Marshal.ThrowExceptionForHR(((delegate* unmanaged[Stdcall]<nint, nint, int>)list.Method(7))(list.Pointer, tasks.Pointer));
 
-            var favorites = entries
-                .Where(entry => entry.FavoriteId is not null && !removedArguments.Contains(entry.Arguments))
-                .DistinctBy(entry => entry.Arguments, StringComparer.Ordinal).Take((int)Math.Min(slots, int.MaxValue))
-                .ToArray();
+            var favorites = entries.Where(entry => entry.FavoriteId is not null && !removedArguments.Contains(entry.Arguments))
+                .DistinctBy(entry => entry.Arguments, StringComparer.Ordinal).Take((int)Math.Min(slots, int.MaxValue)).ToArray();
             if (favorites.Length > 0)
             {
                 using var destinations = CreateCollection(executable, favorites);
@@ -145,16 +137,14 @@ internal static unsafe partial class JumpListNative
         using var list = ComPointer.Create(DestinationListClass, DestinationListId);
         fixed (char* id = appId)
         {
-            Marshal.ThrowExceptionForHR(
-                ((delegate* unmanaged[Stdcall]<nint, char*, int>)list.Method(10))(list.Pointer, id));
+            Marshal.ThrowExceptionForHR(((delegate* unmanaged[Stdcall]<nint, char*, int>)list.Method(10))(list.Pointer, id));
         }
     }
 
     private static HashSet<string> ReadRemovedArguments(ComPointer array)
     {
         uint count = 0;
-        Marshal.ThrowExceptionForHR(
-            ((delegate* unmanaged[Stdcall]<nint, uint*, int>)array.Method(3))(array.Pointer, &count));
+        Marshal.ThrowExceptionForHR(((delegate* unmanaged[Stdcall]<nint, uint*, int>)array.Method(3))(array.Pointer, &count));
         var result = new HashSet<string>(StringComparer.Ordinal);
         var linkId = ShellLinkId;
         var buffer = new char[32768];
@@ -173,8 +163,7 @@ internal static unsafe partial class JumpListNative
             fixed (char* arguments = buffer)
             {
                 Marshal.ThrowExceptionForHR(
-                    ((delegate* unmanaged[Stdcall]<nint, char*, int, int>)link.Method(10))(
-                        link.Pointer, arguments, buffer.Length));
+                    ((delegate* unmanaged[Stdcall]<nint, char*, int, int>)link.Method(10))(link.Pointer, arguments, buffer.Length));
                 result.Add(new string(arguments));
             }
         }
@@ -194,10 +183,8 @@ internal static unsafe partial class JumpListNative
                 fixed (char* arguments = entry.Arguments)
                 {
                     // IShellLinkW.SetPath, SetArguments, and SetIconLocation.
-                    Marshal.ThrowExceptionForHR(
-                        ((delegate* unmanaged[Stdcall]<nint, char*, int>)link.Method(20))(link.Pointer, path));
-                    Marshal.ThrowExceptionForHR(
-                        ((delegate* unmanaged[Stdcall]<nint, char*, int>)link.Method(11))(link.Pointer, arguments));
+                    Marshal.ThrowExceptionForHR(((delegate* unmanaged[Stdcall]<nint, char*, int>)link.Method(20))(link.Pointer, path));
+                    Marshal.ThrowExceptionForHR(((delegate* unmanaged[Stdcall]<nint, char*, int>)link.Method(11))(link.Pointer, arguments));
                     Marshal.ThrowExceptionForHR(
                         ((delegate* unmanaged[Stdcall]<nint, char*, int, int>)link.Method(17))(link.Pointer, path, 0));
                 }
@@ -212,8 +199,7 @@ internal static unsafe partial class JumpListNative
 
                 // IObjectCollection.AddObject retains its own reference to the shell link.
                 Marshal.ThrowExceptionForHR(
-                    ((delegate* unmanaged[Stdcall]<nint, nint, int>)collection.Method(5))(
-                        collection.Pointer, link.Pointer));
+                    ((delegate* unmanaged[Stdcall]<nint, nint, int>)collection.Method(5))(collection.Pointer, link.Pointer));
             }
 
             return collection;
@@ -230,19 +216,30 @@ internal static unsafe partial class JumpListNative
         var pointer = Marshal.StringToCoTaskMemUni(text);
         try
         {
-            var value = new PropVariant
-            {
-                Type = text is null ? (ushort)0 : (ushort)31, Text = pointer
-            }; // VT_EMPTY or VT_LPWSTR
+            var value = new PropVariant { Type = text is null ? (ushort)0 : (ushort)31, Text = pointer }; // VT_EMPTY or VT_LPWSTR
             Marshal.ThrowExceptionForHR(
-                ((delegate* unmanaged[Stdcall]<nint, PropertyKey*, PropVariant*, int>)store.Method(6))(
-                    store.Pointer, &key, &value));
+                ((delegate* unmanaged[Stdcall]<nint, PropertyKey*, PropVariant*, int>)store.Method(6))(store.Pointer, &key, &value));
         }
         finally
         {
             Marshal.FreeCoTaskMem(pointer);
         }
     }
+
+    [LibraryImport("ole32.dll")]
+    private static partial int CoCreateInstance(in Guid classId, nint outer, uint context, in Guid interfaceId, out nint instance);
+
+    [LibraryImport("shell32.dll")]
+    private static partial int SHGetPropertyStoreForWindow(nint window, in Guid interfaceId, out nint store);
+
+    [LibraryImport("ole32.dll")]
+    private static partial int CoInitializeEx(nint reserved, uint flags);
+
+    [LibraryImport("ole32.dll")]
+    private static partial void CoUninitialize();
+
+    [LibraryImport("kernel32.dll")]
+    private static partial int GetCurrentPackageFullName(ref uint length, char* name);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PropertyKey
@@ -271,13 +268,13 @@ internal static unsafe partial class JumpListNative
 
     private sealed class ComPointer : SafeHandleZeroOrMinusOneIsInvalid
     {
+        internal nint Pointer => this.handle;
+
         internal ComPointer(nint pointer)
             : base(true)
         {
             this.SetHandle(pointer);
         }
-
-        internal nint Pointer => this.handle;
 
         internal nint Method(int slot)
         {
@@ -296,24 +293,4 @@ internal static unsafe partial class JumpListNative
             return true;
         }
     }
-
-    [LibraryImport("ole32.dll")]
-    private static partial int CoCreateInstance(
-        in Guid classId,
-        nint outer,
-        uint context,
-        in Guid interfaceId,
-        out nint instance);
-
-    [LibraryImport("shell32.dll")]
-    private static partial int SHGetPropertyStoreForWindow(nint window, in Guid interfaceId, out nint store);
-
-    [LibraryImport("ole32.dll")]
-    private static partial int CoInitializeEx(nint reserved, uint flags);
-
-    [LibraryImport("ole32.dll")]
-    private static partial void CoUninitialize();
-
-    [LibraryImport("kernel32.dll")]
-    private static partial int GetCurrentPackageFullName(ref uint length, char* name);
 }

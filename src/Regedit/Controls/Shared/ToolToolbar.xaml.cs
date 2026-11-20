@@ -12,14 +12,9 @@ namespace JPSoftworks.Regedit.Controls.Shared;
 
 public sealed partial class ToolToolbar : UserControl
 {
-    private bool _searchOnly;
-    private ToolCommand? _preview;
+    public event TextChangedEventHandler? SearchChanged;
 
-    private readonly FontIconSource _viewIcon = new()
-    {
-        FontFamily = new FontFamily("/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"),
-        Glyph = "\U000F0764"
-    };
+    public event EventHandler? PresentationChanged;
 
     public static readonly DependencyProperty SearchTextProperty = DependencyProperty.Register(
         nameof(SearchText), typeof(string), typeof(ToolToolbar), new PropertyMetadata(string.Empty));
@@ -48,16 +43,13 @@ public sealed partial class ToolToolbar : UserControl
         nameof(ShowColumns), typeof(bool), typeof(ToolToolbar),
         new PropertyMetadata(true, (owner, _) => ((ToolToolbar)owner).UpdatePresentation()));
 
-    public ToolToolbar()
+    private readonly FontIconSource _viewIcon = new()
     {
-        this.InitializeComponent();
-        this.UtilitiesHost.Content = null;
-        this.ViewCommand
-            = new ToolCommand("List view", Symbol.View, ToolCommandPlacement.Overflow)
-            {
-                Flyout = this.ViewMenu, IconSource = this._viewIcon
-            };
-    }
+        FontFamily = new FontFamily("/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"), Glyph = "\U000F0764"
+    };
+
+    private bool _searchOnly;
+    private ToolCommand? _preview;
 
     public string SearchText
     {
@@ -98,6 +90,17 @@ public sealed partial class ToolToolbar : UserControl
     internal TextBox SearchBox => this.Input;
 
     internal ToolCommand ViewCommand { get; }
+
+    public ToolToolbar()
+    {
+        this.InitializeComponent();
+        this.UtilitiesHost.Content = null;
+        this.ViewCommand
+            = new ToolCommand("List view", Symbol.View, ToolCommandPlacement.Overflow)
+            {
+                Flyout = this.ViewMenu, IconSource = this._viewIcon
+            };
+    }
 
     public Visibility FilterVisibility(UIElement? content)
     {
@@ -147,13 +150,11 @@ public sealed partial class ToolToolbar : UserControl
 
         this.PreviewButton.Command = command.Command;
         this.PreviewButton.IsEnabled = command.IsEnabled;
-        this.PreviewButton.Visibility
-            = command.IsVisible && !this._searchOnly ? Visibility.Visible : Visibility.Collapsed;
+        this.PreviewButton.Visibility = command.IsVisible && !this._searchOnly ? Visibility.Visible : Visibility.Collapsed;
         this.PreviewIcon.Glyph = command.IsChecked ? "\uE89F" : "\uE8A0";
         AutomationProperties.SetName(this.PreviewButton, command.IsChecked ? "Hide details" : "Show details");
         AutomationProperties.SetItemStatus(this.PreviewButton, command.IsChecked ? "Preview open" : "Preview closed");
-        ToolTipService.SetToolTip(
-            this.PreviewButton, (command.IsChecked ? "Hide details" : "Show details") + " (Alt+P)");
+        ToolTipService.SetToolTip(this.PreviewButton, (command.IsChecked ? "Hide details" : "Show details") + " (Alt+P)");
     }
 
     private void Preview_Click(object sender, RoutedEventArgs args)
@@ -163,10 +164,6 @@ public sealed partial class ToolToolbar : UserControl
             command.IsChecked = !command.IsChecked;
         }
     }
-
-    public event TextChangedEventHandler? SearchChanged;
-
-    public event EventHandler? PresentationChanged;
 
     private void Input_TextChanged(object sender, TextChangedEventArgs args)
     {
@@ -203,7 +200,6 @@ public sealed partial class ToolToolbar : UserControl
 
     private void Surface_SizeChanged(object sender, SizeChangedEventArgs args)
     {
-        this.SearchPanel.Width = this._searchOnly ? Math.Max(0, args.NewSize.Width - 10) :
-            args.NewSize.Width < 900 ? 160 : 240;
+        this.SearchPanel.Width = this._searchOnly ? Math.Max(0, args.NewSize.Width - 10) : args.NewSize.Width < 900 ? 160 : 240;
     }
 }

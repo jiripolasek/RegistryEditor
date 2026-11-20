@@ -14,14 +14,14 @@ internal sealed class WindowDialogPresenter
     private readonly Action _overlap;
     private readonly MainWindowViewModel _state;
 
+    internal bool IsOpen => this._state.IsDialogOpen;
+
     internal WindowDialogPresenter(FrameworkElement owner, MainWindowViewModel state, Action overlap)
     {
         this._owner = owner;
         this._overlap = overlap;
         this._state = state;
     }
-
-    internal bool IsOpen => this._state.IsDialogOpen;
 
     internal Task<ContentDialogResult> ShowAsync(ContentDialog dialog)
     {

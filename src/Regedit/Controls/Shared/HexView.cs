@@ -16,11 +16,14 @@ namespace JPSoftworks.Regedit.Controls.Shared;
 /// </summary>
 public sealed partial class HexView : UserControl
 {
-    public static readonly DependencyProperty BytesProperty = DependencyProperty.Register(
-        nameof(Bytes), typeof(byte[]), typeof(HexView), new PropertyMetadata(null, OnBytesChanged));
+    /// <summary>Raised with a new array after the user overwrites a byte by typing in the view.</summary>
+    public event EventHandler<byte[]>? BytesEdited;
 
     /// <summary>Content width that fits 16 bytes per row, the offset column and the ASCII column.</summary>
     internal const double DialogWidth = 744;
+
+    public static readonly DependencyProperty BytesProperty = DependencyProperty.Register(
+        nameof(Bytes), typeof(byte[]), typeof(HexView), new PropertyMetadata(null, OnBytesChanged));
 
     private readonly BetterHexViewer.WinUI3.BetterHexViewer _viewer;
     private byte[] _loaded = [];
@@ -28,11 +31,13 @@ public sealed partial class HexView : UserControl
     private bool _lowNibble;
     private bool _editing;
 
-    /// <summary>Raised with a new array after the user overwrites a byte by typing in the view.</summary>
-    public event EventHandler<byte[]>? BytesEdited;
-
     /// <summary>When true, typing hex digits overwrites the selected byte (two digits per byte).</summary>
     public bool IsEditable { get; set; }
+
+    /// <summary>
+    /// The bytes to display. The viewer keeps a reference to the array, so callers must not mutate it afterwards.
+    /// </summary>
+    public byte[]? Bytes { get => (byte[]?)this.GetValue(BytesProperty); set => this.SetValue(BytesProperty, value); }
 
     public HexView()
     {
@@ -77,9 +82,7 @@ public sealed partial class HexView : UserControl
         e.Handled = true;
         var offset = Math.Clamp(this._cursor, 0, this._loaded.Length - 1);
         var bytes = (byte[])this._loaded.Clone();
-        bytes[offset] = this._lowNibble
-            ? (byte)((bytes[offset] & 0xF0) | digit)
-            : (byte)((digit << 4) | (bytes[offset] & 0x0F));
+        bytes[offset] = this._lowNibble ? (byte)((bytes[offset] & 0xF0) | digit) : (byte)((digit << 4) | (bytes[offset] & 0x0F));
         var next = this._lowNibble ? Math.Min(offset + 1, bytes.Length - 1) : offset;
         this._lowNibble = !this._lowNibble;
         this._cursor = next;
@@ -122,11 +125,6 @@ public sealed partial class HexView : UserControl
             this._viewer.Clear();
         }
     }
-
-    /// <summary>
-    /// The bytes to display. The viewer keeps a reference to the array, so callers must not mutate it afterwards.
-    /// </summary>
-    public byte[]? Bytes { get => (byte[]?)this.GetValue(BytesProperty); set => this.SetValue(BytesProperty, value); }
 
     /// <summary>
     /// Scrolls to <paramref name="offset"/> and selects up to <paramref name="length"/> bytes from it.

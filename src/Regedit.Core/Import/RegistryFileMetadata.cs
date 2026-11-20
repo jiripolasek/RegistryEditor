@@ -13,16 +13,14 @@ public enum RegistryFileFollowUp
     Logoff = 4
 }
 
-public sealed record RegistryFileMetadata(
-    string Title,
-    string Description,
-    string Author,
-    RegistryFileFollowUp FollowUp)
+public sealed record RegistryFileMetadata(string Title, string Description, string Author, RegistryFileFollowUp FollowUp)
 {
     public static RegistryFileMetadata Empty { get; } = new("", "", "", RegistryFileFollowUp.None);
 
-    public bool HasContent => this.Title.Length > 0 || this.Description.Length > 0 || this.Author.Length > 0 ||
-                              this.FollowUp != RegistryFileFollowUp.None;
+    public bool HasContent => this.Title.Length > 0
+                              || this.Description.Length > 0
+                              || this.Author.Length > 0
+                              || this.FollowUp != RegistryFileFollowUp.None;
 
     public string FollowUpText => string.Join(
         "; ",
@@ -50,13 +48,14 @@ public sealed record RegistryFileMetadata(
             "AUTHOR" => this with { Author = value },
             "REQUIRES" => this with
             {
-                FollowUp = this.FollowUp | (value.ToUpperInvariant() switch
-                {
-                    "EXPLORERRESTART" => RegistryFileFollowUp.ExplorerRestart,
-                    "RESTART" => RegistryFileFollowUp.Restart,
-                    "LOGOFF" => RegistryFileFollowUp.Logoff,
-                    _ => RegistryFileFollowUp.None
-                })
+                FollowUp = this.FollowUp
+                           | (value.ToUpperInvariant() switch
+                           {
+                               "EXPLORERRESTART" => RegistryFileFollowUp.ExplorerRestart,
+                               "RESTART" => RegistryFileFollowUp.Restart,
+                               "LOGOFF" => RegistryFileFollowUp.Logoff,
+                               _ => RegistryFileFollowUp.None
+                           })
             },
             _ => this
         };

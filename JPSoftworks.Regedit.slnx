@@ -33,6 +33,7 @@
   <Folder Name="/eng/">
     <File Path="eng/Format.DotSettings" />
     <File Path="eng/Format.ps1" />
+    <File Path="eng/Format-Modified.ps1" />
     <File Path="eng/Run.ps1" />
   </Folder>
   <Folder Name="/src/">

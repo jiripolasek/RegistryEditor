@@ -42,8 +42,7 @@ public static partial class RegistryLaunch
         var result = new string[count - 1];
         for (var index = 1; index < count; index++)
         {
-            result[index - 1] = Marshal.PtrToStringUni(
-                Marshal.ReadIntPtr(buffer.DangerousGetHandle(), index * nint.Size))!;
+            result[index - 1] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(buffer.DangerousGetHandle(), index * nint.Size))!;
         }
 
         return result;

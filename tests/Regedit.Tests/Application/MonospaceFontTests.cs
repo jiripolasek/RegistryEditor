@@ -11,30 +11,21 @@ internal static class MonospaceFontTests
     internal static void Run(Action<bool, string> check)
     {
         check(
-            MonospaceFonts.ChooseFamily(["Consolas", "Cascadia Code", "JetBrains Mono"], "jetbrains mono") ==
-            "JetBrains Mono", "An installed preferred font takes priority and uses its installed family name");
+            MonospaceFonts.ChooseFamily(["Consolas", "Cascadia Code", "JetBrains Mono"], "jetbrains mono") == "JetBrains Mono",
+            "An installed preferred font takes priority and uses its installed family name");
         check(
-            MonospaceFonts.ChooseFamily(["Consolas", "Cascadia Code", "Courier New"], "Missing font") ==
-            "Cascadia Code", "Cascadia Code is the first fallback when a preferred font is unavailable");
-        check(
-            MonospaceFonts.ChooseFamily(["Courier New", "Consolas"], null) == "Consolas",
-            "Consolas is the second fallback");
-        check(
-            MonospaceFonts.ChooseFamily(["Courier New"], null) == "Courier New",
-            "Courier New is the final installed fallback");
-        check(
-            MonospaceFonts.ChooseFamily([], null) == "Courier New",
-            "An empty font collection keeps the final named fallback");
+            MonospaceFonts.ChooseFamily(["Consolas", "Cascadia Code", "Courier New"], "Missing font") == "Cascadia Code",
+            "Cascadia Code is the first fallback when a preferred font is unavailable");
+        check(MonospaceFonts.ChooseFamily(["Courier New", "Consolas"], null) == "Consolas", "Consolas is the second fallback");
+        check(MonospaceFonts.ChooseFamily(["Courier New"], null) == "Courier New", "Courier New is the final installed fallback");
+        check(MonospaceFonts.ChooseFamily([], null) == "Courier New", "An empty font collection keeps the final named fallback");
 
         var directory = Directory.CreateTempSubdirectory("RegeditMonospace.");
         try
         {
-            var stable = Path.Combine(
-                directory.FullName, "Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json");
+            var stable = Path.Combine(directory.FullName, "Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json");
             Directory.CreateDirectory(Path.GetDirectoryName(stable)!);
-            check(
-                MonospaceFonts.FindTerminalFont(directory.FullName) is null,
-                "Missing Terminal settings do not invent a font preference");
+            check(MonospaceFonts.FindTerminalFont(directory.FullName) is null, "Missing Terminal settings do not invent a font preference");
             var cases = new (string Json, string? Font)[]
             {
                 ("""{"defaultProfile":"Work","profiles":{"defaults":{"font":{"face":"Consolas"}},"list":[{"name":"Work","font":{"face":"Fira Code"}}]}}""",
@@ -47,13 +38,12 @@ internal static class MonospaceFontTests
                 ("""{"profiles":{"defaults":{"font":{"face":false},"fontFace":"Consolas"}}}""", "Consolas"),
                 ("""{"profiles":{"defaults":{"font":{"face":" "}}}}""", null),
                 ("""{"profiles":{"list":[{"name":"Unused","font":{"face":"Unrelated font"}}]}}""", null),
-                ("""{"defaultProfile":{},"profiles":{"defaults":42,"list":[null]}}""", null), ("[]", null),
-                ("{unfinished", null), ("""
-                                        {
-                                            // Terminal settings permit comments and trailing commas.
-                                            "profiles": { "defaults": { "font": { "face": "Fira Code", }, }, },
-                                        }
-                                        """, "Fira Code")
+                ("""{"defaultProfile":{},"profiles":{"defaults":42,"list":[null]}}""", null), ("[]", null), ("{unfinished", null), ("""
+                    {
+                        // Terminal settings permit comments and trailing commas.
+                        "profiles": { "defaults": { "font": { "face": "Fira Code", }, }, },
+                    }
+                    """, "Fira Code")
             };
             foreach (var (json, font) in cases)
             {
@@ -82,9 +72,7 @@ internal static class MonospaceFontTests
             var unpackaged = Path.Combine(directory.FullName, "Microsoft/Windows Terminal/settings.json");
             Directory.CreateDirectory(Path.GetDirectoryName(unpackaged)!);
             File.WriteAllText(unpackaged, """{"profiles":{"defaults":{"font":{"face":"Fira Code"}}}}""");
-            check(
-                MonospaceFonts.FindTerminalFont(directory.FullName) == "Fira Code",
-                "Unpackaged Terminal preferences are also supported");
+            check(MonospaceFonts.FindTerminalFont(directory.FullName) == "Fira Code", "Unpackaged Terminal preferences are also supported");
         }
         finally
         {

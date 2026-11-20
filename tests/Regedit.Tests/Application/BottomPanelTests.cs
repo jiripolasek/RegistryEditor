@@ -24,8 +24,8 @@ internal static class BottomPanelTests
         var store = new InvestigationStore(settings, () => { });
         var registry = new RegistryService();
         var shell = new MainWindowViewModel(
-            settings, store, registry, location => new BrowserViewModel(registry, location),
-            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
+            settings, store, registry, location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
+            NotesStoreTests.CreateStore(settings));
         var origin = shell.OpenBrowser(RegistryLocation.Parse("HKCU\\Software"));
         var query = new SavedSearch("First", [origin.Browser.Location], new SearchOptions("First"));
 
@@ -59,8 +59,7 @@ internal static class BottomPanelTests
             "Changing registry tabs and hiding the shared panel preserve every search and scan");
         shell.ShowBottomPane();
         check(
-            shell.IsBottomPaneOpen && shell.ActiveBottomTab == first && first.IsBusy && second.IsBusy &&
-            shell.BottomTabs.Count == 4,
+            shell.IsBottomPaneOpen && shell.ActiveBottomTab == first && first.IsBusy && second.IsBusy && shell.BottomTabs.Count == 4,
             "The toolbar reopens the existing bottom panel without changing its selection or restarting scans");
         shell.SelectBottomTab(first);
         shell.PromoteBottomTab();
@@ -69,11 +68,9 @@ internal static class BottomPanelTests
             "Promoting a search transfers its live instance without cancellation");
         shell.DockTab(first);
         check(
-            shell.ActiveBottomTab == first && !shell.Tabs.Contains(first) && shell.VisibleBrowser is not null &&
-            first.IsBusy, "Docking restores the same search instance beside a visible browser");
-        check(
-            shell.CaptureWorkspace("Both").Searches.Length == 2,
-            "Workspace capture includes every bottom search result set");
+            shell.ActiveBottomTab == first && !shell.Tabs.Contains(first) && shell.VisibleBrowser is not null && first.IsBusy,
+            "Docking restores the same search instance beside a visible browser");
+        check(shell.CaptureWorkspace("Both").Searches.Length == 2, "Workspace capture includes every bottom search result set");
         shell.CloseBottomTab(first);
         await firstRun.WaitAsync(TimeSpan.FromSeconds(3));
         check(
@@ -91,8 +88,8 @@ internal static class BottomPanelTests
             "Closing the final panel tab hides the panel and keeps registry tabs open");
         shell.ShowBottomPane();
         check(
-            shell.IsBottomPaneOpen && shell.ActiveBottomTab is ToolTab { Tool: ToolKind.Journal } &&
-            shell.BottomTabs.Count == 1, "Showing an empty bottom panel opens its default journal tab");
+            shell.IsBottomPaneOpen && shell.ActiveBottomTab is ToolTab { Tool: ToolKind.Journal } && shell.BottomTabs.Count == 1,
+            "Showing an empty bottom panel opens its default journal tab");
         shell.CloseBottomTab(shell.ActiveBottomTab!);
         shell.ResizeBottomPane(-10000, 900);
         check(shell.BottomPaneHeight == 180, "Bottom panel height has a usable lower bound");
@@ -103,9 +100,7 @@ internal static class BottomPanelTests
         shell.ResizeBottomPane(-20, 700);
         check(shell.BottomPaneHeight == 440, "Reversing a clamped resize responds immediately");
         shell.ResizeBottomPane(-20, 540);
-        check(
-            shell.BottomPaneHeight == 280,
-            "Resizing clamps the stored height before applying a delta after the window shrinks");
+        check(shell.BottomPaneHeight == 280, "Resizing clamps the stored height before applying a delta after the window shrinks");
         shell.ResizeBottomPane(1000, 320);
         check(shell.BottomPaneHeight == 100, "Small windows clamp the panel without exceeding the available height");
         shell.ResizeBottomPane(40, 900);
@@ -119,16 +114,11 @@ internal static class BottomPanelTests
             PaneResize.Apply(previewWidth, -24, 220, 300) == 276,
             "Preview resizing clamps to the current available width before applying a move");
         var previewHeight = PaneResize.Apply(240, 30, 100, 500);
-        check(
-            PaneResize.Apply(previewHeight, 40, 100, 500) == 310,
-            "Preview drag deltas accumulate from the stored height");
-        check(
-            PaneResize.Apply(600, -20, 180, 460) == 440,
-            "A resize reverses immediately after the available space shrinks");
+        check(PaneResize.Apply(previewHeight, 40, 100, 500) == 310, "Preview drag deltas accumulate from the stored height");
+        check(PaneResize.Apply(600, -20, 180, 460) == 440, "A resize reverses immediately after the available space shrinks");
         check(
             new WindowLayout(BottomPaneHeight: double.NaN, BottomTool: "invalid").Normalize() is
-                { BottomPaneHeight: 240, BottomTool: null },
-            "Invalid persisted bottom panel settings fall back safely");
+                { BottomPaneHeight: 240, BottomTool: null }, "Invalid persisted bottom panel settings fall back safely");
         var directory = Directory.CreateTempSubdirectory("RegeditBottomPanel.");
         try
         {
@@ -138,13 +128,13 @@ internal static class BottomPanelTests
             shell.SaveLayout(path);
             var loaded = AppSettings.Load(path);
             var reopened = new MainWindowViewModel(
-                loaded, new InvestigationStore(loaded, () => { }), registry,
-                location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
-                NotesStoreTests.CreateStore(loaded));
+                loaded, new InvestigationStore(loaded, () => { }), registry, location => new BrowserViewModel(registry, location),
+                NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(loaded));
             reopened.Initialize(null);
             check(
-                reopened.BottomPaneHeight == 250 && reopened.IsBottomPaneOpen &&
-                reopened.ActiveBottomTab is ToolTab { Tool: ToolKind.Journal },
+                reopened.BottomPaneHeight == 250
+                && reopened.IsBottomPaneOpen
+                && reopened.ActiveBottomTab is ToolTab { Tool: ToolKind.Journal },
                 "Window restore retains bottom panel height, visibility and selected singleton tool");
             reopened.WindowClosed();
         }

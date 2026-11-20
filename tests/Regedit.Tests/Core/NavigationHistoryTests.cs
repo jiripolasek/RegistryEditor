@@ -17,9 +17,7 @@ internal static class NavigationHistoryTests
         var b = root.Child("B");
         var c = root.Child("C");
         var history = new NavigationHistory(root);
-        check(
-            history.GetEntries(false).Count == 0 && history.GetEntries(true).Count == 0,
-            "New history has no menu entries");
+        check(history.GetEntries(false).Count == 0 && history.GetEntries(true).Count == 0, "New history has no menu entries");
         foreach (var location in new[] { a, b, a, c })
         {
             history.Navigate(location);
@@ -27,8 +25,8 @@ internal static class NavigationHistoryTests
 
         var back = history.GetEntries(false);
         check(
-            back.Select(entry => entry.Location).SequenceEqual(new[] { a, b, a, root }) &&
-            back.Select(entry => entry.Index).SequenceEqual(new[] { 3, 2, 1, 0 }),
+            back.Select(entry => entry.Location).SequenceEqual(new[] { a, b, a, root })
+            && back.Select(entry => entry.Index).SequenceEqual(new[] { 3, 2, 1, 0 }),
             "Back history is nearest-first and distinguishes repeated visits");
         history.MoveTo(1);
         check(
@@ -44,8 +42,8 @@ internal static class NavigationHistoryTests
         reject(() => history.MoveTo(-1), "History rejects negative jump indices");
         reject(() => history.MoveTo(5), "History rejects jump indices past the end");
         check(
-            history.Current == a && history.BackTarget == b && history.GetTarget(-1) is null &&
-            history.GetTarget(5) is null, "Rejected jumps leave the history cursor intact");
+            history.Current == a && history.BackTarget == b && history.GetTarget(-1) is null && history.GetTarget(5) is null,
+            "Rejected jumps leave the history cursor intact");
         history.MoveTo(1);
         var replacement = root.Child("Replacement");
         history.Navigate(replacement);
@@ -53,8 +51,7 @@ internal static class NavigationHistoryTests
             !history.CanGoForward && history.GetTarget(2) == replacement && history.GetTarget(3) is null,
             "New navigation after a jump truncates the forward branch");
         check(
-            back.Select(entry => entry.Location).SequenceEqual(new[] { a, b, a, root }),
-            "Open history menus retain an immutable snapshot");
+            back.Select(entry => entry.Location).SequenceEqual(new[] { a, b, a, root }), "Open history menus retain an immutable snapshot");
 
         var computer = root.GetComputer();
         var remote = RegistryLocation.Parse("\\\\SERVER", RegistryView.Registry32);
@@ -64,9 +61,7 @@ internal static class NavigationHistoryTests
         var forwardChanges = 0;
         view.BackCommand.CanExecuteChanged += (_, _) => backChanges++;
         view.ForwardCommand.CanExecuteChanged += (_, _) => forwardChanges++;
-        check(
-            !view.BackCommand.CanExecute(null) && !view.ForwardCommand.CanExecute(null),
-            "Both history commands start disabled");
+        check(!view.BackCommand.CanExecute(null) && !view.ForwardCommand.CanExecute(null), "Both history commands start disabled");
         await view.NavigateAsync(remote);
         check(
             backChanges > 0 && view.BackCommand.CanExecute(null) && !view.ForwardCommand.CanExecute(null),
@@ -76,9 +71,7 @@ internal static class NavigationHistoryTests
         check(target.Location == remote, "History menu entries retain computer and registry-view identity");
         forwardChanges = 0;
         await view.NavigateHistoryAsync(target.Index, target.Location);
-        check(
-            forwardChanges > 0 && view.ForwardCommand.CanExecute(null),
-            "A history jump enables the bound Forward command");
+        check(forwardChanges > 0 && view.ForwardCommand.CanExecute(null), "A history jump enables the bound Forward command");
         check(view.Location == remote && view.CanGoBack && view.CanGoForward, "Menu jumps update navigation state");
         var stale = view.GetHistory(true)[0];
         await view.NavigateAsync(computer);
@@ -115,22 +108,22 @@ internal static class NavigationHistoryTests
             service.DeleteKey(target.Location);
             await view.NavigateHistoryAsync(target.Index, target.Location);
             check(
-                view.Location == fixture.Child("C") && view.Error is not null &&
-                view.GetHistory(false).SequenceEqual(before) && !view.CanGoForward,
-                "Failed history jumps preserve the location and both stacks");
+                view.Location == fixture.Child("C")
+                && view.Error is not null
+                && view.GetHistory(false).SequenceEqual(before)
+                && !view.CanGoForward, "Failed history jumps preserve the location and both stacks");
             service.CreateKey(fixture, "A");
             await view.NavigateHistoryAsync(target.Index, target.Location);
             check(
-                view.Location == target.Location && view.Error is null && view.GetHistory(true)
-                    .Select(entry => entry.Location.Name).SequenceEqual(new[] { "B", "C" }),
+                view.Location == target.Location
+                && view.Error is null
+                && view.GetHistory(true).Select(entry => entry.Location.Name).SequenceEqual(new[] { "B", "C" }),
                 "A restored history target can be revisited without losing intermediate visits");
             target = view.GetHistory(true).Last();
             var pending = view.NavigateHistoryAsync(target.Index, target.Location);
             await view.NavigateAsync(computer);
             await pending;
-            check(
-                view.Location == computer && !view.CanGoForward,
-                "A newer navigation supersedes a pending history jump");
+            check(view.Location == computer && !view.CanGoForward, "A newer navigation supersedes a pending history jump");
         }
         finally
         {

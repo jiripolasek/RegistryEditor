@@ -178,39 +178,34 @@ public sealed partial class AppSettings
                 settings.Favorites.Add(favorite);
             }
 
-            settings.Tabs = (saved.Tabs ?? []).Where(tab => tab is not null && !string.IsNullOrWhiteSpace(tab.Address))
-                .ToList();
-            settings._sessions = saved.WindowSessions ?? (settings.Tabs.Count == 0
-                ? []
-                : [new SavedWindowSession("legacy", settings.Tabs.ToArray())]);
+            settings.Tabs = (saved.Tabs ?? []).Where(tab => tab is not null && !string.IsNullOrWhiteSpace(tab.Address)).ToList();
+            settings._sessions = saved.WindowSessions
+                                 ?? (settings.Tabs.Count == 0 ? [] : [new SavedWindowSession("legacy", settings.Tabs.ToArray())]);
             ValidateSessions(settings._sessions);
             settings.RestoredLayout = settings._sessions.FirstOrDefault()?.Layout?.Normalize();
             settings.Tabs = settings._sessions.SelectMany(session => session.Tabs)
                 .Select(tab => tab with { Layout = tab.Layout?.Normalize() }).ToList();
-            settings._restoredSessionIds
-                = settings._sessions.Select(session => session.Id).ToHashSet(StringComparer.Ordinal);
+            settings._restoredSessionIds = settings._sessions.Select(session => session.Id).ToHashSet(StringComparer.Ordinal);
             settings.Theme = saved.Theme is "Light" or "Dark" ? saved.Theme : "Default";
             settings.Backdrop = saved.Backdrop == "Acrylic" ? "Acrylic" : "Mica";
             settings.WebSearchUrl = RegistryWebSearch.IsValidTemplate(saved.WebSearchUrl)
                 ? saved.WebSearchUrl!.Trim()
                 : RegistryWebSearch.Bing;
-            settings.HiddenJumpListFavorites = (saved.HiddenJumpListFavorites ?? [])
-                .Where(id => !string.IsNullOrWhiteSpace(id)).ToHashSet(StringComparer.Ordinal);
+            settings.HiddenJumpListFavorites = (saved.HiddenJumpListFavorites ?? []).Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.Ordinal);
             settings.FontFamily = string.IsNullOrWhiteSpace(saved.FontFamily) ? "Segoe UI Variable" : saved.FontFamily;
             settings.FontSize = double.IsFinite(saved.FontSize) ? Math.Clamp(saved.FontSize, 8, 32) : 14;
-            settings.ListRowPadding
-                = double.IsFinite(saved.ListRowPadding) ? Math.Clamp(saved.ListRowPadding, 0, 10) : 3;
-            settings.DataFont = saved.DataFont is { Family: { Length: > 0 }, Size: >= 8 and <= 32 } font &&
-                                !string.IsNullOrWhiteSpace(font.Family)
-                ? font with { Family = font.Family.Trim() }
-                : null;
-            settings.EditorFont = saved.EditorFont is { Family: { Length: > 0 }, Size: >= 8 and <= 32 } editorFont &&
-                                  !string.IsNullOrWhiteSpace(editorFont.Family)
-                ? editorFont with { Family = editorFont.Family.Trim() }
-                : DefaultEditorFont;
-            settings.RegistryFileLayout = Enum.IsDefined(saved.RegistryFileLayout)
-                ? saved.RegistryFileLayout
-                : RegistryFileLayout.Split;
+            settings.ListRowPadding = double.IsFinite(saved.ListRowPadding) ? Math.Clamp(saved.ListRowPadding, 0, 10) : 3;
+            settings.DataFont
+                = saved.DataFont is { Family: { Length: > 0 }, Size: >= 8 and <= 32 } font && !string.IsNullOrWhiteSpace(font.Family)
+                    ? font with { Family = font.Family.Trim() }
+                    : null;
+            settings.EditorFont
+                = saved.EditorFont is { Family: { Length: > 0 }, Size: >= 8 and <= 32 } editorFont
+                  && !string.IsNullOrWhiteSpace(editorFont.Family)
+                    ? editorFont with { Family = editorFont.Family.Trim() }
+                    : DefaultEditorFont;
+            settings.RegistryFileLayout = Enum.IsDefined(saved.RegistryFileLayout) ? saved.RegistryFileLayout : RegistryFileLayout.Split;
             settings.ShowListToolbar = saved.ShowListToolbar;
             settings.PanelTabsAtBottom = saved.PanelTabsAtBottom;
             settings.ToolbarButtons = saved.ToolbarButtons & ToolbarButtons.All;
@@ -229,11 +224,8 @@ public sealed partial class AppSettings
             settings.AutoSyncTree = saved.AutoSyncTree;
             settings.ShowValuePreview = saved.ShowValuePreview;
             settings.ToolPanePinned = saved.ToolPanePinned;
-            settings.ToolPaneWidth
-                = double.IsFinite(saved.ToolPaneWidth) ? Math.Clamp(saved.ToolPaneWidth, 300, 680) : 360;
-            settings.SelectedTool = saved.SelectedTool is "Watches" or "Journal" or "Notes"
-                ? saved.SelectedTool
-                : "Favorites";
+            settings.ToolPaneWidth = double.IsFinite(saved.ToolPaneWidth) ? Math.Clamp(saved.ToolPaneWidth, 300, 680) : 360;
+            settings.SelectedTool = saved.SelectedTool is "Watches" or "Journal" or "Notes" ? saved.SelectedTool : "Favorites";
             settings.Searches = saved.Searches ?? [];
             foreach (var search in settings.Searches)
             {
@@ -264,8 +256,7 @@ public sealed partial class AppSettings
 
             settings._baseline = settings.Capture();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
-                                       or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
         {
             settings.LoadError = $"Settings could not be read: {ex.Message}";
             settings._preserveUnreadableFile = true;
@@ -281,11 +272,11 @@ public sealed partial class AppSettings
 
     internal void UpdatePreferences(Action<AppSettings> change, string? filePath = null)
     {
-        var previous = (this.Theme, this.FontFamily, this.FontSize, this.ShowStatusBar, this.ShowKeysInList,
-            this.ShowParentKeyInList, this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar,
-            this.ListColumns, this.ListRowPadding, this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts,
-            this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton,
-            this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout, this.EditorFont);
+        var previous = (this.Theme, this.FontFamily, this.FontSize, this.ShowStatusBar, this.ShowKeysInList, this.ShowParentKeyInList,
+            this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
+            this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton,
+            this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
+            this.EditorFont);
         try
         {
             change(this);
@@ -299,16 +290,14 @@ public sealed partial class AppSettings
                 throw new ArgumentException("Choose a window backdrop.");
             }
 
-            if (string.IsNullOrWhiteSpace(this.FontFamily) || !double.IsFinite(this.FontSize) ||
-                this.FontSize is < 8 or > 32)
+            if (string.IsNullOrWhiteSpace(this.FontFamily) || !double.IsFinite(this.FontSize) || this.FontSize is < 8 or > 32)
             {
                 throw new ArgumentException("Enter a font family and a size between 8 and 32.");
             }
 
             if (this.DataFont is { } dataFont)
             {
-                if (string.IsNullOrWhiteSpace(dataFont.Family) || !double.IsFinite(dataFont.Size) ||
-                    dataFont.Size is < 8 or > 32)
+                if (string.IsNullOrWhiteSpace(dataFont.Family) || !double.IsFinite(dataFont.Size) || dataFont.Size is < 8 or > 32)
                 {
                     throw new ArgumentException("Enter a Data column font family and a size between 8 and 32.");
                 }
@@ -321,8 +310,10 @@ public sealed partial class AppSettings
                 throw new ArgumentException("Choose an editor layout.");
             }
 
-            if (this.EditorFont is not { } editorFont || string.IsNullOrWhiteSpace(editorFont.Family) ||
-                !double.IsFinite(editorFont.Size) || editorFont.Size is < 8 or > 32)
+            if (this.EditorFont is not { } editorFont
+                || string.IsNullOrWhiteSpace(editorFont.Family)
+                || !double.IsFinite(editorFont.Size)
+                || editorFont.Size is < 8 or > 32)
             {
                 throw new ArgumentException("Enter an editor font family and a size between 8 and 32 points.");
             }
@@ -345,12 +336,11 @@ public sealed partial class AppSettings
         }
         catch
         {
-            (this.Theme, this.FontFamily, this.FontSize, this.ShowStatusBar, this.ShowKeysInList,
-                this.ShowParentKeyInList, this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar,
-                this.ListColumns, this.ListRowPadding, this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts,
-                this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton,
-                this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
-                this.EditorFont) = previous;
+            (this.Theme, this.FontFamily, this.FontSize, this.ShowStatusBar, this.ShowKeysInList, this.ShowParentKeyInList,
+                this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
+                this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton,
+                this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl,
+                this.RegistryFileLayout, this.EditorFont) = previous;
             throw;
         }
     }

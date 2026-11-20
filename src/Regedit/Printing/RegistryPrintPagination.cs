@@ -6,11 +6,7 @@ namespace JPSoftworks.Regedit.Printing;
 
 internal static class RegistryPrintPagination
 {
-    internal static RegistryPrintPageSlice FindNextSlice(
-        string report,
-        int start,
-        Func<int, int, bool> fits,
-        CancellationToken token)
+    internal static RegistryPrintPageSlice FindNextSlice(string report, int start, Func<int, int, bool> fits, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(report);
         ArgumentNullException.ThrowIfNull(fits);
@@ -62,18 +58,20 @@ internal static class RegistryPrintPagination
     private static int AtomicLength(string report, int start, int length)
     {
         var end = start + length;
-        if (end < report.Length && length > 1 &&
-            (char.IsHighSurrogate(report[end - 1]) && char.IsLowSurrogate(report[end]) ||
-             report[end - 1] == '\r' && report[end] == '\n'))
+        if (end < report.Length
+            && length > 1
+            && (char.IsHighSurrogate(report[end - 1]) && char.IsLowSurrogate(report[end])
+                || report[end - 1] == '\r' && report[end] == '\n'))
         {
             length--;
         }
 
         // A single code unit may be the first half of an indivisible pair. Keep the pair together
         // and advance, even when that means the page exceeds its measured limit by one code unit.
-        if (length == 1 && start + 1 < report.Length &&
-            (char.IsHighSurrogate(report[start]) && char.IsLowSurrogate(report[start + 1]) ||
-             report[start] == '\r' && report[start + 1] == '\n'))
+        if (length == 1
+            && start + 1 < report.Length
+            && (char.IsHighSurrogate(report[start]) && char.IsLowSurrogate(report[start + 1])
+                || report[start] == '\r' && report[start + 1] == '\n'))
         {
             return 2;
         }

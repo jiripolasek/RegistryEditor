@@ -15,8 +15,7 @@ using JPSoftworks.Regedit.Services;
 
 namespace JPSoftworks.Regedit.ViewModels;
 
-internal sealed partial class SettingsViewModel(AppSettings settings, Action<Action<AppSettings>> save)
-    : ObservableObject
+internal sealed partial class SettingsViewModel(AppSettings settings, Action<Action<AppSettings>> save) : ObservableObject
 {
     internal event Action<string>? PreferenceSaved;
 
@@ -58,8 +57,7 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
         {
             if (value is >= 0 and <= 2)
             {
-                this.Update(
-                    this.ThemeIndex, value, s => s.Theme = value switch { 1 => "Light", 2 => "Dark", _ => "Default" });
+                this.Update(this.ThemeIndex, value, s => s.Theme = value switch { 1 => "Light", 2 => "Dark", _ => "Default" });
             }
         }
     }
@@ -305,17 +303,13 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
     [RelayCommand]
     private void ToggleToolbarButton(ToolbarButtons button)
     {
-        this.Update(
-            this.ToolbarButtons, this.ToolbarButtons ^ button, s => s.ToolbarButtons ^= button,
-            nameof(this.ToolbarButtons));
+        this.Update(this.ToolbarButtons, this.ToolbarButtons ^ button, s => s.ToolbarButtons ^= button, nameof(this.ToolbarButtons));
     }
 
     [RelayCommand]
     private void HideToolbarButton(ToolbarButtons button)
     {
-        this.Update(
-            this.ToolbarButtons, this.ToolbarButtons & ~button, s => s.ToolbarButtons &= ~button,
-            nameof(this.ToolbarButtons));
+        this.Update(this.ToolbarButtons, this.ToolbarButtons & ~button, s => s.ToolbarButtons &= ~button, nameof(this.ToolbarButtons));
     }
 
     /// <summary>The saved column layout for a list, or null to use the list's defaults.</summary>
@@ -334,8 +328,7 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
 
         this.Update(
             current, layout,
-            s => s.ColumnLayouts
-                = new Dictionary<string, ColumnLayout>(s.ColumnLayouts, StringComparer.Ordinal) { [listId] = layout },
+            s => s.ColumnLayouts = new Dictionary<string, ColumnLayout>(s.ColumnLayouts, StringComparer.Ordinal) { [listId] = layout },
             nameof(this.ColumnLayout));
     }
 

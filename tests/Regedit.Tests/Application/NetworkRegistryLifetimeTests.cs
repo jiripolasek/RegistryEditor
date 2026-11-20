@@ -30,26 +30,21 @@ internal static class NetworkRegistryLifetimeTests
             var local = first.OpenBrowser(new RegistryLocation());
             second.OpenBrowser(new RegistryLocation());
             var tab = first.OpenBrowser(remote);
-            var duplicate = first.OpenBrowser(
-                remote with { Machine = computer.ToUpperInvariant(), View = RegistryView.Registry32 });
+            var duplicate = first.OpenBrowser(remote with { Machine = computer.ToUpperInvariant(), View = RegistryView.Registry32 });
             var elsewhere = second.OpenBrowser(remote);
             check(
                 RemoteRegistryCredentials.ConnectionCount(computer) == 3,
                 "Tabs across windows and registry views share one computer's credential lifetime");
 
             first.CloseTab(tab);
-            check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 2,
-                "Closing one remote tab preserves the other windows' sign-in");
+            check(RemoteRegistryCredentials.ConnectionCount(computer) == 2, "Closing one remote tab preserves the other windows' sign-in");
             await duplicate.Browser.NavigateAsync(other);
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 2 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 2 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
                 "Navigating a tab to another computer retains both computers' credentials");
             await duplicate.Browser.NavigateAsync(new RegistryLocation());
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 2 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 2 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
                 "Navigating to the local computer preserves credentials for remote history");
             await duplicate.Browser.BackCommand.ExecuteAsync(null);
             check(
@@ -59,8 +54,7 @@ internal static class NetworkRegistryLifetimeTests
             await duplicate.Browser.NavigateAsync(remote);
             await duplicate.Browser.NavigateAsync(new RegistryLocation());
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 2 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 2 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
                 "Repeated visits and computer-name casing do not retain extra connections");
 
             second.CloseTab(elsewhere);
@@ -75,21 +69,18 @@ internal static class NetworkRegistryLifetimeTests
             first.CloseTab(duplicate);
             duplicate.Close();
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 0 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 0 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
                 "Closing a local tab releases all visited computers and repeated cleanup is harmless");
 
             var settings = new AppSettings();
             var search = new SearchResultsViewModel(
                 new SavedSearch(
-                    "Remote", [remote, remote with { Machine = computer.ToUpperInvariant() }, other],
-                    new SearchOptions("needle")), new InvestigationStore(settings, () => { }),
-                (_, _) => throw new InvalidOperationException("The lifetime test must not contact a registry"),
-                (_, _) => { });
+                    "Remote", [remote, remote with { Machine = computer.ToUpperInvariant() }, other], new SearchOptions("needle")),
+                new InvestigationStore(settings, () => { }),
+                (_, _) => throw new InvalidOperationException("The lifetime test must not contact a registry"), (_, _) => { });
             first.DockTab(search);
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 1 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 1 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
                 "A remote search retains each distinct computer once without reading the network");
             first.PromoteBottomTab();
             check(
@@ -98,8 +89,7 @@ internal static class NetworkRegistryLifetimeTests
             first.CloseTab(search);
             search.Close();
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 0 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 0 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
                 "Closing a search releases its computers and repeated cleanup is harmless");
 
             var workingTab = first.OpenBrowser(remote);
@@ -114,8 +104,7 @@ internal static class NetworkRegistryLifetimeTests
             picker.SetResult(null);
             await capture;
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 0,
-                "Canceling the snapshot picker releases the operation's sign-in");
+                RemoteRegistryCredentials.ConnectionCount(computer) == 0, "Canceling the snapshot picker releases the operation's sign-in");
 
             var editingTab = first.OpenBrowser(remote with { Hive = RegistryHive.LocalMachine });
             var prompt = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -135,14 +124,14 @@ internal static class NetworkRegistryLifetimeTests
             var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var runningSearch = new SearchResultsViewModel(
                 new SavedSearch(
-                    "Remote", [remote, remote with { Machine = computer.ToUpperInvariant() }, other],
-                    new SearchOptions("needle")), new InvestigationStore(settings, () => { }), async (_, _) =>
+                    "Remote", [remote, remote with { Machine = computer.ToUpperInvariant() }, other], new SearchOptions("needle")),
+                new InvestigationStore(settings, () => { }), async (_, _) =>
                 {
                     started.SetResult();
                     await finish.Task;
                     check(
-                        RemoteRegistryCredentials.ConnectionCount(computer) == 1 &&
-                        RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
+                        RemoteRegistryCredentials.ConnectionCount(computer) == 1
+                        && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 1,
                         "A closing search keeps all distinct computers until its worker finishes");
                     return new RegistrySearchResults([], 0, false);
                 }, (_, _) => { });
@@ -152,8 +141,7 @@ internal static class NetworkRegistryLifetimeTests
             finish.SetResult();
             await run;
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 0 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 0 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
                 "Completed search workers release their remaining sign-ins");
 
             var last = first.OpenBrowser(remote);
@@ -168,8 +156,7 @@ internal static class NetworkRegistryLifetimeTests
                 var disconnect = second.OpenBrowser(remote);
                 await second.DisconnectCommand.ExecuteAsync(null);
                 check(
-                    disconnect.Browser.Location.Machine is null &&
-                    RemoteRegistryCredentials.ConnectionCount(computer) == 2,
+                    disconnect.Browser.Location.Machine is null && RemoteRegistryCredentials.ConnectionCount(computer) == 2,
                     "Disconnect preserves credentials for the tab's remote navigation history");
                 second.CloseTab(disconnect);
                 check(
@@ -184,8 +171,7 @@ internal static class NetworkRegistryLifetimeTests
         }
 
         check(
-            RemoteRegistryCredentials.ConnectionCount(computer) == 0 &&
-            RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
+            RemoteRegistryCredentials.ConnectionCount(computer) == 0 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
             "Closing windows releases their final remote connections");
 
         using var canceled = new CancellationTokenSource();
@@ -200,15 +186,13 @@ internal static class NetworkRegistryLifetimeTests
         {
             workspaceWindow.OpenBrowser(new RegistryLocation());
             await workspaceWindow.RestoreWorkspaceAsync(
-                new RegistryWorkspace("Canceled", [remote, other], [], []), new WorkspaceRestoreOptions(),
-                canceled.Token);
+                new RegistryWorkspace("Canceled", [remote, other], [], []), new WorkspaceRestoreOptions(), canceled.Token);
             check(false, "A canceled workspace stops restoring");
         }
         catch (OperationCanceledException) when (canceled.IsCancellationRequested)
         {
             check(
-                RemoteRegistryCredentials.ConnectionCount(computer) == 0 &&
-                RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
+                RemoteRegistryCredentials.ConnectionCount(computer) == 0 && RemoteRegistryCredentials.ConnectionCount(other.Machine!) == 0,
                 "A canceled workspace releases staged remote tabs that never reached the window");
         }
         finally

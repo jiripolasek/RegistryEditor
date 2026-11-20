@@ -14,8 +14,6 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 internal sealed partial class RegistryBranchCommands(RegistryService registry)
 {
-    internal IRegistryBranchDialogs? Dialogs { get; set; }
-
     internal event Func<RegistryLocation?, Task>? TreeChanged;
 
     internal event Action<string, string, NoticeKind>? Notice;
@@ -33,6 +31,8 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
     internal event Action? RegistryActivityCompleted;
 
     private bool _closed;
+
+    internal IRegistryBranchDialogs? Dialogs { get; set; }
 
     private static bool HasTarget(RegistryLocation? location)
     {
@@ -66,23 +66,18 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
             location, "Couldn't export the registry", "Export canceled", async (target, dialogs) =>
             {
                 var roots = target.GetScopeRoots(all);
-                if (await dialogs.PickSaveAsync(all ? "Registry export" : target.Name, ".reg", "Registry file") is not
-                    { } file)
+                if (await dialogs.PickSaveAsync(all ? "Registry export" : target.Name, ".reg", "Registry file") is not { } file)
                 {
                     return;
                 }
 
                 token.ThrowIfCancellationRequested();
                 this.OperationStarted?.Invoke(
-                    "Exporting…",
-                    "The destination file won't be replaced until the export finishes. Press Esc to cancel.");
-                var skipped = await Task.Run(
-                    () => RegistryExport.ExportAsync(registry, roots, file, token, all), token);
+                    "Exporting…", "The destination file won't be replaced until the export finishes. Press Esc to cancel.");
+                var skipped = await Task.Run(() => RegistryExport.ExportAsync(registry, roots, file, token, all), token);
                 this.ExportNotice?.Invoke(
                     skipped == 0 ? "Export complete" : "Export finished with warnings",
-                    file + (skipped == 0
-                        ? string.Empty
-                        : $" · {skipped} inaccessible branches were skipped and noted in the file."),
+                    file + (skipped == 0 ? string.Empty : $" · {skipped} inaccessible branches were skipped and noted in the file."),
                     skipped == 0 ? NoticeKind.Success : NoticeKind.Warning);
                 this.ExportCompleted?.Invoke(file);
             }, isExport: true);
@@ -94,8 +89,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
         return this.WithDialogsAsync(
             location, "Couldn't save the hive", "Hive save canceled", async (target, dialogs) =>
             {
-                if (IsKey(target) && await dialogs.PickSaveAsync(target.Name, ".hiv", "Registry hive") is { } file &&
-                    !this._closed)
+                if (IsKey(target) && await dialogs.PickSaveAsync(target.Name, ".hiv", "Registry hive") is { } file && !this._closed)
                 {
                     await RegistryService.SaveHiveAsync(target, file);
                     this.Notice?.Invoke("Hive saved", file, NoticeKind.Success);
@@ -117,16 +111,14 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
 
                 string? error = null;
                 var previous = string.Empty;
-                while (!this._closed && await dialogs.RequestMountNameAsync(file, previous, error) is { } name &&
-                       !this._closed)
+                while (!this._closed && await dialogs.RequestMountNameAsync(file, previous, error) is { } name && !this._closed)
                 {
                     previous = name;
                     RegistryLocation target;
                     try
                     {
                         target = parent.Child(name);
-                        if ((await Task.Run(() => registry.SubKeys(parent))).Contains(
-                                name, StringComparer.OrdinalIgnoreCase))
+                        if ((await Task.Run(() => registry.SubKeys(parent))).Contains(name, StringComparer.OrdinalIgnoreCase))
                         {
                             throw new IOException("That key already exists. Choose a new mount name.");
                         }
@@ -137,8 +129,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
                         }
 
                         await Task.Run(() => this.RecordHiveActivity(
-                            "Load hive", target,
-                            file + "\nHive mounting is not automatically reversible from the journal.", "load",
+                            "Load hive", target, file + "\nHive mounting is not automatically reversible from the journal.", "load",
                             target.Address, file));
                     }
                     catch (Exception ex)
@@ -160,10 +151,12 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
         return this.WithDialogsAsync(
             location, "Couldn't unload the hive", "Hive unloading canceled", async (target, dialogs) =>
             {
-                if (!CanUnload(target) || !await dialogs.ConfirmAsync(
+                if (!CanUnload(target)
+                    || !await dialogs.ConfirmAsync(
                         "Unload hive?",
                         $"{target.Address}\n\nChanges will be flushed to the hive file and the hive will be detached. This command requires administrator access.",
-                        "Unload") || this._closed)
+                        "Unload")
+                    || this._closed)
                 {
                     return;
                 }
@@ -176,16 +169,10 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
             });
     }
 
-    private void RecordHiveActivity(
-        string operation,
-        RegistryLocation target,
-        string details,
-        params string[] arguments)
+    private void RecordHiveActivity(string operation, RegistryLocation target, string details, params string[] arguments)
     {
-        var journal = registry.Journal ??
-                      throw new InvalidOperationException("The registry change journal is unavailable.");
-        journal.RecordActivity(
-            operation, target, details, () => RegistryService.RunRegAsync(arguments).GetAwaiter().GetResult());
+        var journal = registry.Journal ?? throw new InvalidOperationException("The registry change journal is unavailable.");
+        journal.RecordActivity(operation, target, details, () => RegistryService.RunRegAsync(arguments).GetAwaiter().GetResult());
     }
 
     private Task NotifyTreeChangedAsync(RegistryLocation? navigateTo = null)
@@ -221,8 +208,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
                 }
 
                 var roots = target.GetScopeRoots(range == ReportRange.AllHives);
-                var report = await Task.Run(
-                    () => RegistryReport.Create(registry, roots, range != ReportRange.CurrentKey, token), token);
+                var report = await Task.Run(() => RegistryReport.Create(registry, roots, range != ReportRange.CurrentKey, token), token);
                 token.ThrowIfCancellationRequested();
                 await dialogs.PreviewReportAsync(target.Address, report, token);
             });
@@ -249,8 +235,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
         {
             if (!this._closed)
             {
-                (isExport ? this.ExportNotice : this.Notice)?.Invoke(
-                    canceledTitle, "The operation was canceled.", NoticeKind.Information);
+                (isExport ? this.ExportNotice : this.Notice)?.Invoke(canceledTitle, "The operation was canceled.", NoticeKind.Information);
             }
         }
         catch (Exception ex)

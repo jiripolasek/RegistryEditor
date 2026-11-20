@@ -17,32 +17,28 @@ internal static class WebSearchTests
     internal static void Run(Action<bool, string> check)
     {
         var key = new RegistryLocation(RegistryHive.CurrentUser, @"Software\Example & #+%\Příliš ");
-        foreach (var template in new[]
-                 {
-                     RegistryWebSearch.Bing, RegistryWebSearch.Google, RegistryWebSearch.DuckDuckGo
-                 })
+        foreach (var template in new[] { RegistryWebSearch.Bing, RegistryWebSearch.Google, RegistryWebSearch.DuckDuckGo })
         {
             var uri = RegistryWebSearch.CreateUri(template, key);
             check(
-                uri.AbsoluteUri == template.Replace("{query}", Uri.EscapeDataString(key.Address)) &&
-                uri.Fragment.Length == 0,
+                uri.AbsoluteUri == template.Replace("{query}", Uri.EscapeDataString(key.Address)) && uri.Fragment.Length == 0,
                 "Search presets encode the complete selected key path, including special characters and trailing spaces");
             var value = RegistryWebSearch.CreateUri(template, key, "Value / & #+%é ");
             check(
                 Uri.UnescapeDataString(value.Query[3..]) == key.Address + "\\Value / & #+%é ",
                 "Value searches append the selected value name and keep its characters in the search parameter");
             check(
-                Uri.UnescapeDataString(RegistryWebSearch.CreateUri(template, key, string.Empty).Query[3..]) ==
-                key.Address + @"\(Default)", "Unnamed default values have an explicit name in the search query");
+                Uri.UnescapeDataString(RegistryWebSearch.CreateUri(template, key, string.Empty).Query[3..]) == key.Address + @"\(Default)",
+                "Unnamed default values have an explicit name in the search query");
         }
 
         var remote = key with { Machine = "SERVER", View = RegistryView.Registry32 };
         check(
-            Uri.UnescapeDataString(RegistryWebSearch.CreateUri(RegistryWebSearch.Bing, remote).Query[3..]) ==
-            key.Address, "Remote searches omit the computer name and registry view while preserving the key path");
+            Uri.UnescapeDataString(RegistryWebSearch.CreateUri(RegistryWebSearch.Bing, remote).Query[3..]) == key.Address,
+            "Remote searches omit the computer name and registry view while preserving the key path");
         check(
-            RegistryWebSearch.CreateUri("https://search.example/{query}?source=regedit", key).AbsoluteUri ==
-            "https://search.example/" + Uri.EscapeDataString(key.Address) + "?source=regedit",
+            RegistryWebSearch.CreateUri("https://search.example/{query}?source=regedit", key).AbsoluteUri
+            == "https://search.example/" + Uri.EscapeDataString(key.Address) + "?source=regedit",
             "Custom engines can place the encoded path in the URL path and retain other parameters");
 
         CheckPrivacy(check);
@@ -66,30 +62,25 @@ internal static class WebSearchTests
             check(
                 model.WebSearchUrl == RegistryWebSearch.Bing && writes == 0 && !File.Exists(path),
                 "New settings use Bing and initializing the search URL performs no writes");
-            foreach (var template in new[]
-                     {
-                         RegistryWebSearch.Google, RegistryWebSearch.DuckDuckGo, RegistryWebSearch.Bing
-                     })
+            foreach (var template in new[] { RegistryWebSearch.Google, RegistryWebSearch.DuckDuckGo, RegistryWebSearch.Bing })
             {
                 model.SetWebSearchUrlCommand.Execute(template);
                 check(
-                    model.WebSearchUrl == template && AppSettings.Load(path).WebSearchUrl == template &&
-                    saved.Last() == nameof(model.WebSearchUrl),
-                    "Each preset applies immediately and survives reloading settings");
+                    model.WebSearchUrl == template
+                    && AppSettings.Load(path).WebSearchUrl == template
+                    && saved.Last() == nameof(model.WebSearchUrl), "Each preset applies immediately and survives reloading settings");
             }
 
             const string custom = "https://search.example/?source=regedit&q={query}";
             model.WebSearchUrl = "  " + custom + "  ";
             check(
-                model.WebSearchUrl == custom && AppSettings.Load(path).WebSearchUrl == custom,
-                "Custom search URLs are trimmed and saved");
+                model.WebSearchUrl == custom && AppSettings.Load(path).WebSearchUrl == custom, "Custom search URLs are trimmed and saved");
             var original = File.ReadAllText(path);
             foreach (var invalid in new[]
                      {
                          "", " ", "https://example.com/search", "/search?q={query}", "file:///C:/test?q={query}",
-                         "javascript:alert('{query}')", "ms-settings:search?query={query}",
-                         "https://{query}.example.com/search", "https://user:password@example.com/?q={query}",
-                         "https://example.com/#q={query}"
+                         "javascript:alert('{query}')", "ms-settings:search?query={query}", "https://{query}.example.com/search",
+                         "https://user:password@example.com/?q={query}", "https://example.com/#q={query}"
                      })
             {
                 model.WebSearchUrl = invalid;
@@ -121,13 +112,9 @@ internal static class WebSearchTests
             model.SetWebSearchUrlCommand.Execute(RegistryWebSearch.Google);
             other.UpdatePreferences(s => s.Theme = "Dark", path);
             check(
-                AppSettings.Load(path) is { WebSearchUrl: RegistryWebSearch.Google, Theme: "Dark" } &&
-                !model.IsSaveErrorOpen,
+                AppSettings.Load(path) is { WebSearchUrl: RegistryWebSearch.Google, Theme: "Dark" } && !model.IsSaveErrorOpen,
                 "Retrying clears the error and another window's independent preference save retains the search engine");
-            foreach (var json in new[]
-                     {
-                         "{}", "{\"WebSearchUrl\":null}", "{\"WebSearchUrl\":\"file:///C:/test?q={query}\"}"
-                     })
+            foreach (var json in new[] { "{}", "{\"WebSearchUrl\":null}", "{\"WebSearchUrl\":\"file:///C:/test?q={query}\"}" })
             {
                 File.WriteAllText(path, json);
                 check(
@@ -160,8 +147,7 @@ internal static class WebSearchTests
         {
             foreach (var (subKey, expected) in new[]
                      {
-                         (sid, @"HKEY_USERS\<SID>"),
-                         (sid + @"\Software\Example & #+%é ", @"HKEY_USERS\<SID>\Software\Example & #+%é "),
+                         (sid, @"HKEY_USERS\<SID>"), (sid + @"\Software\Example & #+%é ", @"HKEY_USERS\<SID>\Software\Example & #+%é "),
                          (sid.ToLowerInvariant() + @"\Software", @"HKEY_USERS\<SID>\Software"),
                          (sid + @"_Classes\CLSID", @"HKEY_USERS\<SID>\CLSID")
                      })
@@ -169,14 +155,12 @@ internal static class WebSearchTests
                 var location = new RegistryLocation(RegistryHive.Users, subKey, machine);
                 foreach (var valueName in new[] { null, string.Empty, "Value & #+%é " })
                 {
-                    var query = Uri.UnescapeDataString(
-                        RegistryWebSearch.CreateUri(RegistryWebSearch.Bing, location, valueName).Query[3..]);
-                    var suffix = valueName is null
-                        ? string.Empty
-                        : "\\" + (valueName.Length == 0 ? "(Default)" : valueName);
+                    var query = Uri.UnescapeDataString(RegistryWebSearch.CreateUri(RegistryWebSearch.Bing, location, valueName).Query[3..]);
+                    var suffix = valueName is null ? string.Empty : "\\" + (valueName.Length == 0 ? "(Default)" : valueName);
                     check(
-                        query == expected + suffix && !query.Contains("PRIVATE-SERVER", StringComparison.Ordinal) &&
-                        !query.Contains(sid, StringComparison.OrdinalIgnoreCase),
+                        query == expected + suffix
+                        && !query.Contains("PRIVATE-SERVER", StringComparison.Ordinal)
+                        && !query.Contains(sid, StringComparison.OrdinalIgnoreCase),
                         "Local and remote user-hive searches redact the user SID before appending the selected value name");
                 }
             }
@@ -185,8 +169,8 @@ internal static class WebSearchTests
             {
                 var location = new RegistryLocation(RegistryHive.Users, user + @"\Software", machine);
                 check(
-                    Uri.UnescapeDataString(RegistryWebSearch.CreateUri(RegistryWebSearch.Bing, location).Query[3..]) ==
-                    @"HKEY_USERS\" + user + @"\Software",
+                    Uri.UnescapeDataString(RegistryWebSearch.CreateUri(RegistryWebSearch.Bing, location).Query[3..])
+                    == @"HKEY_USERS\" + user + @"\Software",
                     "Well-known user hives stay useful search terms while any remote computer name is omitted");
             }
         }
@@ -199,8 +183,8 @@ internal static class WebSearchTests
         var launched = new List<Uri>();
         Exception? launchFailure = null;
         var browser = new BrowserViewModel(
-            new RegistryService(), RegistryLocation.Parse(@"HKCU\Software\Other"), new RegistryEntryClipboard(),
-            preferences: preferences, launchWebSearch: uri =>
+            new RegistryService(), RegistryLocation.Parse(@"HKCU\Software\Other"), new RegistryEntryClipboard(), preferences: preferences,
+            launchWebSearch: uri =>
             {
                 if (launchFailure is not null)
                 {
@@ -215,8 +199,7 @@ internal static class WebSearchTests
             const string path = @"HKEY_USERS\<SID>\Software\Example";
             browser.SearchWebCommand.Execute((target, null));
             check(
-                launched.Count == 1 && launched[^1].Host == "www.google.com" &&
-                Uri.UnescapeDataString(launched[^1].Query[3..]) == path,
+                launched.Count == 1 && launched[^1].Host == "www.google.com" && Uri.UnescapeDataString(launched[^1].Query[3..]) == path,
                 "The VM command uses the Settings model's template, sanitizes the passed location and calls the injected launcher");
 
             browser.SearchWebCommand.Execute((target, "Value & #+%é "));
@@ -236,23 +219,20 @@ internal static class WebSearchTests
             preferences.WebSearchUrl = "https://search.example/{query}?source=regedit";
             browser.SearchWebCommand.Execute((target, null));
             check(
-                launched.Count == 5 && Uri.UnescapeDataString(launched[^1].AbsoluteUri) ==
-                "https://search.example/" + path + "?source=regedit",
+                launched.Count == 5
+                && Uri.UnescapeDataString(launched[^1].AbsoluteUri) == "https://search.example/" + path + "?source=regedit",
                 "The VM command applies the same privacy filtering to custom search URL paths");
 
             browser.SearchWebCommand.Execute((null, "Value"));
             browser.SearchWebCommand.Execute((new RegistryLocation(Machine: "PRIVATE-SERVER"), null));
-            check(
-                launched.Count == 5 && browser.Error is null,
-                "Missing locations and Computer never reach the injected launcher");
+            check(launched.Count == 5 && browser.Error is null, "Missing locations and Computer never reach the injected launcher");
 
             Exception? reported = null;
             browser.WebSearchFailed += exception => reported = exception;
             launchFailure = new InvalidOperationException("The browser could not be opened.");
             browser.SearchWebCommand.Execute((target, null));
             check(
-                ReferenceEquals(reported, launchFailure) && browser.Error == launchFailure.Message &&
-                launched.Count == 5,
+                ReferenceEquals(reported, launchFailure) && browser.Error == launchFailure.Message && launched.Count == 5,
                 "Launcher failures reach the existing VM error surface and failure event without escaping the command");
 
             launchFailure = null;

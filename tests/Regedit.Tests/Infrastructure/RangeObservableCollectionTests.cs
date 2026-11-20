@@ -17,9 +17,7 @@ internal static class RangeObservableCollectionTests
         collection.AddRange([]);
         check(log.Count == 0, "Adding nothing raises nothing");
         collection.AddRange(["a"]);
-        check(
-            log.SequenceEqual(["Count", "Item[]", "Add@0"]),
-            "Adding one item raises a precise Add that WinUI lists can apply");
+        check(log.SequenceEqual(["Count", "Item[]", "Add@0"]), "Adding one item raises a precise Add that WinUI lists can apply");
         log.Clear();
         collection.AddRange(["b", "c", "d"]);
         check(
@@ -36,12 +34,11 @@ internal static class RangeObservableCollectionTests
         check(log.Count == 0 && collection.Count == 4, "Replacing with itself is safe and silent");
 
         check(
-            collection.RemoveRange(["a", "zzz", "c"]) == 2 && collection.SequenceEqual(["d", "b"]) &&
-            log.SequenceEqual(["Count", "Item[]", "Reset"]), "Removing a range removes present items with one Reset");
+            collection.RemoveRange(["a", "zzz", "c"]) == 2
+            && collection.SequenceEqual(["d", "b"])
+            && log.SequenceEqual(["Count", "Item[]", "Reset"]), "Removing a range removes present items with one Reset");
         log.Clear();
-        check(
-            collection.RemoveRange(["missing", "other"]) == 0 && log.Count == 0,
-            "Removing absent items raises nothing");
+        check(collection.RemoveRange(["missing", "other"]) == 0 && log.Count == 0, "Removing absent items raises nothing");
         check(
             collection.RemoveRange(["d"]) == 1 && log.SequenceEqual(["Count", "Item[]", "Remove@0"]),
             "Removing one item raises a precise Remove");
@@ -51,9 +48,7 @@ internal static class RangeObservableCollectionTests
         check(
             duplicates.RemoveRange(["x", null]) == 2 && duplicates.SequenceEqual(["x", "y", null]),
             "Range removal removes one occurrence per listed item, including nulls");
-        check(
-            duplicates.RemoveAll(item => item is null) == 1 && duplicates.SequenceEqual(["x", "y"]),
-            "RemoveAll removes matching items");
+        check(duplicates.RemoveAll(item => item is null) == 1 && duplicates.SequenceEqual(["x", "y"]), "RemoveAll removes matching items");
 
         using (collection.DeferNotifications())
         {
@@ -64,13 +59,12 @@ internal static class RangeObservableCollectionTests
                 collection.Remove("b");
             }
 
-            check(
-                log.Count == 0 && collection.IsDeferring, "Nested deferral holds notifications until the outer scope");
+            check(log.Count == 0 && collection.IsDeferring, "Nested deferral holds notifications until the outer scope");
         }
 
         check(
-            log.SequenceEqual(["Count", "Item[]", "Reset"]) && collection.SequenceEqual(["1", "2", "3"]) &&
-            !collection.IsDeferring, "Deferred changes coalesce into one Reset");
+            log.SequenceEqual(["Count", "Item[]", "Reset"]) && collection.SequenceEqual(["1", "2", "3"]) && !collection.IsDeferring,
+            "Deferred changes coalesce into one Reset");
         log.Clear();
         var scope = collection.DeferNotifications();
         collection.Add("4");
@@ -110,8 +104,7 @@ internal static class RangeObservableCollectionTests
     private static List<string> Observe(RangeObservableCollection<string> collection)
     {
         var log = new List<string>();
-        ((System.ComponentModel.INotifyPropertyChanged)collection).PropertyChanged
-            += (_, args) => log.Add(args.PropertyName!);
+        ((System.ComponentModel.INotifyPropertyChanged)collection).PropertyChanged += (_, args) => log.Add(args.PropertyName!);
         collection.CollectionChanged += (_, args) => log.Add(
             args.Action switch
             {

@@ -104,10 +104,7 @@ internal sealed partial class ValueInspectorViewModel : ObservableObject
     [ObservableProperty]
     public partial string Result { get; private set; } = "Choose a format and byte range, then select Interpret.";
 
-    internal ValueInspectorViewModel(
-        RegistryValue value,
-        string? data = null,
-        IAsyncRelayCommand? revealFileCommand = null)
+    internal ValueInspectorViewModel(RegistryValue value, string? data = null, IAsyncRelayCommand? revealFileCommand = null)
         : this(new RegistryEntry(null, value), data, revealFileCommand)
     {
     }
@@ -148,8 +145,8 @@ internal sealed partial class ValueInspectorViewModel : ObservableObject
         {
             this.TargetStatus = "Missing";
         }
-        catch (Exception error) when (error is UnauthorizedAccessException or SecurityException ||
-                                      error is Win32Exception { NativeErrorCode: 5 })
+        catch (Exception error) when (error is UnauthorizedAccessException or SecurityException
+                                      || error is Win32Exception { NativeErrorCode: 5 })
         {
             this.TargetStatus = "Inaccessible";
         }
@@ -169,16 +166,16 @@ internal sealed partial class ValueInspectorViewModel : ObservableObject
 
         try
         {
-            if (!double.IsFinite(this.Offset) || !double.IsFinite(this.Length) ||
-                this.Offset != Math.Truncate(this.Offset) || this.Length != Math.Truncate(this.Length))
+            if (!double.IsFinite(this.Offset)
+                || !double.IsFinite(this.Length)
+                || this.Offset != Math.Truncate(this.Offset)
+                || this.Length != Math.Truncate(this.Length))
             {
                 throw new ArgumentException("Offset and byte count must be whole numbers.");
             }
 
             this.Result = RegistryValueInspector.Interpret(
-                    value.Data, checked((int)this.Offset), checked((int)this.Length),
-                    (ByteInterpretation)this.FormatIndex)
-                .Replace("\0", "␀");
+                value.Data, checked((int)this.Offset), checked((int)this.Length), (ByteInterpretation)this.FormatIndex).Replace("\0", "␀");
         }
         catch (Exception ex)
         {

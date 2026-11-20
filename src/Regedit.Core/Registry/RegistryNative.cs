@@ -20,20 +20,10 @@ internal static partial class RegistryNative
         out int required);
 
     [LibraryImport("advapi32.dll", EntryPoint = "RegNotifyChangeKeyValue")]
-    internal static partial int NotifyChange(
-        SafeRegistryHandle key,
-        int subtree,
-        uint filter,
-        SafeWaitHandle signal,
-        int asynchronous);
+    internal static partial int NotifyChange(SafeRegistryHandle key, int subtree, uint filter, SafeWaitHandle signal, int asynchronous);
 
     [LibraryImport("advapi32.dll", EntryPoint = "RegOpenKeyExW", StringMarshalling = StringMarshalling.Utf16)]
-    internal static partial int OpenKey(
-        SafeRegistryHandle key,
-        string name,
-        uint options,
-        uint access,
-        out SafeRegistryHandle result);
+    internal static partial int OpenKey(SafeRegistryHandle key, string name, uint options, uint access, out SafeRegistryHandle result);
 
     [LibraryImport("advapi32.dll", EntryPoint = "RegQueryInfoKeyW")]
     internal static partial int QueryInfoKey(
@@ -82,13 +72,7 @@ internal static partial class RegistryNative
         nint dataLength);
 
     [LibraryImport("advapi32.dll", EntryPoint = "RegSetValueExW", StringMarshalling = StringMarshalling.Utf16)]
-    internal static partial int SetValue(
-        SafeRegistryHandle key,
-        string name,
-        uint reserved,
-        uint type,
-        byte[] data,
-        uint size);
+    internal static partial int SetValue(SafeRegistryHandle key, string name, uint reserved, uint type, byte[] data, uint size);
 
     [LibraryImport("advapi32.dll", EntryPoint = "RegRenameKey", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial int RenameKey(SafeRegistryHandle key, string oldName, string newName);

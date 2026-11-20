@@ -25,9 +25,9 @@ public sealed partial class MainWindow
     {
         this.BottomTabs.ApplyTemplate();
         // shortcut: TabView has no add-button flyout API; recheck the AddButton template part when upgrading WinUI.
-        if (VisualTreeHelper.GetChildrenCount(this.BottomTabs) > 0 &&
-            VisualTreeHelper.GetChild(this.BottomTabs, 0) is FrameworkElement root &&
-            root.FindName("AddButton") is Button button)
+        if (VisualTreeHelper.GetChildrenCount(this.BottomTabs) > 0
+            && VisualTreeHelper.GetChild(this.BottomTabs, 0) is FrameworkElement root
+            && root.FindName("AddButton") is Button button)
         {
             button.Flyout = this.BottomPanelMenu;
             AutomationProperties.SetAutomationId(button, "BottomPanelAddButton");
@@ -67,8 +67,7 @@ public sealed partial class MainWindow
 
         this._panelView = view;
         this.BottomActions.SetCommands(view?.PanelCommands);
-        this.BottomActions.Visibility
-            = view is { PanelCommands.Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        this.BottomActions.Visibility = view is { PanelCommands.Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
         AutomationProperties.SetAutomationId(this.BottomActions, view?.PanelCommandsId ?? "BottomActions");
 
         var search = view?.PanelSearch;

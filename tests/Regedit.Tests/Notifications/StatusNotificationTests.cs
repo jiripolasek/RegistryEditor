@@ -38,35 +38,30 @@ internal static class StatusNotificationTests
                 return Task.CompletedTask;
             });
         using var session = new NotificationSession();
-        var first = StatusNotifications.Show(
-            session, "Stopped", "A watch stopped", NoticeKind.Information, [action], "watch-status");
+        var first = StatusNotifications.Show(session, "Stopped", "A watch stopped", NoticeKind.Information, [action], "watch-status");
         check(
             session.GetActive() is [{ Content.Duration: null, Content.Actions.Count: 1 }],
             "Feedback with a recovery action stays available until dismissed");
-        var replacement = StatusNotifications.Show(
-            session, "Stopped again", "Updated reason", NoticeKind.Error, [action], "watch-status");
+        var replacement = StatusNotifications.Show(session, "Stopped again", "Updated reason", NoticeKind.Error, [action], "watch-status");
         check(
             first.Id == replacement.Id && session.GetActive().Length == 1,
             "Keyed app feedback replaces its own status without adding duplicate cards");
         await session.InvokeActionAsync(replacement.Id, action);
         check(
-            invoked == 1 && session.GetActive().Length == 0,
-            "App feedback executes its recovery action and dismisses the completed card");
-        check(
-            session.GetHistory() is [{ Content.Actions.Count: 0 }],
-            "Closed app feedback releases application callbacks");
+            invoked == 1 && session.GetActive().Length == 0, "App feedback executes its recovery action and dismisses the completed card");
+        check(session.GetHistory() is [{ Content.Actions.Count: 0 }], "Closed app feedback releases application callbacks");
 
         var canceledOperation = 0;
         var previous = StatusNotifications.WithOpenFolderAction(
             StatusNotifications.Create("Hive saved", "Previous output", NoticeKind.Success, key: "operation"),
             Path.Combine(Path.GetTempPath(), "previous.hiv"));
         var previousHandle = session.Show(previous);
-        var started = StatusNotifications.Create(
-            "Exporting…", "Current output", NoticeKind.Information, key: "operation");
+        var started = StatusNotifications.Create("Exporting…", "Current output", NoticeKind.Information, key: "operation");
         var running = StatusNotifications.Running(started, () => canceledOperation++);
         var progress = session.Show(running);
         check(
-            progress.Id == previousHandle.Id && session.GetActive() is
+            progress.Id == previousHandle.Id
+            && session.GetActive() is
             [
                 {
                     Content:
@@ -80,8 +75,7 @@ internal static class StatusNotificationTests
             "Preparing operation progress preserves the previous notification content and actions");
         await session.InvokeActionAsync(progress.Id, running.Actions[0]);
         check(canceledOperation == 1, "Operation progress invokes only its supplied cancellation callback");
-        var finished = StatusNotifications.Create(
-            "Export complete", "Current output", NoticeKind.Success, key: "operation");
+        var finished = StatusNotifications.Create("Export complete", "Current output", NoticeKind.Success, key: "operation");
         session.Show(finished);
         check(
             session.GetActive() is [{ Content.Progress: null, Content.Actions.Count: 0 }],
@@ -97,8 +91,9 @@ internal static class StatusNotificationTests
             var id = error!.Id;
             error = StatusNotifications.UpdateError(errors, error, "Watch action failed", "Second failure", "watch");
             check(
-                error!.Id == id && errors.GetActive().Length == 2 &&
-                errors.GetActive().Single(item => item.Id == id).Content.Message == "Second failure",
+                error!.Id == id
+                && errors.GetActive().Length == 2
+                && errors.GetActive().Single(item => item.Id == id).Content.Message == "Second failure",
                 "Repeated action errors replace one owner's active error without accumulating cards");
             error = StatusNotifications.UpdateError(errors, error, "Watch action failed", null, "watch");
             check(
@@ -108,8 +103,7 @@ internal static class StatusNotificationTests
             check(error is null && errors.GetActive().Length == 1, "Repeated recovery is harmless");
         }
 
-        var missingExport = Path.Combine(
-            Path.GetTempPath(), "Regedit export " + Guid.NewGuid().ToString("N"), "output.reg");
+        var missingExport = Path.Combine(Path.GetTempPath(), "Regedit export " + Guid.NewGuid().ToString("N"), "output.reg");
         var exported = StatusNotifications.WithOpenFolderAction(
             StatusNotifications.Create("Export complete", missingExport, NoticeKind.Success), missingExport);
         check(
@@ -122,9 +116,7 @@ internal static class StatusNotificationTests
         }
         catch (FileNotFoundException error)
         {
-            check(
-                error.FileName == missingExport,
-                "An unavailable export reports its exact file instead of opening another folder");
+            check(error.FileName == missingExport, "An unavailable export reports its exact file instead of opening another folder");
         }
 
         using var canceled = new CancellationTokenSource();
@@ -161,16 +153,14 @@ internal static class StatusNotificationTests
         var exportId = session.GetActive().Single().Id;
         snapshot.Start("Loading snapshot", "Snapshot work");
         var snapshotId = session.GetActive().Single(item => item.Content.Key == "page:snapshot").Id;
-        var plain = StatusNotifications.Show(
-            session, "History changed", "Review the change", NoticeKind.Warning, key: "page");
+        var plain = StatusNotifications.Show(session, "History changed", "Review the change", NoticeKind.Warning, key: "page");
         check(
-            session.GetActive().Length == 3 &&
-            session.GetActive().Count(item => item.Content.Progress is not null) == 2,
+            session.GetActive().Length == 3 && session.GetActive().Count(item => item.Content.Progress is not null) == 2,
             "Concurrent export, snapshot, and page feedback retain separate entries and progress");
         snapshot.Start("Comparing snapshot", "Next phase");
         check(
-            session.GetActive().Single(item => item.Content.Key == "page:snapshot").Id == snapshotId &&
-            session.GetActive().Single(item => item.Id == exportId).Content.Title == "Exporting",
+            session.GetActive().Single(item => item.Content.Key == "page:snapshot").Id == snapshotId
+            && session.GetActive().Single(item => item.Id == exportId).Content.Title == "Exporting",
             "A new snapshot phase updates only its own operation entry");
         var exportAction = session.GetActive().Single(item => item.Id == exportId).Content.Actions[0];
         var snapshotAction = session.GetActive().Single(item => item.Id == snapshotId).Content.Actions[0];
@@ -182,13 +172,14 @@ internal static class StatusNotificationTests
         export.Complete();
         check(
             session.GetActive().Single(item => item.Id == exportId).Content is
-                { Title: "Export complete", Progress: null, Actions: [{ Label: "Open folder" }] } &&
-            session.GetActive().Single(item => item.Id == snapshotId).Content.Progress is not null,
+                { Title: "Export complete", Progress: null, Actions: [{ Label: "Open folder" }] }
+            && session.GetActive().Single(item => item.Id == snapshotId).Content.Progress is not null,
             "An export result and folder action preserve concurrent snapshot progress");
         snapshot.Complete();
         check(
-            session.GetActive().Length == 2 && session.GetActive().All(item => item.Id != snapshotId) &&
-            session.GetActive().Any(item => item.Id == plain.Id),
+            session.GetActive().Length == 2
+            && session.GetActive().All(item => item.Id != snapshotId)
+            && session.GetActive().Any(item => item.Id == plain.Id),
             "Completing without a result dismisses only the unfinished progress card");
         snapshot.Start("Capturing snapshot", "Work");
         snapshot.ShowResult("Snapshot failed", "Failure", NoticeKind.Error);
@@ -206,8 +197,6 @@ internal static class StatusNotificationTests
         snapshot.Start("Pending snapshot", "Work");
         snapshot.Complete();
         snapshot.Complete();
-        check(
-            exportCanceled == 1 && snapshotCanceled == 1,
-            "Silent completion and owner disposal do not invoke cancellation callbacks");
+        check(exportCanceled == 1 && snapshotCanceled == 1, "Silent completion and owner disposal do not invoke cancellation callbacks");
     }
 }

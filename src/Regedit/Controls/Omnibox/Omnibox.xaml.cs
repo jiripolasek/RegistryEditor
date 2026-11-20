@@ -16,13 +16,7 @@ namespace JPSoftworks.Regedit.Controls.Omnibox;
 
 public sealed partial class Omnibox : UserControl
 {
-    private CancellationTokenSource? _suggestionsCancellation;
-    private CancellationTokenSource? _childrenCancellation;
-    private Flyout? _childrenMenu;
-    private Func<string?, CancellationToken, Task<IReadOnlyList<OmniboxItem>>>? _childrenProvider;
-    private readonly List<(OmniboxItem Item, StackPanel Panel, Button Label, Button Children)> _segments = [];
-    private int _firstVisible;
-    private bool _isEnteringEditMode;
+    public event EventHandler<OmniboxNavigationRequestedEventArgs>? NavigationRequested;
 
     public static readonly DependencyProperty AddressProperty = DependencyProperty.Register(
         nameof(Address), typeof(string), typeof(Omnibox),
@@ -43,6 +37,14 @@ public sealed partial class Omnibox : UserControl
     public static readonly DependencyProperty LocationIconSourceProperty = DependencyProperty.Register(
         nameof(LocationIconSource), typeof(IconSource), typeof(Omnibox),
         new PropertyMetadata(null, (sender, _) => ((Omnibox)sender).UpdateLocationIcon()));
+
+    private readonly List<(OmniboxItem Item, StackPanel Panel, Button Label, Button Children)> _segments = [];
+    private CancellationTokenSource? _suggestionsCancellation;
+    private CancellationTokenSource? _childrenCancellation;
+    private Flyout? _childrenMenu;
+    private Func<string?, CancellationToken, Task<IReadOnlyList<OmniboxItem>>>? _childrenProvider;
+    private int _firstVisible;
+    private bool _isEnteringEditMode;
 
     public string Address
     {
@@ -86,8 +88,6 @@ public sealed partial class Omnibox : UserControl
 
     public Func<string, CancellationToken, Task<IReadOnlyList<OmniboxItem>>>? SuggestionProvider { get; set; }
 
-    public event EventHandler<OmniboxNavigationRequestedEventArgs>? NavigationRequested;
-
     public UIElement? TrailingContent
     {
         get => this.TrailingPresenter.Content as UIElement;
@@ -105,8 +105,7 @@ public sealed partial class Omnibox : UserControl
 
     public void SetLocation(string address, IEnumerable<OmniboxItem> breadcrumbs)
     {
-        var restoreFocus = this.XamlRoot is not null && Contains(
-            this, FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject);
+        var restoreFocus = this.XamlRoot is not null && Contains(this, FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject);
         this.Breadcrumbs = breadcrumbs;
         this.Address = address;
         this.EndEdit(restoreFocus);
@@ -268,9 +267,11 @@ public sealed partial class Omnibox : UserControl
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            if (!this._isEnteringEditMode && this.XamlRoot is not null &&
-                this.Editor.Visibility == Visibility.Visible && !this.Editor.IsSuggestionListOpen && !Contains(
-                    this, FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject))
+            if (!this._isEnteringEditMode
+                && this.XamlRoot is not null
+                && this.Editor.Visibility == Visibility.Visible
+                && !this.Editor.IsSuggestionListOpen
+                && !Contains(this, FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject))
             {
                 this.EndEdit(false);
             }
@@ -316,9 +317,7 @@ public sealed partial class Omnibox : UserControl
                 Height = 32,
                 Padding = new Thickness(0),
                 Flyout = this.CreateChildrenMenu(item.Address),
-                Visibility = this.ChildrenProvider is null || item.HasChildren == false
-                    ? Visibility.Collapsed
-                    : Visibility.Visible
+                Visibility = this.ChildrenProvider is null || item.HasChildren == false ? Visibility.Collapsed : Visibility.Visible
             };
             AutomationProperties.SetName(children, $"Children of {item.Label}");
             AutomationProperties.SetAutomationId(children, $"BreadcrumbChildren{this._segments.Count}");
@@ -328,8 +327,7 @@ public sealed partial class Omnibox : UserControl
             panel.Children.Add(children);
             if (this.ChildrenProvider is null && this._segments.Count > 0)
             {
-                panel.Children.Insert(
-                    0, new FontIcon { Glyph = "\uE76C", FontSize = 10, Margin = new Thickness(2, 0, 2, 0) });
+                panel.Children.Insert(0, new FontIcon { Glyph = "\uE76C", FontSize = 10, Margin = new Thickness(2, 0, 2, 0) });
             }
 
             this.Trail.Children.Add(panel);
@@ -373,8 +371,7 @@ public sealed partial class Omnibox : UserControl
             widths[i] = segment.Panel.DesiredSize.Width;
         }
 
-        this._firstVisible = OmniboxLayout.FirstVisible(
-            widths, this.TrailViewport.ActualWidth, this.OverflowButton.Width);
+        this._firstVisible = OmniboxLayout.FirstVisible(widths, this.TrailViewport.ActualWidth, this.OverflowButton.Width);
         this.OverflowButton.Visibility = this._firstVisible > 0 ? Visibility.Visible : Visibility.Collapsed;
         for (var i = 0; i < this._firstVisible; i++)
         {
@@ -383,8 +380,7 @@ public sealed partial class Omnibox : UserControl
 
         var last = this._segments[^1];
         var preceding = widths.Skip(this._firstVisible).Take(widths.Length - this._firstVisible - 1).Sum();
-        var available = this.TrailViewport.ActualWidth - (this._firstVisible > 0 ? this.OverflowButton.Width : 0) -
-                        preceding;
+        var available = this.TrailViewport.ActualWidth - (this._firstVisible > 0 ? this.OverflowButton.Width : 0) - preceding;
         last.Label.MaxWidth = Math.Max(0, available - (widths[^1] - last.Label.DesiredSize.Width));
     }
 

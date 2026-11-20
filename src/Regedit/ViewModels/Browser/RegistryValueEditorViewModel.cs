@@ -17,40 +17,6 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
     private string _data;
     private byte[] _previewBytes = [];
 
-    internal RegistryValueEditorViewModel(RegistryValue? original, RegistryValueType type, bool binary, bool creating)
-    {
-        this._type = type;
-        this.IsCreating = creating;
-        this.Name = original?.Name ?? string.Empty;
-        var value = original ?? new RegistryValue(
-            string.Empty, type,
-            RegistryValue.ParseData(
-                type,
-                type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord
-                    ? "0"
-                    : string.Empty));
-        this.Value = value;
-        this.Title = creating ? "New value" : "Edit value";
-        this.TypeName = value.TypeName;
-        var supportsTypedEditing = type is RegistryValueType.String or RegistryValueType.ExpandString
-            or RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.MultiString
-            or RegistryValueType.QWord;
-        this.IsRaw = binary || !supportsTypedEditing || !CanRoundTrip(value);
-        this.RawFallbackMessage = this.IsRaw && !binary && supportsTypedEditing
-            ? (type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord
-                  ? $"{this.TypeName} requires {(type == RegistryValueType.QWord ? 8 : 4)} bytes, but this value contains {value.Data.Length:N0}. "
-                  : $"This value cannot be edited as {this.TypeName} without changing its data. ") +
-              "The binary editor is used to preserve the stored bytes."
-            : string.Empty;
-        this.IsNumeric = !this.IsRaw &&
-                         type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord;
-        this._original = original;
-        this._data = this.IsRaw ? FormatHex(value.Data) : value.EditText(true);
-        this._initialData = this._data;
-        this._isMultiline = !this.IsNumeric && (!this.IsString || HasLineBreaks(this.Data));
-        this.UpdateDataHelp(this.IsRaw ? value.Data : null);
-    }
-
     internal RegistryValue Value { get; private set; }
 
     public bool IsNameReadOnly => !this.IsCreating;
@@ -136,6 +102,39 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
 
             this.OnPropertyChanged();
         }
+    }
+
+    internal RegistryValueEditorViewModel(RegistryValue? original, RegistryValueType type, bool binary, bool creating)
+    {
+        this._type = type;
+        this.IsCreating = creating;
+        this.Name = original?.Name ?? string.Empty;
+        var value = original
+                    ?? new RegistryValue(
+                        string.Empty, type,
+                        RegistryValue.ParseData(
+                            type,
+                            type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord
+                                ? "0"
+                                : string.Empty));
+        this.Value = value;
+        this.Title = creating ? "New value" : "Edit value";
+        this.TypeName = value.TypeName;
+        var supportsTypedEditing = type is RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.DWord
+            or RegistryValueType.DWordBigEndian or RegistryValueType.MultiString or RegistryValueType.QWord;
+        this.IsRaw = binary || !supportsTypedEditing || !CanRoundTrip(value);
+        this.RawFallbackMessage = this.IsRaw && !binary && supportsTypedEditing
+            ? (type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord
+                  ? $"{this.TypeName} requires {(type == RegistryValueType.QWord ? 8 : 4)} bytes, but this value contains {value.Data.Length:N0}. "
+                  : $"This value cannot be edited as {this.TypeName} without changing its data. ")
+              + "The binary editor is used to preserve the stored bytes."
+            : string.Empty;
+        this.IsNumeric = !this.IsRaw && type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord;
+        this._original = original;
+        this._data = this.IsRaw ? FormatHex(value.Data) : value.EditText(true);
+        this._initialData = this._data;
+        this._isMultiline = !this.IsNumeric && (!this.IsString || HasLineBreaks(this.Data));
+        this.UpdateDataHelp(this.IsRaw ? value.Data : null);
     }
 
     internal bool Validate()
@@ -235,8 +234,7 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
         try
         {
             var parsed = RegistryValue.ParseData(value.Type, value.EditText(true));
-            if (value.Type is RegistryValueType.String or RegistryValueType.ExpandString
-                or RegistryValueType.MultiString)
+            if (value.Type is RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.MultiString)
             {
                 // Strings differ only in how many terminators they carry, e.g. an empty REG_MULTI_SZ stored as
                 // 00 00 by regedit versus 00 00 00 00 written by this editor.

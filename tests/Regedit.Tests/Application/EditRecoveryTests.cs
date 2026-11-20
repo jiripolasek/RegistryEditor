@@ -34,13 +34,13 @@ internal static class EditRecoveryTests
             RegistryService.RenameCollides(5, "Source", "TAKEN", Siblings) && probes == 1,
             "Native rename access denial is a collision only for a confirmed case-insensitive sibling");
         check(
-            !RegistryService.RenameCollides(5, "Source", "sOuRcE", Siblings) && probes == 1 &&
-            !RegistryService.RenameCollides(2, "Source", "Taken", Siblings),
+            !RegistryService.RenameCollides(5, "Source", "sOuRcE", Siblings)
+            && probes == 1
+            && !RegistryService.RenameCollides(2, "Source", "Taken", Siblings),
             "Case-only rename excludes the source and unrelated native errors are not reclassified");
         foreach (var failure in new Exception[]
                  {
-                     new UnauthorizedAccessException(), new IOException(), new SecurityException(),
-                     new Win32Exception(5)
+                     new UnauthorizedAccessException(), new IOException(), new SecurityException(), new Win32Exception(5)
                  })
         {
             check(
@@ -62,13 +62,18 @@ internal static class EditRecoveryTests
 
         prompt.SetFailure(denial, target, false, Elevate);
         check(
-            ReferenceEquals(prompt.Failure, denial) && prompt.Error == denial.Message && launches.Count == 0 &&
-            prompt.Recovery?.Target == target && prompt.Recovery.CanOpenAsAdministrator,
+            ReferenceEquals(prompt.Failure, denial)
+            && prompt.Error == denial.Message
+            && launches.Count == 0
+            && prompt.Recovery?.Target == target
+            && prompt.Recovery.CanOpenAsAdministrator,
             "Access recovery retains the exact failure target view and draft without automatic elevation");
         await prompt.Recovery!.OpenAsAdministratorCommand.ExecuteAsync(null);
         check(
-            launches.Count == 1 && launches[0].ArgumentList.SequenceEqual([location.Address, "--32"]) &&
-            prompt.Name == "typed retry name" && ReferenceEquals(prompt.Failure, denial),
+            launches.Count == 1
+            && launches[0].ArgumentList.SequenceEqual([location.Address, "--32"])
+            && prompt.Name == "typed retry name"
+            && ReferenceEquals(prompt.Failure, denial),
             "Only the explicit recovery command requests runas and it transmits no editor draft");
         prompt.SetFailure(denial, target, false, _ => Task.FromException(new Win32Exception(1223)));
         await prompt.Recovery!.OpenAsAdministratorCommand.ExecuteAsync(null);
@@ -77,19 +82,16 @@ internal static class EditRecoveryTests
             "Canceling an administrator launch preserves the original draft and access failure");
         prompt.SetFailure(denial, target, true, Elevate);
         check(
-            !prompt.Recovery!.CanOpenAsAdministrator &&
-            prompt.Recovery.Guidance.Contains("already running as administrator"),
+            !prompt.Recovery!.CanOpenAsAdministrator && prompt.Recovery.Guidance.Contains("already running as administrator"),
             "An elevated denial offers permission recovery without another elevation action");
         await prompt.Recovery.OpenAsAdministratorCommand.ExecuteAsync(null);
         check(launches.Count == 1, "Executing disabled elevated recovery cannot launch another window");
-        prompt.SetFailure(
-            denial, new RegistryEditTarget(RegistryLocation.Parse(@"\\fixture\HKLM\Software")), false, Elevate);
+        prompt.SetFailure(denial, new RegistryEditTarget(RegistryLocation.Parse(@"\\fixture\HKLM\Software")), false, Elevate);
         check(!prompt.Recovery!.CanOpenAsAdministrator, "Local elevation recovery is not offered for a remote target");
         foreach (var failure in new Exception[]
                  {
                      new IOException("Before-state capture failed", denial),
-                     new IOException(
-                         "The final journal state could not be saved", new UnauthorizedAccessException()),
+                     new IOException("The final journal state could not be saved", new UnauthorizedAccessException()),
                      new IOException("A key with this name already exists.", denial)
                  })
         {
@@ -107,8 +109,7 @@ internal static class EditRecoveryTests
             var changed = false;
             try
             {
-                new RegistryJournal(blockedJournal.FullName).RecordActivity(
-                    "Denied storage", location, "test", () => changed = true);
+                new RegistryJournal(blockedJournal.FullName).RecordActivity("Denied storage", location, "test", () => changed = true);
             }
             catch (IOException ex)
             {
@@ -122,9 +123,12 @@ internal static class EditRecoveryTests
 
             prompt.SetFailure(storageFailure, target, false, Elevate);
             check(
-                !changed && storageFailure.InnerException is UnauthorizedAccessException &&
-                storageFailure.Message.Contains("journal storage") && prompt.Recovery is null && launches.Count == 1 &&
-                Directory.GetFiles(blockedJournal.FullName, "*.json").Length == 0,
+                !changed
+                && storageFailure.InnerException is UnauthorizedAccessException
+                && storageFailure.Message.Contains("journal storage")
+                && prompt.Recovery is null
+                && launches.Count == 1
+                && Directory.GetFiles(blockedJournal.FullName, "*.json").Length == 0,
                 "A journal file access denial preserves its storage error without mutation or registry elevation recovery");
         }
         finally
@@ -160,9 +164,8 @@ internal static class EditRecoveryTests
             service.Write(collisionSource, original, null);
             service.Write(
                 existing,
-                new RegistryValue(
-                    "Value", RegistryValueType.String,
-                    RegistryValue.ParseData(RegistryValueType.String, "existing data")), null);
+                new RegistryValue("Value", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "existing data")),
+                null);
             service.Journal = new RegistryJournal(folder.FullName);
             var browser = new BrowserViewModel(service, other);
             await browser.NavigateAsync(other);
@@ -178,11 +181,12 @@ internal static class EditRecoveryTests
                 else
                 {
                     check(
-                        rename.Name == "eXiStInG" &&
-                        form.Failure is IOException { InnerException: Win32Exception native } &&
-                        native.NativeErrorCode is 5 or 183 && form.Recovery is null &&
-                        service.ReadValue(collisionSource, "Value")!.SameData(original) &&
-                        service.ReadValue(existing, "Value")!.DisplayData == "existing data",
+                        rename.Name == "eXiStInG"
+                        && form.Failure is IOException { InnerException: Win32Exception native }
+                        && native.NativeErrorCode is 5 or 183
+                        && form.Recovery is null
+                        && service.ReadValue(collisionSource, "Value")!.SameData(original)
+                        && service.ReadValue(existing, "Value")!.DisplayData == "existing data",
                         "A real key collision retains the attempted spelling and both keys without offering elevation");
                     rename.Name = "FreeName";
                 }
@@ -197,8 +201,7 @@ internal static class EditRecoveryTests
 
             using var registryRoot = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, source.View);
             using var permissions = registryRoot.OpenSubKey(
-                source.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree,
-                RegistryRights.ReadKey | RegistryRights.ChangePermissions)!;
+                source.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.ReadKey | RegistryRights.ChangePermissions)!;
             var originalSecurity = permissions.GetAccessControl(AccessControlSections.Access);
             var originalDacl = originalSecurity.GetSecurityDescriptorBinaryForm();
             var originalAces = new RawSecurityDescriptor(originalDacl, 0).DiscretionaryAcl!;
@@ -215,12 +218,12 @@ internal static class EditRecoveryTests
                 var restored = permissions.GetAccessControl(AccessControlSections.Access);
                 var aces = new RawSecurityDescriptor(restored.GetSecurityDescriptorBinaryForm(), 0).DiscretionaryAcl;
                 using var writable = registryRoot.OpenSubKey(
-                    source.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree,
-                    RegistryRights.Delete | RegistryRights.SetValue);
+                    source.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.Delete | RegistryRights.SetValue);
                 check(
-                    writable is not null &&
-                    restored.AreAccessRulesProtected == originalSecurity.AreAccessRulesProtected && aces is not null &&
-                    aces.Cast<GenericAce>().SequenceEqual(originalAces.Cast<GenericAce>()),
+                    writable is not null
+                    && restored.AreAccessRulesProtected == originalSecurity.AreAccessRulesProtected
+                    && aces is not null
+                    && aces.Cast<GenericAce>().SequenceEqual(originalAces.Cast<GenericAce>()),
                     "The fixture restores the original access rules and regains delete and value-write rights");
             }
 
@@ -251,25 +254,27 @@ internal static class EditRecoveryTests
                     }
 
                     check(
-                        rename.Name == "DeniedRename" && ReferenceEquals(form.Failure, actualFailure) &&
-                        form.Failure is Win32Exception { NativeErrorCode: 5 } &&
-                        form.Recovery?.Target.Location == source && requests.Count == 0 &&
-                        service.SubKeys(fixture).Contains(source.Name) &&
-                        !service.SubKeys(fixture).Contains(rename.Name),
+                        rename.Name == "DeniedRename"
+                        && ReferenceEquals(form.Failure, actualFailure)
+                        && form.Failure is Win32Exception { NativeErrorCode: 5 }
+                        && form.Recovery?.Target.Location == source
+                        && requests.Count == 0
+                        && service.SubKeys(fixture).Contains(source.Name)
+                        && !service.SubKeys(fixture).Contains(rename.Name),
                         "Genuine ACL rename denial preserves native error 5 the typed name and exact tree target without mutation");
                     await browser.NavigateAsync(elsewhere);
                     await form.Recovery!.OpenAsAdministratorCommand.ExecuteAsync(null);
                     check(
-                        requests.Single().ArgumentList.SequenceEqual([source.Address, "--32"]) &&
-                        browser.Location == elsewhere,
+                        requests.Single().ArgumentList.SequenceEqual([source.Address, "--32"]) && browser.Location == elsewhere,
                         "Explicit recovery keeps its captured tree target and view after independent browser navigation");
                     return false;
                 };
                 await browser.RenameTreeKeyCommand.ExecuteAsync(source);
                 check(
-                    deniedPrompts == 2 && browser.Location == elsewhere &&
-                    service.ReadValue(source, "Value")!.SameData(original) &&
-                    !service.SubKeys(fixture).Contains("DeniedRename"),
+                    deniedPrompts == 2
+                    && browser.Location == elsewhere
+                    && service.ReadValue(source, "Value")!.SameData(original)
+                    && !service.SubKeys(fixture).Contains("DeniedRename"),
                     "Canceling the denied edit leaves the original window location and registry contents intact");
                 browser.CancelPending();
             }
@@ -301,9 +306,10 @@ internal static class EditRecoveryTests
                     else
                     {
                         valueFailure = draft.Failure;
-                        retainedValue = draft.Data == "retained typed data" && draft.Name == "Value" &&
-                                        draft.Recovery?.Target == new RegistryEditTarget(source, "Value") &&
-                                        service.ReadValue(source, "Value")!.SameData(original);
+                        retainedValue = draft.Data == "retained typed data"
+                                        && draft.Name == "Value"
+                                        && draft.Recovery?.Target == new RegistryEditTarget(source, "Value")
+                                        && service.ReadValue(source, "Value")!.SameData(original);
                         RestorePermissions();
                         VerifyRestoredAccess();
                         await browser.NavigateAsync(elsewhere);
@@ -316,9 +322,11 @@ internal static class EditRecoveryTests
                     retainedValue && valueFailure is SecurityException,
                     "A genuine value ACL denial retains direct SecurityException typed data name target and view without writing");
                 check(
-                    dataPrompts == 2 && service.ReadValue(source, "Value")!.DisplayData == "retained typed data" &&
-                    service.ReadValue(elsewhere, "Value") is null && browser.Location == elsewhere &&
-                    draft!.Recovery is null,
+                    dataPrompts == 2
+                    && service.ReadValue(source, "Value")!.DisplayData == "retained typed data"
+                    && service.ReadValue(elsewhere, "Value") is null
+                    && browser.Location == elsewhere
+                    && draft!.Recovery is null,
                     "Permission recovery retries the retained data at its original target while preserving later navigation");
                 browser.CancelPending();
             }

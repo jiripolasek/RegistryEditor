@@ -12,16 +12,12 @@ namespace JPSoftworks.Omnibox.Sample;
 
 public partial class App : Application
 {
-    private Window? _window;
     internal static readonly OmniboxItem Workspace = new("Workspace", "space:home") { HasChildren = true };
     internal static readonly OmniboxItem Projects = new("Projects", "space:projects") { HasChildren = true };
     internal static readonly OmniboxItem Notes = new("Notes", "space:notes") { HasChildren = false };
 
     internal static readonly OmniboxItem Component = new(
-        "An unusually long component name for checking a narrow address field", "space:component")
-    {
-        HasChildren = false
-    };
+        "An unusually long component name for checking a narrow address field", "space:component") { HasChildren = false };
 
     internal static readonly Dictionary<string, OmniboxItem[]> Paths = new()
     {
@@ -30,6 +26,8 @@ public partial class App : Application
         [Notes.Address] = [Workspace, Notes],
         [Component.Address] = [Workspace, Projects, Component]
     };
+
+    private Window? _window;
 
     public App()
     {
@@ -97,8 +95,8 @@ public partial class App : Application
             ChildrenProvider = ChildrenAsync,
             SuggestionProvider = (text, token) => Task.FromResult<IReadOnlyList<OmniboxItem>>(
                 Paths.Values.Select(path => path[^1]).Where(item =>
-                    item.Label.Contains(text, StringComparison.OrdinalIgnoreCase) || item.Address.Contains(
-                        text, StringComparison.OrdinalIgnoreCase)).ToArray())
+                    item.Label.Contains(text, StringComparison.OrdinalIgnoreCase)
+                    || item.Address.Contains(text, StringComparison.OrdinalIgnoreCase)).ToArray())
         };
     }
 

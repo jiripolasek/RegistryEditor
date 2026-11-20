@@ -16,10 +16,11 @@ internal static class ClipboardRoutingTests
         var root = RegistryLocation.Parse(@"HKCU\Software\RegeditClipboard-" + Guid.NewGuid().ToString("N"));
         var remote = RegistryLocation.Parse(@"\\SERVER\HKLM\Software\CaseSensitiveSpelling", RegistryView.Registry32);
         check(
-            remote.IsSameLocation(remote with { Machine = "server", SubKey = remote.SubKey.ToLowerInvariant() }) &&
-            !remote.IsSameLocation(remote with { Hive = RegistryHive.Users }) &&
-            !remote.IsSameLocation(remote with { View = RegistryView.Registry64 }) &&
-            !remote.IsSameLocation(remote.GetComputer()) && !remote.IsSameLocation(null),
+            remote.IsSameLocation(remote with { Machine = "server", SubKey = remote.SubKey.ToLowerInvariant() })
+            && !remote.IsSameLocation(remote with { Hive = RegistryHive.Users })
+            && !remote.IsSameLocation(remote with { View = RegistryView.Registry64 })
+            && !remote.IsSameLocation(remote.GetComputer())
+            && !remote.IsSameLocation(null),
             "Registry location comparison ignores machine and key casing while preserving hive view and Computer identity");
         var clipboard = new RegistryEntryClipboard();
         var browser = new BrowserViewModel(new RegistryService(), root, clipboard);
@@ -35,8 +36,10 @@ internal static class ClipboardRoutingTests
         browser.SelectedEntry = value;
         browser.CopyTreeKeyCommand.Execute(root.Child("TreeSource"));
         check(
-            clipboard.Entry?.Key == root.Child("TreeSource") && text == root.Child("TreeSource").Address &&
-            notifications > 0 && other.PasteIntoCommand.CanExecute(root),
+            clipboard.Entry?.Key == root.Child("TreeSource")
+            && text == root.Child("TreeSource").Address
+            && notifications > 0
+            && other.PasteIntoCommand.CanExecute(root),
             "Tree Copy captures the selected key and path independently of the list and notifies typed Paste");
         var copiedKey = clipboard.Entry;
         foreach (var target in new RegistryLocation?[] { null, root.GetComputer() })
@@ -49,13 +52,12 @@ internal static class ClipboardRoutingTests
         }
 
         check(
-            ReferenceEquals(clipboard.Entry, copiedKey) &&
-            browser.CopyTreeKeyCommand.CanExecute(RegistryLocation.Parse("HKCU")),
+            ReferenceEquals(clipboard.Entry, copiedKey) && browser.CopyTreeKeyCommand.CanExecute(RegistryLocation.Parse("HKCU")),
             "Disabled tree Copy preserves the clipboard and real hive keys retain their copy eligibility");
         foreach (var selection in new RegistryEntry[][]
                  {
-                     [], [new RegistryEntry(null, null, true)],
-                     [new RegistryEntry(null, null, ParentLocation: root)], [value, copiedKey!]
+                     [], [new RegistryEntry(null, null, true)], [new RegistryEntry(null, null, ParentLocation: root)],
+                     [value, copiedKey!]
                  })
         {
             browser.SetSelection(selection);
@@ -148,12 +150,15 @@ internal static class ClipboardRoutingTests
             before = () => clipboard.Entry = value;
             await browser.PasteIntoCommand.ExecuteAsync(tree);
             check(
-                registry.ReadValue(tree.Child("TreeClone"), "Raw")!.SameData(raw) &&
-                !registry.SubKeys(list).Contains("TreeClone") && destinationName == tree.Name,
-                "Typed tree Paste captures its source and explicit destination before the prompt");
+                registry.ReadValue(tree.Child("TreeClone"), "Raw")!.SameData(raw)
+                && !registry.SubKeys(list).Contains("TreeClone")
+                && destinationName == tree.Name, "Typed tree Paste captures its source and explicit destination before the prompt");
             check(
-                branches.SequenceEqual([tree]) && rebuilds == 0 && ReferenceEquals(browser.Entries, entries) &&
-                ReferenceEquals(browser.SelectedEntry, selected) && browser.Location == list,
+                branches.SequenceEqual([tree])
+                && rebuilds == 0
+                && ReferenceEquals(browser.Entries, entries)
+                && ReferenceEquals(browser.SelectedEntry, selected)
+                && browser.Location == list,
                 "Divergent tree key Paste refreshes only its destination branch and preserves the unrelated list");
 
             browser.SelectedEntry = new RegistryEntry(null, raw);
@@ -162,8 +167,7 @@ internal static class ClipboardRoutingTests
             branches.Clear();
             await browser.PasteIntoCommand.ExecuteAsync(tree);
             check(
-                registry.ReadValue(tree, name)!.SameData(raw) && registry.ReadValue(list, name) is null &&
-                branches.Count == 0,
+                registry.ReadValue(tree, name)!.SameData(raw) && registry.ReadValue(list, name) is null && branches.Count == 0,
                 "Typed tree value Paste preserves type and bytes without rebuilding any tree branch");
             accept = false;
             name = "Canceled";
@@ -189,15 +193,17 @@ internal static class ClipboardRoutingTests
             name = "ListPaste";
             await browser.PasteCommand.ExecuteAsync(null);
             check(
-                registry.ReadValue(list, name)!.SameData(raw) && registry.ReadValue(tree, name) is null &&
-                browser.Entries.Any(row => row.Value?.Name == name),
+                registry.ReadValue(list, name)!.SameData(raw)
+                && registry.ReadValue(tree, name) is null
+                && browser.Entries.Any(row => row.Value?.Name == name),
                 "List Paste still targets and refreshes the current container with the copied type and bytes");
             entries = browser.Entries;
             name = "CaseAliasPaste";
             await browser.PasteIntoCommand.ExecuteAsync(list with { SubKey = list.SubKey.ToLowerInvariant() });
             check(
-                registry.ReadValue(list, name)!.SameData(raw) && !ReferenceEquals(browser.Entries, entries) &&
-                browser.Entries.Any(row => row.Value?.Name == name),
+                registry.ReadValue(list, name)!.SameData(raw)
+                && !ReferenceEquals(browser.Entries, entries)
+                && browser.Entries.Any(row => row.Value?.Name == name),
                 "Pasting through a differently cased address refreshes the same visible registry key");
             browser.CancelPending();
         }

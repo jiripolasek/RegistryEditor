@@ -36,6 +36,8 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
 
     internal event Action? ActivationRequested;
 
+    internal event Action<string, string, NoticeKind>? Notice;
+
     private readonly IRegistryFileDialogs _dialogs;
     private readonly Func<string, string, RegistryView, Task> _import;
     private readonly ILogger _logger;
@@ -73,8 +75,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
     public partial RegistryFileLayout Layout { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(
-        nameof(TargetViewLabel), nameof(TargetViewHelp), nameof(IsRegistry32), nameof(IsRegistry64))]
+    [NotifyPropertyChangedFor(nameof(TargetViewLabel), nameof(TargetViewHelp), nameof(IsRegistry32), nameof(IsRegistry64))]
     public partial RegistryView TargetRegistryView { get; private set; }
 
     [ObservableProperty]
@@ -169,8 +170,9 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
 
     private bool CanOpenKey => this.CanPreview && this.SelectedKeyPath is not null;
 
-    private bool CanGoToSelectedKey => this.CanOpenKey && this.Document!.Sections.Any(section =>
-        StringComparer.OrdinalIgnoreCase.Equals(section.Path, this.SelectedKeyPath));
+    private bool CanGoToSelectedKey => this.CanOpenKey
+                                       && this.Document!.Sections.Any(section =>
+                                           StringComparer.OrdinalIgnoreCase.Equals(section.Path, this.SelectedKeyPath));
 
     private bool CanGoToError => this.CanNavigateDiagnostics;
 
@@ -178,8 +180,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
 
     private bool CanRedo => this.HasFile && this._editorCanRedo;
 
-    internal bool CanCompleteClose => this.IsClosed ||
-                                      this.IsClosePending && this._approvedCloseRevision == this._revision;
+    internal bool CanCompleteClose => this.IsClosed || this.IsClosePending && this._approvedCloseRevision == this._revision;
 
     internal RegistryFilePreviewViewModel(
         RegistryView view,
@@ -308,8 +309,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         List<RegistryFilePreviewRow> rows = [];
         if (this.Document is { } document && this.SelectedKeyPath is { } path)
         {
-            foreach (var section in document.Sections.Where(section =>
-                         StringComparer.OrdinalIgnoreCase.Equals(section.Path, path)))
+            foreach (var section in document.Sections.Where(section => StringComparer.OrdinalIgnoreCase.Equals(section.Path, path)))
             {
                 rows.Add(
                     new(
@@ -319,8 +319,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
                 rows.AddRange(
                     section.Values.Select(value => new RegistryFilePreviewRow(
                         value.Operation, value.DisplayName, value.Value?.TypeName ?? string.Empty,
-                        value.Value?.DisplayPreview ?? string.Empty, value.Line,
-                        new RegistryEntry(null, value.Value))));
+                        value.Value?.DisplayPreview ?? string.Empty, value.Line, new RegistryEntry(null, value.Value))));
             }
         }
 
@@ -338,9 +337,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         this.RefreshCommands();
     }
 
-    partial void OnDiagnosticsChanged(
-        IReadOnlyList<RegistryFileDiagnostic> oldValue,
-        IReadOnlyList<RegistryFileDiagnostic> newValue)
+    partial void OnDiagnosticsChanged(IReadOnlyList<RegistryFileDiagnostic> oldValue, IReadOnlyList<RegistryFileDiagnostic> newValue)
     {
         if (oldValue.Count == 0 && newValue.Count > 0)
         {
@@ -506,8 +503,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
 
         if (!this.CanCompleteClose)
         {
-            throw new InvalidOperationException(
-                "The registry file changed while closing. Review your changes and close again.");
+            throw new InvalidOperationException("The registry file changed while closing. Review your changes and close again.");
         }
 
         this.IsClosed = true;
@@ -542,8 +538,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         {
             this.CancelPendingClose();
             this.ShowNotice(
-                "Can't close yet", "The registry file changed while closing. Review your changes and close again.",
-                NoticeKind.Warning);
+                "Can't close yet", "The registry file changed while closing. Review your changes and close again.", NoticeKind.Warning);
             return false;
         }
 
@@ -665,8 +660,8 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         if (this.CanGoToSelectedKey)
         {
             this.SourceLineRequested?.Invoke(
-                this.Document!.Sections.First(section =>
-                    StringComparer.OrdinalIgnoreCase.Equals(section.Path, this.SelectedKeyPath)).Line, false);
+                this.Document!.Sections.First(section => StringComparer.OrdinalIgnoreCase.Equals(section.Path, this.SelectedKeyPath)).Line,
+                false);
         }
     }
 
@@ -743,8 +738,6 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         this._logger.LogFailure(LogLevel.Warning, "Registry file preview", ex);
         this.ShowNotice(title, ex.Message, NoticeKind.Error);
     }
-
-    internal event Action<string, string, NoticeKind>? Notice;
 
     private void ShowNotice(string title, string message, NoticeKind kind)
     {

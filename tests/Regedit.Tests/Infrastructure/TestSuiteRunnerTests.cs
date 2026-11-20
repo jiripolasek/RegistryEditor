@@ -59,29 +59,18 @@ internal static class TestSuiteRunnerTests
         ];
         using var output = new StringWriter();
         var status = await TestSuiteRunner.RunAsync(suites, output);
-        check(
-            status == 1 && attempts == 2 && independentRan,
-            "Runner continues independent suites and returns failure for two failures");
+        check(status == 1 && attempts == 2 && independentRan, "Runner continues independent suites and returns failure for two failures");
         check(
             activeFixtures == 0 && cleanedFixtures == 2 && dirtyStarts == 0 && followOnMutations == 0,
             "Failed setup and assertions unwind fixtures without follow-on mutations");
-        check(
-            output.ToString().Contains("Failed suites: setup-failure, assertion-failure"),
-            "Runner summarizes both failing suite names");
+        check(output.ToString().Contains("Failed suites: setup-failure, assertion-failure"), "Runner summarizes both failing suite names");
         check(await TestSuiteRunner.RunAsync([suites[2]], TextWriter.Null) == 0, "Successful suites return success");
         check(
-            TestSuiteRunner
-                .Select(
-                    suites, suites, ["--suite", "INDEPENDENT", "--suite", "setup-failure", "--suite", "independent"])
+            TestSuiteRunner.Select(suites, suites, ["--suite", "INDEPENDENT", "--suite", "setup-failure", "--suite", "independent"])
                 .Select(suite => suite.Name).SequenceEqual(["setup-failure", "independent"]),
             "Exact suite selection is case insensitive, deduplicated and follows registration order");
-        check(
-            TestSuiteRunner.Select(suites, [suites[1]], []).SequenceEqual([suites[1]]),
-            "Runner preserves default suite selection");
-        foreach (var args in new[]
-                 {
-                     new[] { "--suite" }, new[] { "--suite", "missing" }, new[] { "--suite", "--registry" }
-                 })
+        check(TestSuiteRunner.Select(suites, [suites[1]], []).SequenceEqual([suites[1]]), "Runner preserves default suite selection");
+        foreach (var args in new[] { new[] { "--suite" }, new[] { "--suite", "missing" }, new[] { "--suite", "--registry" } })
         {
             var rejected = false;
             try

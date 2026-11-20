@@ -17,8 +17,7 @@ internal static class JournalLockTests
 {
     internal static async Task HoldAsync(string folder)
     {
-        using var lease = new FileStream(
-            Path.Combine(folder, "write.lock"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var lease = new FileStream(Path.Combine(folder, "write.lock"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         Console.WriteLine("locked");
         await Console.Out.FlushAsync();
         await Console.In.ReadLineAsync();
@@ -27,9 +26,8 @@ internal static class JournalLockTests
     internal static async Task RunAsync(Action<bool, string> check, bool registry, bool administratorOnly = false)
     {
         var folder = Path.Combine(
-            administratorOnly
-                ? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
-                : Path.GetTempPath(), "RegeditJournalLock." + Guid.NewGuid().ToString("N"));
+            administratorOnly ? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) : Path.GetTempPath(),
+            "RegeditJournalLock." + Guid.NewGuid().ToString("N"));
         var journal = new RegistryJournal(folder, administratorOnly);
         var location = RegistryLocation.Parse("HKCU");
         try
@@ -46,8 +44,7 @@ internal static class JournalLockTests
                 await ReleaseAsync(holder);
                 await pending.WaitAsync(TimeSpan.FromSeconds(5));
                 check(
-                    ran && journal.ReadEntries().Length == 2,
-                    "Journal writer succeeds when the competing process releases before timeout");
+                    ran && journal.ReadEntries().Length == 2, "Journal writer succeeds when the competing process releases before timeout");
             }
 
             using (var holder = await HoldLockAsync(folder))
@@ -73,8 +70,7 @@ internal static class JournalLockTests
             {
                 journal.RecordActivity("Committed", location, "test", cancellation.Cancel, cancellation.Token);
                 check(
-                    journal.ReadEntries().Last().After is not null,
-                    "Cancellation after activity starts still saves its completed history");
+                    journal.ReadEntries().Last().After is not null, "Cancellation after activity starts still saves its completed history");
             }
 
             var failed = false;
@@ -107,8 +103,7 @@ internal static class JournalLockTests
             }
 
             check(
-                rejected && watch.Elapsed < TimeSpan.FromSeconds(2),
-                "A genuine lock storage error is surfaced without contention retries");
+                rejected && watch.Elapsed < TimeSpan.FromSeconds(2), "A genuine lock storage error is surfaced without contention retries");
 
             if (registry)
             {
@@ -130,10 +125,7 @@ internal static class JournalLockTests
         }
     }
 
-    private static async Task CheckGateAsync(
-        RegistryJournal journal,
-        RegistryLocation location,
-        Action<bool, string> check)
+    private static async Task CheckGateAsync(RegistryJournal journal, RegistryLocation location, Action<bool, string> check)
     {
         using var entered = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
@@ -158,8 +150,7 @@ internal static class JournalLockTests
             reading = Task.Run(journal.ReadHistory);
             using var cancellation = new CancellationTokenSource();
             var pending = Task.Run(() => journal.RecordActivity(
-                "Gate canceled", location, "test", () => throw new InvalidOperationException("Canceled action ran."),
-                cancellation.Token));
+                "Gate canceled", location, "test", () => throw new InvalidOperationException("Canceled action ran."), cancellation.Token));
             await StillWaitingAsync(pending);
             cancellation.Cancel();
             await CanceledAsync(pending, check, "Cancellation also interrupts the same-process gate");
@@ -174,8 +165,7 @@ internal static class JournalLockTests
 
         var history = await reading!.WaitAsync(TimeSpan.FromSeconds(5));
         check(
-            history.DamagedFiles.Length == 0 &&
-            history.Entries.Single(entry => entry.Operation == "Gate holder").After is not null,
+            history.DamagedFiles.Length == 0 && history.Entries.Single(entry => entry.Operation == "Gate holder").After is not null,
             "A background history reader waits through writer timeout and displays its final record after release");
         check(
             !journal.ReadEntries().Any(entry => entry.Operation is "Gate canceled" or "Gate expired"),
@@ -204,8 +194,7 @@ internal static class JournalLockTests
                 await CanceledAsync(pending, check, "Registry Write cancels before mutation under process contention");
                 await BusyAsync(() => writer.Write(root, replacement, original), check);
                 check(
-                    raw.ReadValue(root, "Value")!.Data.SequenceEqual(original.Data) &&
-                    Directory.GetFiles(folder, "*.json").Length == count,
+                    raw.ReadValue(root, "Value")!.Data.SequenceEqual(original.Data) && Directory.GetFiles(folder, "*.json").Length == count,
                     "Canceled and expired registry edits leave the value and history untouched");
                 await ReleaseAsync(holder);
             }
@@ -227,14 +216,14 @@ internal static class JournalLockTests
                 await pending.WaitAsync(TimeSpan.FromSeconds(2));
                 await BusyAsync(() => journal.Revert(edit.Id), check);
                 check(
-                    notices == 0 && raw.ReadValue(root, "Value")!.Data.SequenceEqual(replacement.Data) &&
-                    Directory.GetFiles(folder, "*.json").Length == count,
+                    notices == 0
+                    && raw.ReadValue(root, "Value")!.Data.SequenceEqual(replacement.Data)
+                    && Directory.GetFiles(folder, "*.json").Length == count,
                     "Revert command cancellation and Core timeout preserve the value and history");
                 await ReleaseAsync(holder);
             }
 
-            var clipboard
-                = new RegistryEntryClipboard { Entry = new RegistryEntry(null, original with { Name = "Paste" }) };
+            var clipboard = new RegistryEntryClipboard { Entry = new RegistryEntry(null, original with { Name = "Paste" }) };
             var browser = new BrowserViewModel(writer, root, clipboard);
             browser.EditPromptRequested += _ => Task.FromResult(true);
             var failures = 0;
@@ -246,8 +235,7 @@ internal static class JournalLockTests
                 browser.CancelPending();
                 await pending.WaitAsync(TimeSpan.FromSeconds(2));
                 check(
-                    failures == 0 && raw.ReadValue(root, "Paste") is null &&
-                    Directory.GetFiles(folder, "*.json").Length == count,
+                    failures == 0 && raw.ReadValue(root, "Paste") is null && Directory.GetFiles(folder, "*.json").Length == count,
                     "Closing a browser tab cancels its contended paste without creating value or history");
                 await ReleaseAsync(holder);
             }
@@ -262,35 +250,15 @@ internal static class JournalLockTests
                     }, cancellationToken: cancellation.Token);
                 var committed = journal.ReadEntries().Last();
                 check(
-                    committed.After is not null && committed.Error is null && committed.After[0].Snapshot.Keys[0].Values
-                        .Single().Data.SequenceEqual(original.Data),
+                    committed.After is not null
+                    && committed.Error is null
+                    && committed.After[0].Snapshot.Keys[0].Values.Single().Data.SequenceEqual(original.Data),
                     "Cancellation after mutation commits still captures and saves the final registry state");
             }
         }
         finally
         {
             user.DeleteSubKeyTree(root.SubKey, false);
-        }
-    }
-
-    private sealed class LockHolder : IDisposable
-    {
-        internal Process Process { get; }
-
-        internal LockHolder(Process process)
-        {
-            this.Process = process;
-        }
-
-        public void Dispose()
-        {
-            if (!this.Process.HasExited)
-            {
-                this.Process.Kill(true);
-                this.Process.WaitForExit();
-            }
-
-            this.Process.Dispose();
         }
     }
 
@@ -379,12 +347,33 @@ internal static class JournalLockTests
         catch (IOException ex) when (ex.Message.Contains("Another Registry Editor operation"))
         {
             check(
-                started.Elapsed >= TimeSpan.FromSeconds(2.8) && started.Elapsed < TimeSpan.FromSeconds(8) &&
-                ex.Message.Contains("close the other Registry Editor windows"),
-                "Writer timeout is bounded and explains how to recover");
+                started.Elapsed >= TimeSpan.FromSeconds(2.8)
+                && started.Elapsed < TimeSpan.FromSeconds(8)
+                && ex.Message.Contains("close the other Registry Editor windows"), "Writer timeout is bounded and explains how to recover");
             return;
         }
 
         throw new InvalidOperationException("Contended journal operation did not time out.");
+    }
+
+    private sealed class LockHolder : IDisposable
+    {
+        internal Process Process { get; }
+
+        internal LockHolder(Process process)
+        {
+            this.Process = process;
+        }
+
+        public void Dispose()
+        {
+            if (!this.Process.HasExited)
+            {
+                this.Process.Kill(true);
+                this.Process.WaitForExit();
+            }
+
+            this.Process.Dispose();
+        }
     }
 }

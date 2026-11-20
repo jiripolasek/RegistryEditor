@@ -25,8 +25,9 @@ public sealed partial class MainWindow
 {
     public event EventHandler? ContextChanged;
 
-    private Control? _toolsTrigger;
     private readonly Dictionary<ToolKind, IToolSurface> _toolPanels = [];
+
+    private Control? _toolsTrigger;
     private bool _toolsReady, _returnToolFocus;
 
     private object? SelectedTabContent => this.ActiveTabContent.Content;
@@ -84,8 +85,7 @@ public sealed partial class MainWindow
         }
 
         this.UpdatePinButton();
-        this.ToolSelector.ItemsSource = ToolPresentation.Tools
-            .Where(tool => tool.Kind is ToolKind.Favorites or ToolKind.Notes).ToArray();
+        this.ToolSelector.ItemsSource = ToolPresentation.Tools.Where(tool => tool.Kind is ToolKind.Favorites or ToolKind.Notes).ToArray();
         this.ToolSelector.SelectedItem = this.ViewModel.SelectedTool.Choice();
         this._toolsReady = true;
         if (this.ViewModel.IsPaneOpen)
@@ -104,8 +104,8 @@ public sealed partial class MainWindow
         }
 
         var view = new FavoritesView(
-            this.Favorites, this.Dialogs, compact, this.ViewModel.NavigateFromToolsAsync,
-            this.ViewModel.OpenInBackground, this.ShowToolInPanel, this.Logger, this.Notifications, this.ColumnLayouts);
+            this.Favorites, this.Dialogs, compact, this.ViewModel.NavigateFromToolsAsync, this.ViewModel.OpenInBackground,
+            this.ShowToolInPanel, this.Logger, this.Notifications, this.ColumnLayouts);
         view.MenuButton.Click += this.ApplicationMenu_Click;
         view.ApplyListSpacing(this.Settings.ListRowPadding);
         return view;
@@ -207,8 +207,8 @@ public sealed partial class MainWindow
 
     internal void ShowToolInPanel(IToolSurface source)
     {
-        if (source.Tool is ToolKind.Journal or ToolKind.Watches &&
-            this._views.FirstOrDefault(pair => ReferenceEquals(pair.Value, source)).Key is { } tab)
+        if (source.Tool is ToolKind.Journal or ToolKind.Watches
+            && this._views.FirstOrDefault(pair => ReferenceEquals(pair.Value, source)).Key is { } tab)
         {
             this.ViewModel.DockTab(tab);
             return;
@@ -294,8 +294,10 @@ public sealed partial class MainWindow
 
     private void ToolsPane_Closing(SplitView sender, SplitViewPaneClosingEventArgs args)
     {
-        args.Cancel = this.ViewModel.IsPanePinned && this.ViewModel.IsPaneOpen && !this.ViewModel.IsClosing &&
-                      !this.ViewModel.CanCloseWindow;
+        args.Cancel = this.ViewModel.IsPanePinned
+                      && this.ViewModel.IsPaneOpen
+                      && !this.ViewModel.IsClosing
+                      && !this.ViewModel.CanCloseWindow;
     }
 
     private void ToolsPane_Closed(SplitView sender, object args)
@@ -357,10 +359,9 @@ public sealed partial class MainWindow
             return;
         }
 
-        this.ToolsSplit.DisplayMode
-            = this.ViewModel.IsPanePinned && this.Shell.ActualWidth >= this.ViewModel.PaneWidth + 760
-                ? SplitViewDisplayMode.Inline
-                : SplitViewDisplayMode.Overlay;
+        this.ToolsSplit.DisplayMode = this.ViewModel.IsPanePinned && this.Shell.ActualWidth >= this.ViewModel.PaneWidth + 760
+            ? SplitViewDisplayMode.Inline
+            : SplitViewDisplayMode.Overlay;
         this.ToolPane.Style = (Style)Application.Current.Resources[
             this.ToolsSplit.DisplayMode == SplitViewDisplayMode.Overlay ? "OverlayToolPaneStyle" : "TabSurfaceStyle"];
         this.ToolsSplit.OpenPaneLength = Math.Min(this.ViewModel.PaneWidth, Math.Max(280, this.Shell.ActualWidth - 32));
@@ -408,8 +409,7 @@ public sealed partial class MainWindow
         {
             this.Logger.LogFailure(LogLevel.Warning, "Save tool preferences", ex);
             this._preferenceNotice = StatusNotifications.Show(
-                this.Notifications, "Could not save preferences", ex.Message, NoticeKind.Error,
-                key: "tool-preferences");
+                this.Notifications, "Could not save preferences", ex.Message, NoticeKind.Error, key: "tool-preferences");
         }
     }
 
@@ -428,8 +428,10 @@ public sealed partial class MainWindow
     private async Task<NoteCloseChoice> ConfirmDirtyNotesAsync(string? error)
     {
         var dialog = new AppDialog(
-            "Unsaved notes", error ?? "Save your note changes before closing?", "Save notes",
-            defaultButton: ContentDialogButton.Close) { SecondaryButtonText = "Discard notes" };
+            "Unsaved notes", error ?? "Save your note changes before closing?", "Save notes", defaultButton: ContentDialogButton.Close)
+        {
+            SecondaryButtonText = "Discard notes"
+        };
         return await this.Dialogs.ShowCloseConfirmationAsync(dialog) switch
         {
             ContentDialogResult.Primary => NoteCloseChoice.Save,
@@ -444,8 +446,7 @@ public sealed partial class MainWindow
         {
             if (this.Dialogs.IsOpen)
             {
-                this.ShowApplicationNotice(
-                    "Can't close yet", "Close the open dialog, then try again.", NoticeKind.Warning);
+                this.ShowApplicationNotice("Can't close yet", "Close the open dialog, then try again.", NoticeKind.Warning);
                 return;
             }
 

@@ -38,9 +38,7 @@ internal static class ToolPageDesignTests
         target.ValueName = " Theme ";
         check(target.Watch().ValueName == " Theme ", "An explicit value name retains its exact whitespace");
         target.ValueName = " ";
-        check(
-            target.Watch().ValueName == " ",
-            "A whitespace-only registry value name is distinct from the default value");
+        check(target.Watch().ValueName == " ", "A whitespace-only registry value name is distinct from the default value");
         target.ValueName = "invalid\0name";
         Reject(target.Watch, check, "Watch target validation rejects an invalid value name");
         target.Address = @"\\remote\HKLM\Software";
@@ -50,27 +48,27 @@ internal static class ToolPageDesignTests
         Reject(target.Location, check, "An invalid registry-view selection cannot silently select a view");
 
         var options = new SearchOptions(
-            "Theme", Keys: false, Data: false, MatchCase: true, Whole: true,
-            Types: [RegistryValueType.String, RegistryValueType.DWord]);
+            "Theme", Keys: false, Data: false, MatchCase: true, Whole: true, Types: [RegistryValueType.String, RegistryValueType.DWord]);
         var description = ToolPresentation.SearchOptionsText(options);
         check(
             description == "Search in: Value names\nMatch: Case sensitive · Whole text\nValue types: REG_SZ, REG_DWORD",
             "Saved-search details expose matching fields, case, whole-text and registry-type constraints");
         check(
-            ToolPresentation.SearchOptionsText(new SearchOptions("Theme")).EndsWith("Value types: All") &&
-            ToolPresentation.SearchOptionsText(new SearchOptions("Theme")).Contains("Ignore case · Substring"),
+            ToolPresentation.SearchOptionsText(new SearchOptions("Theme")).EndsWith("Value types: All")
+            && ToolPresentation.SearchOptionsText(new SearchOptions("Theme")).Contains("Ignore case · Substring"),
             "Saved-search details describe default matching and unrestricted value types");
         var search = new SavedSearch("Theme search", [branch.Location], options);
         var workspace = new RegistryWorkspace("Investigation", [branch.Location], [search], [unnamed]);
         var sections = ToolPresentation.WorkspaceComparisons(workspace).ToArray();
         check(
-            sections.Select(section => section.BeforeLabel).SequenceEqual(["Tabs", "Saved searches", "Watches"]) &&
-            sections[0].Before.EndsWith("64-bit") && sections[1].Before == "Theme search" &&
-            sections[2].Before.EndsWith("32-bit · Value: (Default)"),
+            sections.Select(section => section.BeforeLabel).SequenceEqual(["Tabs", "Saved searches", "Watches"])
+            && sections[0].Before.EndsWith("64-bit")
+            && sections[1].Before == "Theme search"
+            && sections[2].Before.EndsWith("32-bit · Value: (Default)"),
             "Workspace preview names its contents and preserves registry views and explicit default-value watches");
         check(
-            ToolPresentation.WorkspaceComparisons(workspace with { Tabs = [], Searches = [] }).Single().BeforeLabel ==
-            "Watches", "Workspace previews omit empty content sections");
+            ToolPresentation.WorkspaceComparisons(workspace with { Tabs = [], Searches = [] }).Single().BeforeLabel == "Watches",
+            "Workspace previews omit empty content sections");
 
         var collection = new Collection();
         var alpha = Row("Alpha", @"HKCU\Software\Alpha", "Theme");
@@ -88,9 +86,7 @@ internal static class ToolPageDesignTests
             collection.DisplayRows.SequenceEqual([beta]) && collection.Selected.Count == 0,
             "Registry-path filtering removes a hidden selection");
         collection.Query = "missing";
-        check(
-            collection.IsEmpty && collection.CountText.StartsWith("0 items"),
-            "An empty filter result reports the visible count");
+        check(collection.IsEmpty && collection.CountText.StartsWith("0 items"), "An empty filter result reports the visible count");
         collection.Query = string.Empty;
         check(
             collection.DisplayRows.Count == 2 && collection.Selected.Count == 0,

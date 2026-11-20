@@ -12,17 +12,18 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed partial class WorkspacesViewModel : InvestigationViewModel
 {
-    private readonly InvestigationStore _store;
-    private readonly Func<string, RegistryWorkspace> _capture;
-
-    private readonly Func<RegistryWorkspace, WorkspaceRestoreOptions, CancellationToken, Task<WorkspaceRestoreResult>>
-        _restore;
-
-    private int _open;
-
     internal event Func<RegistryWorkspace, Task<WorkspaceRestoreOptions?>>? PreviewRequested;
 
     internal event Func<string[], Task<bool>>? ConfirmRemote;
+
+    private readonly InvestigationStore _store;
+    private readonly Func<string, RegistryWorkspace> _capture;
+
+    private readonly Func<RegistryWorkspace, WorkspaceRestoreOptions, CancellationToken, Task<WorkspaceRestoreResult>> _restore;
+
+    private int _open;
+
+    internal override IRelayCommand ActivateCommand => this.OpenCommand;
 
     internal WorkspacesViewModel(
         InvestigationStore store,
@@ -31,8 +32,7 @@ internal sealed partial class WorkspacesViewModel : InvestigationViewModel
         : base(
             "Workspaces",
             "Save groups of registry tabs, search definitions, and watched branches or values for an investigation. Preview a workspace before adding or replacing tabs and choosing whether to start its saved searches and watches.",
-            "No saved workspaces",
-            "Save your current tabs, searches, and watches to return to this investigation later.")
+            "No saved workspaces", "Save your current tabs, searches, and watches to return to this investigation later.")
     {
         this._store = store;
         this._capture = capture;
@@ -41,12 +41,12 @@ internal sealed partial class WorkspacesViewModel : InvestigationViewModel
         store.WorkspacesChanged += this.Refresh;
     }
 
-    internal override IRelayCommand ActivateCommand => this.OpenCommand;
-
     internal static string Target(RegistryLocation location)
     {
-        return (location.Machine ?? Environment.MachineName) + " · " + location.Address +
-               (location.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit");
+        return (location.Machine ?? Environment.MachineName)
+               + " · "
+               + location.Address
+               + (location.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit");
     }
 
     internal static string Count(int count, string singular, string plural)
@@ -56,24 +56,21 @@ internal sealed partial class WorkspacesViewModel : InvestigationViewModel
 
     internal static string CountSummary(int tabs, int searches, int watches)
     {
-        return
-            $"{Count(tabs, "tab", "tabs")} · {Count(searches, "search", "searches")} · {Count(watches, "watch", "watches")}";
+        return $"{Count(tabs, "tab", "tabs")} · {Count(searches, "search", "searches")} · {Count(watches, "watch", "watches")}";
     }
 
     private void Refresh()
     {
         this.ReplaceNamedRows(
             this._store.Workspaces.Select(workspace => new InvestigationRow(
-                "Workspace", workspace.Name,
-                CountSummary(workspace.Tabs.Length, workspace.Searches.Length, workspace.Watches.Length), string.Empty,
-                string.Join("\n", workspace.Tabs.Select(tab => tab.Address)),
+                "Workspace", workspace.Name, CountSummary(workspace.Tabs.Length, workspace.Searches.Length, workspace.Watches.Length),
+                string.Empty, string.Join("\n", workspace.Tabs.Select(tab => tab.Address)),
                 string.Join(
                     "\n",
                     workspace.Searches.Select(search => "Search: " + search.Name).Concat(
-                        workspace.Watches.Select(watch => "Watch: " + watch.Location.Address +
-                                                          (watch.ValueName is null
-                                                              ? string.Empty
-                                                              : " · " + watch.ValueName)))), workspace)));
+                        workspace.Watches.Select(watch =>
+                            "Watch: " + watch.Location.Address + (watch.ValueName is null ? string.Empty : " · " + watch.ValueName)))),
+                workspace)));
     }
 
     protected override void SelectionChanged()
@@ -119,9 +116,8 @@ internal sealed partial class WorkspacesViewModel : InvestigationViewModel
                 return;
             }
 
-            var machines = workspace.Tabs.Concat(workspace.Searches.SelectMany(search => search.Roots))
-                .Select(location => location.Machine).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            var machines = workspace.Tabs.Concat(workspace.Searches.SelectMany(search => search.Roots)).Select(location => location.Machine)
+                .OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             if (machines.Length > 0 && (this.ConfirmRemote is null || !await this.ConfirmRemote(machines)))
             {
                 return;
@@ -140,12 +136,11 @@ internal sealed partial class WorkspacesViewModel : InvestigationViewModel
             }
 
             var summary
-                = $"{Count(result.Tabs, "tab", "tabs")} added · {Count(result.Searches, "search", "searches")} started · {Count(result.Watches, "watch", "watches")} requested" +
-                  (options.ReplaceTabs
+                = $"{Count(result.Tabs, "tab", "tabs")} added · {Count(result.Searches, "search", "searches")} started · {Count(result.Watches, "watch", "watches")} requested"
+                  + (options.ReplaceTabs
                       ? result.Replaced ? " · Previous browser/search tabs replaced" : " · Existing tabs kept"
-                      : string.Empty) + (!options.StartInvestigations
-                      ? "\nSaved searches are ready to run; saved watches were not started."
-                      : string.Empty);
+                      : string.Empty)
+                  + (!options.StartInvestigations ? "\nSaved searches are ready to run; saved watches were not started." : string.Empty);
             this.Report(
                 result.Errors.Length == 0 ? "Workspace opened" : "Some workspace items couldn't be opened",
                 summary + (result.Errors.Length == 0 ? string.Empty : "\n\n" + string.Join("\n", result.Errors)),

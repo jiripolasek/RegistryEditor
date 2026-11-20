@@ -19,8 +19,7 @@ internal static class RegistryFileEditorSettingsTests
             File.WriteAllText(path, "{}");
             var settings = AppSettings.Load(path);
             check(
-                settings.RegistryFileLayout == RegistryFileLayout.Split &&
-                settings.EditorFont == AppSettings.DefaultEditorFont,
+                settings.RegistryFileLayout == RegistryFileLayout.Split && settings.EditorFont == AppSettings.DefaultEditorFont,
                 "Existing profiles retain the split view and native editor font defaults");
 
             var savedProperties = new List<string>();
@@ -44,16 +43,12 @@ internal static class RegistryFileEditorSettingsTests
             model.EditorFontSize = 17.5;
             var loaded = AppSettings.Load(path);
             check(
-                loaded.RegistryFileLayout == RegistryFileLayout.Preview &&
-                loaded.EditorFont == new RegistryFont("Courier New", 17.5),
+                loaded.RegistryFileLayout == RegistryFileLayout.Preview && loaded.EditorFont == new RegistryFont("Courier New", 17.5),
                 "Editor view, trimmed family, and fractional point size round-trip through settings");
             check(
                 savedProperties.SequenceEqual(
-                    new[]
-                    {
-                        nameof(model.EditorLayoutIndex), nameof(model.EditorFontFamily),
-                        nameof(model.EditorFontSize)
-                    }), "Editor preference changes notify the host once per saved change");
+                    new[] { nameof(model.EditorLayoutIndex), nameof(model.EditorFontFamily), nameof(model.EditorFontSize) }),
+                "Editor preference changes notify the host once per saved change");
 
             var saved = File.ReadAllBytes(path);
 
@@ -75,10 +70,11 @@ internal static class RegistryFileEditorSettingsTests
                 }
 
                 check(
-                    rejected && settings.Theme == "Default" &&
-                    settings.RegistryFileLayout == RegistryFileLayout.Preview &&
-                    settings.EditorFont == new RegistryFont("Courier New", 17.5) &&
-                    saved.SequenceEqual(File.ReadAllBytes(path)), label);
+                    rejected
+                    && settings.Theme == "Default"
+                    && settings.RegistryFileLayout == RegistryFileLayout.Preview
+                    && settings.EditorFont == new RegistryFont("Courier New", 17.5)
+                    && saved.SequenceEqual(File.ReadAllBytes(path)), label);
             }
 
             Reject(
@@ -106,8 +102,7 @@ internal static class RegistryFileEditorSettingsTests
             second.UpdatePreferences(value => value.RegistryFileLayout = RegistryFileLayout.Editor, path);
             loaded = AppSettings.Load(path);
             check(
-                loaded.EditorFont == new RegistryFont("Consolas", 19) &&
-                loaded.RegistryFileLayout == RegistryFileLayout.Editor,
+                loaded.EditorFont == new RegistryFont("Consolas", 19) && loaded.RegistryFileLayout == RegistryFileLayout.Editor,
                 "Independent windows merge editor view and font changes without overwriting one another");
 
             saved = File.ReadAllBytes(path);
@@ -130,20 +125,19 @@ internal static class RegistryFileEditorSettingsTests
             }
 
             check(
-                failed && loaded.RegistryFileLayout == RegistryFileLayout.Editor &&
-                loaded.EditorFont == new RegistryFont("Consolas", 19) && saved.SequenceEqual(File.ReadAllBytes(path)),
-                "A failed settings write restores both editor preferences");
-            check(
-                !Directory.EnumerateFiles(directory.FullName, "*.tmp").Any(),
-                "Editor preference save failures leave no temporary files");
+                failed
+                && loaded.RegistryFileLayout == RegistryFileLayout.Editor
+                && loaded.EditorFont == new RegistryFont("Consolas", 19)
+                && saved.SequenceEqual(File.ReadAllBytes(path)), "A failed settings write restores both editor preferences");
+            check(!Directory.EnumerateFiles(directory.FullName, "*.tmp").Any(), "Editor preference save failures leave no temporary files");
 
-            File.WriteAllText(
-                path, """{"Theme":"Dark","RegistryFileLayout":99,"EditorFont":{"Family":" ","Size":100}}""");
+            File.WriteAllText(path, """{"Theme":"Dark","RegistryFileLayout":99,"EditorFont":{"Family":" ","Size":100}}""");
             loaded = AppSettings.Load(path);
             check(
-                loaded.LoadError is null && loaded.Theme == "Dark" &&
-                loaded.RegistryFileLayout == RegistryFileLayout.Split &&
-                loaded.EditorFont == AppSettings.DefaultEditorFont,
+                loaded.LoadError is null
+                && loaded.Theme == "Dark"
+                && loaded.RegistryFileLayout == RegistryFileLayout.Split
+                && loaded.EditorFont == AppSettings.DefaultEditorFont,
                 "Malformed editor preferences fall back without discarding valid application preferences");
         }
         finally

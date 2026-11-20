@@ -73,6 +73,10 @@ public sealed partial class MainWindow : Window
 
     internal ApplicationRegistryViewModel RegistryMenu { get; }
 
+    internal NotificationSession Notifications { get; } = new(TimeSpan.FromSeconds(new UISettings().MessageDuration));
+
+    internal bool IsClosed { get; private set; }
+
     internal MainWindow(
         ILogger<MainWindow> logger,
         AppSettings settings,
@@ -106,8 +110,7 @@ public sealed partial class MainWindow : Window
         viewModel.WatchFailed += session =>
         {
             this.ShowApplicationNotice(
-                "Watch stopped unexpectedly", session.Target + "\n" + session.Error!.Message, NoticeKind.Error,
-                (NotificationAction[])
+                "Watch stopped unexpectedly", session.Target + "\n" + session.Error!.Message, NoticeKind.Error, (NotificationAction[])
                 [
                     new NotificationAction(
                         "Open watch", _ =>
@@ -120,16 +123,16 @@ public sealed partial class MainWindow : Window
         var dialogs = new RegistryDialogs(this);
         journal.ConfirmRevert = entry => dialogs.ConfirmAsync(
             "Revert this edit?",
-            entry.Summary + "\n" + entry.Path +
-            "\n\nThe current values must still match the recorded after-state. Registry writes are not atomic. Recreated keys restore owner, group, and access rules; auditing and key metadata are not restored.",
+            entry.Summary
+            + "\n"
+            + entry.Path
+            + "\n\nThe current values must still match the recorded after-state. Registry writes are not atomic. Recreated keys restore owner, group, and access rules; auditing and key metadata are not restored.",
             "Check and revert");
-        journal.RefreshBrowser
-            = () => viewModel.ContextBrowser?.RefreshCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+        journal.RefreshBrowser = () => viewModel.ContextBrowser?.RefreshCommand.ExecuteAsync(null) ?? Task.CompletedTask;
         journal.Notice += (title, message, kind) => this.ShowApplicationNotice(title, message, kind);
         var branches = new RegistryBranchCommands(registry) { Dialogs = dialogs };
         branches.Notice += this.ShowBranchNotice;
-        this._exportNotification = new OperationNotification(
-            this.Notifications, "application-branch:export", this.CancelApplicationExport);
+        this._exportNotification = new OperationNotification(this.Notifications, "application-branch:export", this.CancelApplicationExport);
         branches.OperationStarted += this._exportNotification.Start;
         branches.ExportNotice += this._exportNotification.ShowResult;
         branches.ExportCompleted += this._exportNotification.AddOpenFolderAction;
@@ -140,8 +143,7 @@ public sealed partial class MainWindow : Window
         this.RegistryMenu.OpenFilePreviewAsync = this.OpenRegistryFileAsync;
         this.RegistryMenu.ExportAllCommand.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(this.RegistryMenu.ExportAllCommand.IsRunning) &&
-                !this.RegistryMenu.ExportAllCommand.IsRunning)
+            if (args.PropertyName == nameof(this.RegistryMenu.ExportAllCommand.IsRunning) && !this.RegistryMenu.ExportAllCommand.IsRunning)
             {
                 this._exportNotification.Complete();
             }
@@ -155,19 +157,14 @@ public sealed partial class MainWindow : Window
         this.InitializeComponent();
         this.NotificationOverlay.Attach(this.Notifications);
         this.NotificationOverlay.ShadowReceiver = this.Shell;
-        this.NotificationOverlay.ActionFailed += error =>
-            this.Logger.LogFailure(LogLevel.Warning, "Notification action", error);
+        this.NotificationOverlay.ActionFailed += error => this.Logger.LogFailure(LogLevel.Warning, "Notification action", error);
         this.Activated += (_, args) => this.NotificationOverlay.IsWindowActive
             = args.WindowActivationState != WindowActivationState.Deactivated;
-        this.ColumnLayouts = new ColumnLayoutPersistence(
-            this.DispatcherQueue, preferences.ColumnLayout, preferences.SaveColumnLayout);
+        this.ColumnLayouts = new ColumnLayoutPersistence(this.DispatcherQueue, preferences.ColumnLayout, preferences.SaveColumnLayout);
         this.ApplyListDensity();
         this.SuppressMenuChime();
         // VK_OEM_COMMA has no named VirtualKey member.
-        var settingsShortcut = new KeyboardAccelerator
-        {
-            Key = (VirtualKey)0xBC, Modifiers = VirtualKeyModifiers.Control
-        };
+        var settingsShortcut = new KeyboardAccelerator { Key = (VirtualKey)0xBC, Modifiers = VirtualKeyModifiers.Control };
         settingsShortcut.Invoked += this.Settings_Invoked;
         this.Shell.KeyboardAccelerators.Add(settingsShortcut);
         this.Shell.PreviewKeyDown += this.Shortcuts_KeyDown;
@@ -178,8 +175,7 @@ public sealed partial class MainWindow : Window
                 viewModel.IsDialogOpen
                     ? "Close the open dialog, then try again."
                     : "A new dialog can't be opened while the window is closing.", NoticeKind.Warning));
-        this.Shell.AddHandler(
-            UIElement.PointerReleasedEvent, new PointerEventHandler(this.Shell_PointerReleased), true);
+        this.Shell.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(this.Shell_PointerReleased), true);
         this.Shell.AddHandler(UIElement.DragOverEvent, new DragEventHandler(this.RegistryFile_DragOver), true);
         this.Shell.AddHandler(UIElement.DropEvent, new DragEventHandler(this.RegistryFile_Drop), true);
         this.ViewModel.Initialize(initialLocation);
@@ -212,8 +208,7 @@ public sealed partial class MainWindow : Window
                     preview.ApplyEditorFont(this.Settings.EditorFont);
                 }
             }
-            else if (property is not (nameof(SettingsViewModel.ColumnLayout)
-                     or nameof(SettingsViewModel.EditorLayoutIndex)))
+            else if (property is not (nameof(SettingsViewModel.ColumnLayout) or nameof(SettingsViewModel.EditorLayoutIndex)))
             {
                 this.ApplyViewSettings();
             }
@@ -238,10 +233,8 @@ public sealed partial class MainWindow : Window
             }
         };
         this.ViewModel.PropertyChanged += this.ShellStateChanged;
-        this.ViewModel.SettingsSectionRequested += shortcuts =>
-            ((SettingsPage)this.ActiveTabContent.Content).ShowShortcuts(shortcuts);
-        this.ViewModel.RegistryFileEditorSettingsRequested += () =>
-            ((SettingsPage)this.ActiveTabContent.Content).ShowRegistryFileEditor();
+        this.ViewModel.SettingsSectionRequested += shortcuts => ((SettingsPage)this.ActiveTabContent.Content).ShowShortcuts(shortcuts);
+        this.ViewModel.RegistryFileEditorSettingsRequested += () => ((SettingsPage)this.ActiveTabContent.Content).ShowRegistryFileEditor();
         this.ViewModel.TabClosed += this.ReleaseView;
         this.ViewModel.SearchFocusRequested += () => (this.SelectedTabContent as BrowserPage)?.FocusSearch();
         this.ViewModel.CloseRequested += this.RequestClose;
@@ -275,10 +268,6 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    internal NotificationSession Notifications { get; } = new(TimeSpan.FromSeconds(new UISettings().MessageDuration));
-
-    internal bool IsClosed { get; private set; }
-
     internal void CancelApplicationExport()
     {
         this.RegistryMenu.ExportAllCommand.Cancel();
@@ -305,11 +294,7 @@ public sealed partial class MainWindow : Window
         return count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void ShowApplicationNotice(
-        string title,
-        string message,
-        NoticeKind kind,
-        IReadOnlyList<NotificationAction>? actions = null)
+    private void ShowApplicationNotice(string title, string message, NoticeKind kind, IReadOnlyList<NotificationAction>? actions = null)
     {
         if (!this.IsClosed)
         {
@@ -345,8 +330,7 @@ public sealed partial class MainWindow : Window
         }
 
         this._startupError = null;
-        await this.Dialogs.ShowAsync(
-            new AppDialog("Startup notice", error, close: "OK", defaultButton: ContentDialogButton.Close));
+        await this.Dialogs.ShowAsync(new AppDialog("Startup notice", error, close: "OK", defaultButton: ContentDialogButton.Close));
     }
 
     private void TitleBarRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args)
@@ -370,8 +354,7 @@ public sealed partial class MainWindow : Window
 
         var scale = root.RasterizationScale;
         this.CaptionInset.Width = new GridLength(CaptionLayout.InsetWidth(this.AppWindow.TitleBar.RightInset, scale));
-        this.TabStripHeader.Margin = new Thickness(
-            CaptionLayout.InsetWidth(this.AppWindow.TitleBar.LeftInset, scale) + 8, 0, 4, 0);
+        this.TabStripHeader.Margin = new Thickness(CaptionLayout.InsetWidth(this.AppWindow.TitleBar.LeftInset, scale) + 8, 0, 4, 0);
     }
 
     private void SetWindowIconRegion(object? sender, object args)
@@ -409,8 +392,7 @@ public sealed partial class MainWindow : Window
 
     public void ApplyTheme(string theme)
     {
-        this.Shell.RequestedTheme
-            = Enum.TryParse<ElementTheme>(theme, out var selected) ? selected : ElementTheme.Default;
+        this.Shell.RequestedTheme = Enum.TryParse<ElementTheme>(theme, out var selected) ? selected : ElementTheme.Default;
         this.AppWindow.TitleBar.PreferredTheme = this.Shell.RequestedTheme switch
         {
             ElementTheme.Light => TitleBarTheme.Light,
@@ -444,8 +426,7 @@ public sealed partial class MainWindow : Window
 
     private void ApplyListDensity()
     {
-        Application.Current.Resources["ListRowPadding"] = new Thickness(
-            0, this.Settings.ListRowPadding, 0, this.Settings.ListRowPadding);
+        Application.Current.Resources["ListRowPadding"] = new Thickness(0, this.Settings.ListRowPadding, 0, this.Settings.ListRowPadding);
         Application.Current.Resources["ListRowMinHeight"] = 22d + 2 * this.Settings.ListRowPadding;
         foreach (var view in this._views.Values.Concat(this._toolPanels.Values.OfType<FrameworkElement>()))
         {
@@ -541,8 +522,7 @@ public sealed partial class MainWindow : Window
         {
             this.ShowTools(this.ViewModel.SelectedTool);
         }
-        else if (args.PropertyName is nameof(MainWindowViewModel.ActiveBottomTab)
-                 or nameof(MainWindowViewModel.IsBottomPaneOpen))
+        else if (args.PropertyName is nameof(MainWindowViewModel.ActiveBottomTab) or nameof(MainWindowViewModel.IsBottomPaneOpen))
         {
             this.ShowBottomContent();
         }
@@ -550,9 +530,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateTitle()
     {
-        var prefix = this.IsAdministrator && this.ViewModel.VisibleBrowser is not null
-            ? "Administrator: "
-            : string.Empty;
+        var prefix = this.IsAdministrator && this.ViewModel.VisibleBrowser is not null ? "Administrator: " : string.Empty;
         this.Title = $"{prefix}{this.ViewModel.ActiveTab?.Title} - Registry Editor";
     }
 
@@ -616,9 +594,12 @@ public sealed partial class MainWindow : Window
 
         // Resolve the character each time so layout switches and a shifted slash work.
         var slash = args.Key == VirtualKey.Divide ? (short)VirtualKey.Divide : VkKeyScan('/');
-        if (slash == -1 || args.Key != (VirtualKey)(slash & 0xFF) || Down(VirtualKey.Shift) != ((slash & 0x100) != 0) ||
-            Down(VirtualKey.Menu) != ((slash & 0x400) != 0) || Down(VirtualKey.LeftWindows) ||
-            Down(VirtualKey.RightWindows))
+        if (slash == -1
+            || args.Key != (VirtualKey)(slash & 0xFF)
+            || Down(VirtualKey.Shift) != ((slash & 0x100) != 0)
+            || Down(VirtualKey.Menu) != ((slash & 0x400) != 0)
+            || Down(VirtualKey.LeftWindows)
+            || Down(VirtualKey.RightWindows))
         {
             return;
         }
@@ -700,8 +681,7 @@ public sealed partial class MainWindow : Window
         }
 
         var tabs = this.ViewModel.BottomTabs;
-        this.ViewModel.ActiveBottomTab
-            = tabs[(tabs.IndexOf(this.ViewModel.ActiveBottomTab!) + offset + tabs.Count) % tabs.Count];
+        this.ViewModel.ActiveBottomTab = tabs[(tabs.IndexOf(this.ViewModel.ActiveBottomTab!) + offset + tabs.Count) % tabs.Count];
         return true;
     }
 }

@@ -32,14 +32,12 @@ internal static class NetworkRegistryNativeTests
                     check(
                         authenticatedLogon != originalLogon,
                         "Authentication uses a separate outbound logon after an asynchronous continuation");
-                    check(
-                        await Task.Run(CurrentLogon) == authenticatedLogon, "Authentication flows to a worker thread");
+                    check(await Task.Run(CurrentLogon) == authenticatedLogon, "Authentication flows to a worker thread");
                 });
         }
 
         check(
-            await Task.Run(() => RemoteRegistryCredentials.Run(computer.ToUpperInvariant(), CurrentLogon)) ==
-            authenticatedLogon,
+            await Task.Run(() => RemoteRegistryCredentials.Run(computer.ToUpperInvariant(), CurrentLogon)) == authenticatedLogon,
             "Later workers reuse the exact authenticated logon after the prompt token has been disposed");
         check(
             RemoteRegistryCredentials.Run(computer + "-other", CurrentLogon) == originalLogon,
@@ -53,9 +51,7 @@ internal static class NetworkRegistryNativeTests
                 computer, replacement, async () =>
                 {
                     var replacementLogon = CurrentLogon();
-                    check(
-                        replacementLogon != authenticatedLogon,
-                        "A reconnect probes new credentials before replacing the old token");
+                    check(replacementLogon != authenticatedLogon, "A reconnect probes new credentials before replacing the old token");
                     check(
                         await Task.Run(() => RemoteRegistryCredentials.Run(computer, CurrentLogon)) == replacementLogon,
                         "The old cached token cannot override a reconnect probe on another worker");
@@ -85,8 +81,7 @@ internal static class NetworkRegistryNativeTests
 
         check(CurrentLogon() == originalLogon, "All operations restore the caller's original identity");
 
-        using var operation
-            = RemoteRegistryCredentials.Retain(new string?[] { null, computer, computer.ToUpperInvariant() });
+        using var operation = RemoteRegistryCredentials.Retain(new string?[] { null, computer, computer.ToUpperInvariant() });
         connection.Dispose();
         check(
             RemoteRegistryCredentials.ConnectionCount(computer) == 1,
@@ -100,8 +95,8 @@ internal static class NetworkRegistryNativeTests
                 {
                     operation.Dispose();
                     return CurrentLogon();
-                }) == authenticatedLogon,
-            "An operation already using a token can finish safely after the last connection closes");
+                })
+            == authenticatedLogon, "An operation already using a token can finish safely after the last connection closes");
         check(
             RemoteRegistryCredentials.Run(computer, CurrentLogon) == originalLogon,
             "Closing the last connection forgets its authenticated token");
@@ -123,8 +118,7 @@ internal static class NetworkRegistryNativeTests
                 return Task.CompletedTask;
             });
         check(
-            replacementLogon != authenticatedLogon &&
-            RemoteRegistryCredentials.Run(computer, CurrentLogon) == replacementLogon,
+            replacementLogon != authenticatedLogon && RemoteRegistryCredentials.Run(computer, CurrentLogon) == replacementLogon,
             "Reconnecting after closing the last tab uses the replacement account's token");
     }
 

@@ -19,12 +19,10 @@ public sealed partial class CommandIcon : IconSourceElement
         new PropertyMetadata(default(Symbol), (d, _) => ((CommandIcon)d).UpdateSymbol()));
 
     public static readonly DependencyProperty GlyphProperty = DependencyProperty.Register(
-        nameof(Glyph), typeof(string), typeof(CommandIcon),
-        new PropertyMetadata(null, (d, _) => ((CommandIcon)d).UpdateGlyph()));
+        nameof(Glyph), typeof(string), typeof(CommandIcon), new PropertyMetadata(null, (d, _) => ((CommandIcon)d).UpdateGlyph()));
 
     public static readonly DependencyProperty AccentProperty = DependencyProperty.Register(
-        nameof(Accent), typeof(bool), typeof(CommandIcon),
-        new PropertyMetadata(true, (d, _) => ((CommandIcon)d).UpdateAppearance()));
+        nameof(Accent), typeof(bool), typeof(CommandIcon), new PropertyMetadata(true, (d, _) => ((CommandIcon)d).UpdateAppearance()));
 
     private static readonly AccessibilitySettings Accessibility = new();
 
@@ -33,12 +31,6 @@ public sealed partial class CommandIcon : IconSourceElement
 
     private Control? _host;
     private bool _isCompact;
-
-    public CommandIcon()
-    {
-        this.Loaded += (_, _) => this.Attach();
-        this.Unloaded += (_, _) => this.Detach();
-    }
 
     /// <summary>Symbol rendered with its current Segoe Fluent Icons glyph.</summary>
     public Symbol Symbol
@@ -73,6 +65,12 @@ public sealed partial class CommandIcon : IconSourceElement
                 this.UpdateAppearance();
             }
         }
+    }
+
+    public CommandIcon()
+    {
+        this.Loaded += (_, _) => this.Attach();
+        this.Unloaded += (_, _) => this.Detach();
     }
 
     internal void SetHost(Control host)

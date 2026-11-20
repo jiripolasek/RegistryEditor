@@ -25,18 +25,6 @@ public sealed record RegistryEntry(
 
     public bool IsDefaultPlaceholder { get => this._isDefaultPlaceholder; init => this._isDefaultPlaceholder = value; }
 
-    private RegistryEntry(RegistryEntry original)
-    {
-        // A with-copy can replace the value after this constructor, so its caches start empty.
-        this.Key = original.Key;
-        this.Value = original.Value;
-        this.IsDefaultPlaceholder = original.IsDefaultPlaceholder;
-        this.ParentLocation = original.ParentLocation;
-        this.ContainingKeyLastWriteUtc = original.ContainingKeyLastWriteUtc;
-        this.SourceLocation = original.SourceLocation;
-        this.Note = string.Empty;
-    }
-
     public bool IsParent => this.ParentLocation is not null;
 
     public bool IsKey => this.Key is not null;
@@ -63,10 +51,8 @@ public sealed record RegistryEntry(
     internal DateTimeOffset? LastWriteTimeUtc =>
         this.IsKey ? this.Details?.LastWriteTimeUtc : this.ContainingKeyLastWriteUtc;
 
-    public string LastWriteText => this.LastWriteTimeUtc?.ToLocalTime().ToString("G") ??
-                                   (this.IsParent || this.Key is { Machine: null } && !this.DetailsRead
-                                       ? string.Empty
-                                       : "Unavailable");
+    public string LastWriteText => this.LastWriteTimeUtc?.ToLocalTime().ToString("G")
+                                   ?? (this.IsParent || this.Key is { Machine: null } && !this.DetailsRead ? string.Empty : "Unavailable");
 
     public string LastWriteHelp => this.IsKey || this.IsParent
         ? this.LastWriteText
@@ -76,9 +62,8 @@ public sealed record RegistryEntry(
         ? $"{info.SubKeyCount:N0} {(info.SubKeyCount == 1 ? "key" : "keys")} · {info.ValueCount:N0} {(info.ValueCount == 1 ? "value" : "values")}"
         : this.Unavailable;
 
-    public string LinkTarget => this.Value?.Type == RegistryValueType.Link
-        ? this.DataPreview
-        : this.Details?.LinkTarget ?? this.Unavailable;
+    public string LinkTarget =>
+        this.Value?.Type == RegistryValueType.Link ? this.DataPreview : this.Details?.LinkTarget ?? this.Unavailable;
 
     public string SizeText => this.Value?.Data.Length.ToString("N0") ?? string.Empty;
 
@@ -88,12 +73,76 @@ public sealed record RegistryEntry(
 
     private string Unavailable => this.DetailsRead && this.Details is null ? "Unavailable" : string.Empty;
 
+    public string Name => this.IsParent ? ".." : this.Key?.Name ?? this.Value?.DisplayName ?? "(Default)";
+
+    public string Type => this.IsParent ? "Parent key" :
+        this.IsKey ? this.Key!.SubKey.Length == 0 ? "Hive" : "Key" : this.Value?.TypeName ?? "REG_SZ";
+
+    public string Data => this._data ??= this.IsParent ? this.ParentLocation!.Address :
+        this.IsKey ? string.Empty : this.Value?.DisplayData ?? "(value not set)";
+
+    public string NamePreview => this._namePreview ??= Shorten(this.Name);
+
+    public string DataPreview => this._dataPreview ??= this.IsParent ? Shorten(this.ParentLocation!.Address) :
+        this.IsKey ? string.Empty :
+        this.LinkLocation is { } target ? Shorten(RegistryLink.DisplayPath(target)).ReplaceLineEndings(" ") :
+        this.Value?.DisplayPreview ?? "(value not set)";
+
+    public bool HasNavigationIcon => this.IsKey || this.IsParent;
+
+    public bool HasStringIcon =>
+        !this.HasNavigationIcon
+        && (this.Value?.Type is RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.MultiString
+            || this.IsDefaultPlaceholder);
+
+    public bool HasLinkIcon => !this.HasNavigationIcon && this.IsLink;
+
+    public bool HasBinaryIcon =>
+        !this.HasNavigationIcon && !this.IsDefaultValue && this.Value?.Type == RegistryValueType.Binary;
+
+    public bool HasDataIcon =>
+        !this.HasNavigationIcon && !this.HasStringIcon && !this.HasLinkIcon && !this.HasBinaryIcon;
+
+    public string Glyph => this.IsParent ? "\uE0C3" :
+        this.IsKey ? "\uE8B7" :
+        this.IsLink ? "\uE71B" :
+        this.IsDefaultValue ? "\uE8EC" :
+        this.Value?.Type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord ? "\uE887" :
+        this.HasStringIcon ? "\uECE9" : "\uE943";
+
+    public string IconFontFamily =>
+        this.IsParent
+        || !this.IsDefaultValue
+        && (this.HasStringIcon
+            || this.Value?.Type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord)
+            ? "/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"
+            : "Segoe Fluent Icons, Segoe MDL2 Assets";
+
+    public string AccessibleName => this._accessibleName ??= this.IsDefaultValue
+        ? $"{this.NamePreview}, {this.Type}, {this.DataPreview}, unnamed default value"
+        : $"{this.NamePreview}, {this.Type}, {this.DataPreview}";
+
+    private RegistryEntry(RegistryEntry original)
+    {
+        // A with-copy can replace the value after this constructor, so its caches start empty.
+        this.Key = original.Key;
+        this.Value = original.Value;
+        this.IsDefaultPlaceholder = original.IsDefaultPlaceholder;
+        this.ParentLocation = original.ParentLocation;
+        this.ContainingKeyLastWriteUtc = original.ContainingKeyLastWriteUtc;
+        this.SourceLocation = original.SourceLocation;
+        this.Note = string.Empty;
+    }
+
+    // A live row keeps its identity as its data and presentation change.
+    public bool Equals(RegistryEntry? other)
+    {
+        return ReferenceEquals(this, other);
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    internal static RegistryEntry ForValue(
-        RegistryValue? value,
-        DateTimeOffset? containingKeyLastWriteUtc,
-        RegistryLocation sourceLocation)
+    internal static RegistryEntry ForValue(RegistryValue? value, DateTimeOffset? containingKeyLastWriteUtc, RegistryLocation sourceLocation)
     {
         return new RegistryEntry(null, value, value is null)
         {
@@ -142,72 +191,6 @@ public sealed record RegistryEntry(
         this._accessibleName = null;
         this._data = null;
         this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
-    }
-
-    public string Name => this.IsParent ? ".." : this.Key?.Name ?? this.Value?.DisplayName ?? "(Default)";
-
-    public string Type => this.IsParent ? "Parent key" :
-        this.IsKey ? this.Key!.SubKey.Length == 0 ? "Hive" : "Key" : this.Value?.TypeName ?? "REG_SZ";
-
-    public string Data => this._data ??= this.IsParent ? this.ParentLocation!.Address :
-        this.IsKey ? string.Empty : this.Value?.DisplayData ?? "(value not set)";
-
-    public string NamePreview => this._namePreview ??= Shorten(this.Name);
-
-    public string DataPreview => this._dataPreview ??= this.IsParent ? Shorten(this.ParentLocation!.Address) :
-        this.IsKey ? string.Empty :
-        this.LinkLocation is { } target ? Shorten(RegistryLink.DisplayPath(target)).ReplaceLineEndings(" ") :
-        this.Value?.DisplayPreview ?? "(value not set)";
-
-    public bool HasNavigationIcon => this.IsKey || this.IsParent;
-
-    public bool HasStringIcon =>
-        !this.HasNavigationIcon &&
-        (this.Value?.Type is RegistryValueType.String or RegistryValueType.ExpandString
-            or RegistryValueType.MultiString || this.IsDefaultPlaceholder);
-
-    public bool HasLinkIcon => !this.HasNavigationIcon && this.IsLink;
-
-    public bool HasBinaryIcon =>
-        !this.HasNavigationIcon && !this.IsDefaultValue && this.Value?.Type == RegistryValueType.Binary;
-
-    public bool HasDataIcon =>
-        !this.HasNavigationIcon && !this.HasStringIcon && !this.HasLinkIcon && !this.HasBinaryIcon;
-
-    public string Glyph => this.IsParent
-        ? "\uE0C3"
-        :
-        this.IsKey
-            ? "\uE8B7"
-            :
-            this.IsLink
-                ? "\uE71B"
-                :
-                this.IsDefaultValue
-                    ? "\uE8EC"
-                    :
-                    this.Value?.Type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian
-                        or RegistryValueType.QWord
-                        ?
-                        "\uE887"
-                        : this.HasStringIcon
-                            ? "\uECE9"
-                            : "\uE943";
-
-    public string IconFontFamily => this.IsParent || !this.IsDefaultValue &&
-        (this.HasStringIcon ||
-         this.Value?.Type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord)
-            ? "/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"
-            : "Segoe Fluent Icons, Segoe MDL2 Assets";
-
-    public string AccessibleName => this._accessibleName ??= this.IsDefaultValue
-        ? $"{this.NamePreview}, {this.Type}, {this.DataPreview}, unnamed default value"
-        : $"{this.NamePreview}, {this.Type}, {this.DataPreview}";
-
-    // A live row keeps its identity as its data and presentation change.
-    public bool Equals(RegistryEntry? other)
-    {
-        return ReferenceEquals(this, other);
     }
 
     public override int GetHashCode()

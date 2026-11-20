@@ -15,9 +15,11 @@ internal static class RegistryKeyboardShortcuts
 {
     internal static bool IsPlainControl(XamlRoot root)
     {
-        return (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0 &&
-               ((InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) |
-                 InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift)) & CoreVirtualKeyStates.Down) == 0 &&
-               FocusManager.GetFocusedElement(root) is not (TextBox or RichEditBox or PasswordBox);
+        return (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0
+               && ((InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu)
+                    | InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift))
+                   & CoreVirtualKeyStates.Down)
+               == 0
+               && FocusManager.GetFocusedElement(root) is not (TextBox or RichEditBox or PasswordBox);
     }
 }

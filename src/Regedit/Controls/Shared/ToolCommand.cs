@@ -22,13 +22,6 @@ public enum ToolCommandPlacement
 /// </summary>
 public sealed partial class ToolCommand : ObservableObject
 {
-    public ToolCommand(string label, Symbol symbol, ToolCommandPlacement placement = ToolCommandPlacement.Primary)
-    {
-        this.Label = label;
-        this.Symbol = symbol;
-        this.Placement = placement;
-    }
-
     [ObservableProperty]
     public partial Symbol Symbol { get; set; }
 
@@ -75,4 +68,11 @@ public sealed partial class ToolCommand : ObservableObject
 
     [ObservableProperty]
     public partial bool IsChecked { get; set; }
+
+    public ToolCommand(string label, Symbol symbol, ToolCommandPlacement placement = ToolCommandPlacement.Primary)
+    {
+        this.Label = label;
+        this.Symbol = symbol;
+        this.Placement = placement;
+    }
 }

@@ -17,10 +17,9 @@ public static class RegistrySearch
     {
         return value.Type switch
         {
-            RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.Link
-                or RegistryValueType.MultiString => Encoding.Unicode.GetString(value.Data).TrimEnd('\0'),
-            RegistryValueType.DWord or RegistryValueType.DWordBigEndian when value.Data.Length == 4 =>
-                value.DisplayData,
+            RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.Link or RegistryValueType.MultiString =>
+                Encoding.Unicode.GetString(value.Data).TrimEnd('\0'),
+            RegistryValueType.DWord or RegistryValueType.DWordBigEndian when value.Data.Length == 4 => value.DisplayData,
             RegistryValueType.QWord when value.Data.Length == 8 => value.DisplayData,
             _ => Convert.ToHexString(value.Data)
         };
@@ -55,12 +54,15 @@ public static class RegistrySearch
 
     public static void Validate(SavedSearch search)
     {
-        if (search is null || string.IsNullOrWhiteSpace(search.Name) || search.Roots is null ||
-            search.Roots.Length == 0 || search.Options is null || string.IsNullOrEmpty(search.Options.Text) ||
-            !(search.Options.Keys || search.Options.Values || search.Options.Data))
+        if (search is null
+            || string.IsNullOrWhiteSpace(search.Name)
+            || search.Roots is null
+            || search.Roots.Length == 0
+            || search.Options is null
+            || string.IsNullOrEmpty(search.Options.Text)
+            || !(search.Options.Keys || search.Options.Values || search.Options.Data))
         {
-            throw new ArgumentException(
-                "A saved search needs a name, search text, scope, and at least one search field.");
+            throw new ArgumentException("A saved search needs a name, search text, scope, and at least one search field.");
         }
 
         foreach (var root in search.Roots)
@@ -88,8 +90,7 @@ public static class RegistrySearch
 
         void Publish(bool final = false)
         {
-            if (progress is null || pending.Count == 0 ||
-                !final && pending.Count < 128 && published.ElapsedMilliseconds < 100)
+            if (progress is null || pending.Count == 0 || !final && pending.Count < 128 && published.ElapsedMilliseconds < 100)
             {
                 return;
             }
@@ -114,17 +115,14 @@ public static class RegistrySearch
 
         bool Matches(string text)
         {
-            return search.Options.Whole
-                ? text.Equals(search.Options.Text, comparison)
-                : text.Contains(search.Options.Text, comparison);
+            return search.Options.Whole ? text.Equals(search.Options.Text, comparison) : text.Contains(search.Options.Text, comparison);
         }
 
         string Excerpt(string text)
         {
             var start = Math.Max(0, text.IndexOf(search.Options.Text, comparison) - 60);
             var length = Math.Min(240, text.Length - start);
-            return (start > 0 ? "…" : string.Empty) + text.Substring(start, length) +
-                   (start + length < text.Length ? "…" : string.Empty);
+            return (start > 0 ? "…" : string.Empty) + text.Substring(start, length) + (start + length < text.Length ? "…" : string.Empty);
         }
 
         var stack = new Stack<RegistryLocation>(search.Roots.Reverse());
@@ -136,8 +134,7 @@ public static class RegistrySearch
             {
                 snapshot = registry.Read(location);
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException
-                                           or Win32Exception)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException or Win32Exception)
             {
                 skipped++;
                 continue;
@@ -178,8 +175,7 @@ public static class RegistrySearch
 
                 Add(
                     new RegistrySearchMatch(
-                        location, value.Name, value,
-                        nameMatch && dataMatch ? "Value name and data" : nameMatch ? "Value name" : "Data",
+                        location, value.Name, value, nameMatch && dataMatch ? "Value name and data" : nameMatch ? "Value name" : "Data",
                         Excerpt(dataMatch ? data : value.Name)));
             }
 

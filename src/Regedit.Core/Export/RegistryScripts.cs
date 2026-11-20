@@ -48,17 +48,14 @@ public static class RegistryScripts
                 script.AppendLine("    try {");
                 if (change.Kind == RegistryChangeKind.ValueRemoved)
                 {
-                    script.AppendLine(
-                        $"        if ($null -ne $key) {{ $key.DeleteValue({Quote(value!.Name)}, $false) }}");
+                    script.AppendLine($"        if ($null -ne $key) {{ $key.DeleteValue({Quote(value!.Name)}, $false) }}");
                 }
                 else if (change.After is { } after)
                 {
-                    script.AppendLine(
-                        $"        $bytes = [Convert]::FromBase64String('{Convert.ToBase64String(after.Data)}')");
+                    script.AppendLine($"        $bytes = [Convert]::FromBase64String('{Convert.ToBase64String(after.Data)}')");
                     script.AppendLine(
                         $"        $errorCode = [RegeditScript.Native]::Set($key.Handle, {Quote(after.Name)}, 0, [uint32]{(uint)after.Type}, $bytes, [uint32]$bytes.Length)");
-                    script.AppendLine(
-                        "        if ($errorCode -ne 0) { throw [System.ComponentModel.Win32Exception]::new($errorCode) }");
+                    script.AppendLine("        if ($errorCode -ne 0) { throw [System.ComponentModel.Win32Exception]::new($errorCode) }");
                 }
 
                 script.AppendLine("    } finally { if ($null -ne $key) { $key.Dispose() } }");
@@ -79,8 +76,7 @@ public static class RegistryScripts
         {
             var location = change.Location;
             var command = new StringBuilder("\"%SystemRoot%\\System32\\reg.exe\" ");
-            command.Append(
-                change.Kind is RegistryChangeKind.KeyRemoved or RegistryChangeKind.ValueRemoved ? "delete " : "add ");
+            command.Append(change.Kind is RegistryChangeKind.KeyRemoved or RegistryChangeKind.ValueRemoved ? "delete " : "add ");
             command.Append(BatchQuote(location.Address));
             var value = change.After ?? change.Before;
             if (value is not null)
@@ -98,14 +94,13 @@ public static class RegistryScripts
                         // reg.exe writes this numeric payload in host byte order despite the big-endian type.
                         data = "0x" + BinaryPrimitives.ReadUInt32LittleEndian(after.Data).ToString("X8");
                     }
-                    else if (after.Type is RegistryValueType.DWord or RegistryValueType.QWord &&
-                             RegistryValueInspector.Number(after) is { } number)
+                    else if (after.Type is RegistryValueType.DWord or RegistryValueType.QWord
+                             && RegistryValueInspector.Number(after) is { } number)
                     {
                         data = number.Hexadecimal;
                     }
-                    else if (after.Type is RegistryValueType.String or RegistryValueType.ExpandString
-                                 or RegistryValueType.MultiString && after.Data.AsSpan()
-                                 .SequenceEqual(RegistryValue.ParseData(after.Type, after.EditText(false))))
+                    else if (after.Type is RegistryValueType.String or RegistryValueType.ExpandString or RegistryValueType.MultiString
+                             && after.Data.AsSpan().SequenceEqual(RegistryValue.ParseData(after.Type, after.EditText(false))))
                     {
                         if (after.Type == RegistryValueType.MultiString)
                         {
@@ -115,8 +110,7 @@ public static class RegistryScripts
                                 throw Unsupported();
                             }
 
-                            var separator = "|;~#".FirstOrDefault(candidate =>
-                                parts.All(part => !part.Contains(candidate)));
+                            var separator = "|;~#".FirstOrDefault(candidate => parts.All(part => !part.Contains(candidate)));
                             if (separator == default)
                             {
                                 throw Unsupported();
@@ -182,29 +176,31 @@ public static class RegistryScripts
         }
 
         // A branch deletion already removes its selected descendant deletions.
-        return changes.Where((change, index) =>
-            change.Kind is not (RegistryChangeKind.KeyRemoved or RegistryChangeKind.ValueRemoved) || !changes
-                .Take(index).Any(parent => parent.Kind == RegistryChangeKind.KeyRemoved &&
-                                           SameBranch(change.Location, parent.Location) && !changes.Take(index)
-                                               .SkipWhile(item => item != parent).Skip(1).Any(item =>
-                                                   item.Kind is RegistryChangeKind.KeyAdded
-                                                       or RegistryChangeKind.ValueAdded
-                                                       or RegistryChangeKind.ValueChanged &&
-                                                   SameBranch(item.Location, parent.Location)))).ToArray();
+        return changes.Where((change, index) => change.Kind is not (RegistryChangeKind.KeyRemoved or RegistryChangeKind.ValueRemoved)
+                                                || !changes.Take(index).Any(parent =>
+                                                    parent.Kind == RegistryChangeKind.KeyRemoved
+                                                    && SameBranch(change.Location, parent.Location)
+                                                    && !changes.Take(index).SkipWhile(item => item != parent).Skip(1).Any(item =>
+                                                        item.Kind is RegistryChangeKind.KeyAdded or RegistryChangeKind.ValueAdded
+                                                            or RegistryChangeKind.ValueChanged
+                                                        && SameBranch(item.Location, parent.Location)))).ToArray();
     }
 
     private static bool SameBranch(RegistryLocation child, RegistryLocation parent)
     {
-        return child.Hive == parent.Hive && child.View == parent.View &&
-               string.Equals(child.Machine, parent.Machine, StringComparison.OrdinalIgnoreCase) &&
-               (child.SubKey.Equals(parent.SubKey, StringComparison.OrdinalIgnoreCase) || child.SubKey.StartsWith(
-                   parent.SubKey + "\\", StringComparison.OrdinalIgnoreCase));
+        return child.Hive == parent.Hive
+               && child.View == parent.View
+               && string.Equals(child.Machine, parent.Machine, StringComparison.OrdinalIgnoreCase)
+               && (child.SubKey.Equals(parent.SubKey, StringComparison.OrdinalIgnoreCase)
+                   || child.SubKey.StartsWith(parent.SubKey + "\\", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string Quote(string text)
     {
-        return "'" + text.Replace("'", "''").Replace("\u2018", "\u2018\u2018").Replace("\u2019", "\u2019\u2019")
-            .Replace("\u201a", "\u201a\u201a").Replace("\u201b", "\u201b\u201b") + "'";
+        return "'"
+               + text.Replace("'", "''").Replace("\u2018", "\u2018\u2018").Replace("\u2019", "\u2019\u2019")
+                   .Replace("\u201a", "\u201a\u201a").Replace("\u201b", "\u201b\u201b")
+               + "'";
     }
 
     private static string BatchQuote(string text)

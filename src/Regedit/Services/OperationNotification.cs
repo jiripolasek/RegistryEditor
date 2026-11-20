@@ -36,8 +36,7 @@ internal sealed class OperationNotification : IDisposable
     internal void Start(string title, string message)
     {
         this.Show(
-            StatusNotifications.Running(
-                StatusNotifications.Create(title, message, NoticeKind.Information, key: this._key), this._cancel),
+            StatusNotifications.Running(StatusNotifications.Create(title, message, NoticeKind.Information, key: this._key), this._cancel),
             true);
     }
 

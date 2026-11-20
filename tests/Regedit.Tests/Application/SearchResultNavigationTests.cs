@@ -34,14 +34,15 @@ internal static class SearchResultNavigationTests
         var first = Create("First");
         var second = Create("Second");
         var rows = new[] { "Alpha", "Beta", "Gamma" }.Select(name => new InvestigationRow(
-            new RegistrySearchMatch(
-                root, name, new RegistryValue(name, RegistryValueType.String, []), "Value name", "match"))).ToArray();
+            new RegistrySearchMatch(root, name, new RegistryValue(name, RegistryValueType.String, []), "Value name", "match"))).ToArray();
         first.Rows.ReplaceAll(rows);
         var revealed = new List<InvestigationRow>();
         first.ResultSelected += revealed.Add;
         check(
-            first.SelectNext()?.ValueName == "Alpha" && first.Selected is [var selected] && selected == rows[0] &&
-            revealed.SequenceEqual([rows[0]]), "F3 selects the first result and requests that its row be revealed");
+            first.SelectNext()?.ValueName == "Alpha"
+            && first.Selected is [var selected]
+            && selected == rows[0]
+            && revealed.SequenceEqual([rows[0]]), "F3 selects the first result and requests that its row be revealed");
         check(first.SelectNext()?.ValueName == "Beta", "F3 advances from the selected result");
         first.Selected = [rows[0], rows[1]];
         check(first.SelectNext()?.ValueName == "Gamma", "F3 advances after the last selected row");
@@ -50,8 +51,7 @@ internal static class SearchResultNavigationTests
             "F3 stops at the end without wrapping or clearing the result selection");
         first.Rows.Add(
             new InvestigationRow(
-                new RegistrySearchMatch(
-                    root, "Delta", new RegistryValue("Delta", RegistryValueType.String, []), "Value name", "match")));
+                new RegistrySearchMatch(root, "Delta", new RegistryValue("Delta", RegistryValueType.String, []), "Value name", "match")));
         check(first.SelectNext()?.ValueName == "Delta", "F3 can advance into results appended by an ongoing scan");
         first.Filter = "Beta";
         check(
@@ -65,8 +65,8 @@ internal static class SearchResultNavigationTests
         check(first.SelectNext() is null, "A closed result set cannot advance its selection");
 
         var shell = new MainWindowViewModel(
-            settings, store, registry, target => new BrowserViewModel(registry, target),
-            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
+            settings, store, registry, target => new BrowserViewModel(registry, target), NullLogger<MainWindowViewModel>.Instance,
+            NotesStoreTests.CreateStore(settings));
         try
         {
             var browser = shell.OpenBrowser(root);
@@ -98,8 +98,7 @@ internal static class SearchResultNavigationTests
             shell.CloseTab(active);
             await shell.FindNextResultCommand.ExecuteAsync(null);
             check(
-                browser.Browser.Status.StartsWith("Find: Second"),
-                "Closing the active result set makes F3 follow a remaining result set");
+                browser.Browser.Status.StartsWith("Find: Second"), "Closing the active result set makes F3 follow a remaining result set");
             shell.CloseBottomTab(second);
             await shell.FindNextResultCommand.ExecuteAsync(null);
             check(focusRequests == 2, "Closing the final result set makes F3 request search focus");
@@ -125,8 +124,8 @@ internal static class SearchResultNavigationTests
         var settings = new AppSettings();
         var store = new InvestigationStore(settings, () => { });
         var shell = new MainWindowViewModel(
-            settings, store, registry, target => new BrowserViewModel(registry, target),
-            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
+            settings, store, registry, target => new BrowserViewModel(registry, target), NullLogger<MainWindowViewModel>.Instance,
+            NotesStoreTests.CreateStore(settings));
         try
         {
             var original = shell.OpenBrowser(root.Parent!);
@@ -136,8 +135,8 @@ internal static class SearchResultNavigationTests
             var unnamed = new RegistrySearchMatch(
                 root, string.Empty, new RegistryValue(string.Empty, RegistryValueType.Binary, [1]), "Data", "one");
             var named = new RegistrySearchMatch(
-                root with { View = RegistryView.Registry32 }, "Named",
-                new RegistryValue("Named", RegistryValueType.Binary, [2]), "Data", "two");
+                root with { View = RegistryView.Registry32 }, "Named", new RegistryValue("Named", RegistryValueType.Binary, [2]), "Data",
+                "two");
             source.Rows.ReplaceAll([new InvestigationRow(unnamed), new InvestigationRow(named)]);
             shell.SelectBottomTab(source);
             shell.IsBottomPaneOpen = false;
@@ -147,9 +146,12 @@ internal static class SearchResultNavigationTests
             original.Browser.ValueSelectionRequested += originalValues.Add;
             await shell.FindNextResultCommand.ExecuteAsync(null);
             check(
-                shell.ActiveTab == original && original.Browser.Location == root && originalValues is [""] &&
-                source.Selected.Single() == source.Rows[0] && !shell.IsBottomPaneOpen && notices == 0,
-                "F3 navigates the current browser to the exact unnamed value and updates selection with the panel hidden");
+                shell.ActiveTab == original
+                && original.Browser.Location == root
+                && originalValues is [""]
+                && source.Selected.Single() == source.Rows[0]
+                && !shell.IsBottomPaneOpen
+                && notices == 0, "F3 navigates the current browser to the exact unnamed value and updates selection with the panel hidden");
             var other = shell.OpenBrowser(root.Parent!);
             var otherValues = new List<string>();
             other.Browser.ValueSelectionRequested += otherValues.Add;
@@ -157,14 +159,18 @@ internal static class SearchResultNavigationTests
             var tabCount = shell.Tabs.Count;
             await shell.FindNextResultCommand.ExecuteAsync(null);
             check(
-                shell.ActiveTab == other && shell.Tabs.Count == tabCount && other.Browser.Location == named.Location &&
-                otherValues is ["Named"] && source.Selected.Single() == source.Rows[1] && !shell.IsBottomPaneOpen &&
-                other.Browser.Status == "Find: match · 2/2" && notices == 0,
+                shell.ActiveTab == other
+                && shell.Tabs.Count == tabCount
+                && other.Browser.Location == named.Location
+                && otherValues is ["Named"]
+                && source.Selected.Single() == source.Rows[1]
+                && !shell.IsBottomPaneOpen
+                && other.Browser.Status == "Find: match · 2/2"
+                && notices == 0,
                 "A new browser tab continues the active result set in its original registry view without opening another tab");
             await shell.FindNextResultCommand.ExecuteAsync(null);
             check(
-                otherValues.Count == 1 && other.Browser.Status.EndsWith("No more results.") &&
-                !shell.IsBottomPaneOpen && notices == 0,
+                otherValues.Count == 1 && other.Browser.Status.EndsWith("No more results.") && !shell.IsBottomPaneOpen && notices == 0,
                 "F3 at the end keeps the browser and selection stable and reports completion only in status");
             shell.SelectBottomTab(source);
             source.Selected = [];

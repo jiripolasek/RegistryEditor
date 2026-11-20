@@ -26,8 +26,10 @@ internal sealed partial class TokenPrivilege : IDisposable
 
             var requested = new TokenPrivileges { Count = 1, Luid = luid, Attributes = 2 };
             this._changed = AdjustTokenPrivileges(
-                this._identity.AccessToken, 0, ref requested, (uint)Marshal.SizeOf<TokenPrivileges>(),
-                out this._previous, out _) != 0 && Marshal.GetLastPInvokeError() == 0;
+                                this._identity.AccessToken, 0, ref requested, (uint)Marshal.SizeOf<TokenPrivileges>(), out this._previous,
+                                out _)
+                            != 0
+                            && Marshal.GetLastPInvokeError() == 0;
         }
         catch (System.Security.SecurityException)
         {
@@ -41,13 +43,23 @@ internal sealed partial class TokenPrivilege : IDisposable
     {
         if (this._changed && this._identity is not null)
         {
-            AdjustTokenPrivileges(
-                this._identity.AccessToken, 0, ref this._previous, (uint)Marshal.SizeOf<TokenPrivileges>(), out _,
-                out _);
+            AdjustTokenPrivileges(this._identity.AccessToken, 0, ref this._previous, (uint)Marshal.SizeOf<TokenPrivileges>(), out _, out _);
         }
 
         this._identity?.Dispose();
     }
+
+    [LibraryImport("advapi32.dll", EntryPoint = "LookupPrivilegeValueW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    private static partial int LookupPrivilegeValue(string? system, string name, out Luid luid);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    private static partial int AdjustTokenPrivileges(
+        SafeAccessTokenHandle token,
+        int disableAll,
+        ref TokenPrivileges state,
+        uint length,
+        out TokenPrivileges previous,
+        out uint returnedLength);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Luid
@@ -63,18 +75,4 @@ internal sealed partial class TokenPrivilege : IDisposable
         public Luid Luid;
         public uint Attributes;
     }
-
-    [LibraryImport(
-        "advapi32.dll", EntryPoint = "LookupPrivilegeValueW", StringMarshalling = StringMarshalling.Utf16,
-        SetLastError = true)]
-    private static partial int LookupPrivilegeValue(string? system, string name, out Luid luid);
-
-    [LibraryImport("advapi32.dll", SetLastError = true)]
-    private static partial int AdjustTokenPrivileges(
-        SafeAccessTokenHandle token,
-        int disableAll,
-        ref TokenPrivileges state,
-        uint length,
-        out TokenPrivileges previous,
-        out uint returnedLength);
 }

@@ -20,9 +20,15 @@ public sealed partial class PanelCommandStrip : StackPanel
     private readonly List<(ToolCommand Command, ButtonBase Button, PropertyChangedEventHandler Handler)> _bound = [];
     private readonly List<ToolCommand> _overflow = [];
     private readonly List<ToolCommand> _dynamicOverflow = [];
-    private int _maxPrimaryCommands = int.MaxValue;
     private readonly Button _more;
     private readonly MenuFlyout _moreMenu = new() { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
+    private int _maxPrimaryCommands = int.MaxValue;
+
+    /// <summary>Style for command buttons and the overflow button.</summary>
+    public Style? ButtonStyle { get; set; }
+
+    /// <summary>Style for toggle commands.</summary>
+    public Style? ToggleButtonStyle { get; set; }
 
     public PanelCommandStrip()
     {
@@ -34,12 +40,6 @@ public sealed partial class PanelCommandStrip : StackPanel
         ToolTipService.SetToolTip(this._more, "More options");
         this._moreMenu.Opening += (_, _) => this.FillOverflowMenu();
     }
-
-    /// <summary>Style for command buttons and the overflow button.</summary>
-    public Style? ButtonStyle { get; set; }
-
-    /// <summary>Style for toggle commands.</summary>
-    public Style? ToggleButtonStyle { get; set; }
 
     internal void SetMaxPrimaryCommands(int count)
     {
@@ -96,9 +96,7 @@ public sealed partial class PanelCommandStrip : StackPanel
             }
         }
 
-        this._more.Visibility = this._overflow.Count > 0 || this._dynamicOverflow.Count > 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        this._more.Visibility = this._overflow.Count > 0 || this._dynamicOverflow.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private ButtonBase CreateButton(ToolCommand command)
@@ -155,10 +153,7 @@ public sealed partial class PanelCommandStrip : StackPanel
         AutomationProperties.SetName(button, command.AutomationName ?? command.Label);
         AutomationProperties.SetHelpText(button, command.ToolTip ?? string.Empty);
         ToolTipService.SetToolTip(
-            button,
-            command.ToolTip is { } help && help != command.Label
-                ? command.Label + Environment.NewLine + help
-                : command.Label);
+            button, command.ToolTip is { } help && help != command.Label ? command.Label + Environment.NewLine + help : command.Label);
         button.Visibility = command.IsVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -167,9 +162,7 @@ public sealed partial class PanelCommandStrip : StackPanel
         this._moreMenu.Items.Clear();
         foreach (var command in this._dynamicOverflow.Concat(this._overflow).Where(command => command.IsVisible))
         {
-            MenuFlyoutItem item = command.IsToggle
-                ? new ToggleMenuFlyoutItem { IsChecked = command.IsChecked }
-                : new MenuFlyoutItem();
+            MenuFlyoutItem item = command.IsToggle ? new ToggleMenuFlyoutItem { IsChecked = command.IsChecked } : new MenuFlyoutItem();
             item.Text = command.Label;
             item.KeyboardAcceleratorTextOverride = command.ShortcutText ?? string.Empty;
             item.Icon = command.IconSource is { } source

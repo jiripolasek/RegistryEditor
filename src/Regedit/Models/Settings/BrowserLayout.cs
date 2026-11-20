@@ -55,8 +55,7 @@ public sealed record BrowserLayout(
             RegistrySortColumn.Data => this with { DataWidth = width },
             _ => this with
             {
-                ExtraColumnWidths
-                = new Dictionary<string, double>(this.ExtraColumnWidths ?? []) { [column.ToString()] = width }
+                ExtraColumnWidths = new Dictionary<string, double>(this.ExtraColumnWidths ?? []) { [column.ToString()] = width }
             }
         };
     }

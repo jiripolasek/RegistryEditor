@@ -14,6 +14,8 @@ internal sealed partial class SavedSearchesViewModel : InvestigationViewModel
     private readonly InvestigationStore _store;
     private readonly Action<SavedSearch> _run;
 
+    internal override IRelayCommand ActivateCommand => this.RunCommand;
+
     internal SavedSearchesViewModel(InvestigationStore store, Action<SavedSearch> run)
         : base(
             "Saved searches", "Select a search to run it in a new results tab or remove it.", "No saved searches",
@@ -25,14 +27,12 @@ internal sealed partial class SavedSearchesViewModel : InvestigationViewModel
         store.SearchesChanged += this.Refresh;
     }
 
-    internal override IRelayCommand ActivateCommand => this.RunCommand;
-
     private void Refresh()
     {
         this.ReplaceNamedRows(
             this._store.Searches.Select(search => new InvestigationRow(
-                "Saved search", search.Name, string.Join(", ", search.Roots.Select(root => root.Address)),
-                search.Options.Text, string.Empty, search.Options.Text, search)));
+                "Saved search", search.Name, string.Join(", ", search.Roots.Select(root => root.Address)), search.Options.Text,
+                string.Empty, search.Options.Text, search)));
     }
 
     protected override void SelectionChanged()

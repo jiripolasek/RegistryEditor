@@ -32,36 +32,30 @@ internal static class RegistryLinkTests
         check(
             target == RegistryLocation.Parse(@"HKCU\Software\LinkTarget", RegistryView.Registry32),
             "Native links to the current user resolve to HKCU and preserve the source registry view");
-        check(
-            RegistryLink.DisplayPath(target) == @"HKCU\Software\LinkTarget",
-            "Link target paths use familiar hive aliases");
+        check(RegistryLink.DisplayPath(target) == @"HKCU\Software\LinkTarget", "Link target paths use familiar hive aliases");
         var remote = source with { Hive = RegistryHive.Users, Machine = "server" };
         var remoteTarget = RegistryLink.Resolve(value, remote)!;
         check(
-            remoteTarget == new RegistryLocation(
-                RegistryHive.Users, sid + @"\Software\LinkTarget", "server", source.View) &&
-            RegistryLink.DisplayPath(remoteTarget) == $@"\\server\HKU\{sid}\Software\LinkTarget",
+            remoteTarget == new RegistryLocation(RegistryHive.Users, sid + @"\Software\LinkTarget", "server", source.View)
+            && RegistryLink.DisplayPath(remoteTarget) == $@"\\server\HKU\{sid}\Software\LinkTarget",
             "Remote user targets stay on their source computer and never map to local HKCU");
-        var searchRow = new InvestigationRow(
-            new RegistrySearchMatch(remote, value.Name, value, "Data", value.DisplayData));
+        var searchRow = new InvestigationRow(new RegistrySearchMatch(remote, value.Name, value, "Data", value.DisplayData));
         check(
-            searchRow.MatchEntry?.DataPreview == $@"\\server\HKU\{sid}\Software\LinkTarget" &&
-            searchRow.MatchEntry.LinkLocation == remoteTarget,
+            searchRow.MatchEntry?.DataPreview == $@"\\server\HKU\{sid}\Software\LinkTarget"
+            && searchRow.MatchEntry.LinkLocation == remoteTarget,
             "Search-row link previews retain the match's remote machine, user hive, SID and registry view");
         check(
-            RegistryLink.Resolve(Link(@"\rEgIsTrY\mAcHiNe\Software\Target"), remote) == new RegistryLocation(
-                RegistryHive.LocalMachine, @"Software\Target", "server", source.View),
+            RegistryLink.Resolve(Link(@"\rEgIsTrY\mAcHiNe\Software\Target"), remote)
+            == new RegistryLocation(RegistryHive.LocalMachine, @"Software\Target", "server", source.View),
             "Machine link paths resolve case-insensitively and retain the source computer");
         check(
             RegistryLink.Resolve(Link(@"\Registry\User\OtherHive\Key "), source)?.SubKey == @"OtherHive\Key ",
             "Other user hives and significant trailing key whitespace are preserved");
         check(
-            RegistryLink.Resolve(Link($@"\Registry\User\{sid}"), source)?.Hive == RegistryHive.CurrentUser &&
-            RegistryLink.Resolve(Link(@"\Registry\Machine"), source)?.SubKey == string.Empty,
-            "Links can target hive roots");
+            RegistryLink.Resolve(Link($@"\Registry\User\{sid}"), source)?.Hive == RegistryHive.CurrentUser
+            && RegistryLink.Resolve(Link(@"\Registry\Machine"), source)?.SubKey == string.Empty, "Links can target hive roots");
         check(
-            RegistryLink.Resolve(Link(value.DisplayData + '\0'), source) == target,
-            "A stored terminating null does not change the target");
+            RegistryLink.Resolve(Link(value.DisplayData + '\0'), source) == target, "A stored terminating null does not change the target");
         foreach (var invalid in new[]
                  {
                      Link(string.Empty), Link(@"HKCU\Software"), Link(@"\Registry\Machinery\Software"),
@@ -72,21 +66,25 @@ internal static class RegistryLinkTests
                      value with { Type = RegistryValueType.String }
                  })
         {
-            check(
-                RegistryLink.Resolve(invalid, source) is null,
-                "Malformed or non-link data does not offer navigation: " + invalid.Name);
+            check(RegistryLink.Resolve(invalid, source) is null, "Malformed or non-link data does not offer navigation: " + invalid.Name);
         }
 
         var row = RegistryEntry.ForValue(value, null, source);
         check(
-            row.DataPreview == @"HKCU\Software\LinkTarget" && row.LinkTarget == row.DataPreview &&
-            row.Data == value.DisplayData && row.Value == value && row.Type == "REG_LINK" && row.Glyph == "\uE71B",
+            row.DataPreview == @"HKCU\Software\LinkTarget"
+            && row.LinkTarget == row.DataPreview
+            && row.Data == value.DisplayData
+            && row.Value == value
+            && row.Type == "REG_LINK"
+            && row.Glyph == "\uE71B",
             "A link row displays its readable target while retaining the original stored type, data and identity");
         var inspector = new ValueInspectorViewModel(row);
         check(
-            inspector.LinkTargetPath == row.DataPreview && inspector.Data == row.Data &&
-            inspector.Bytes.SequenceEqual(value.Data) && inspector.IsLink && inspector.HasText,
-            "Link inspection presents the readable target alongside its original text and raw bytes");
+            inspector.LinkTargetPath == row.DataPreview
+            && inspector.Data == row.Data
+            && inspector.Bytes.SequenceEqual(value.Data)
+            && inspector.IsLink
+            && inspector.HasText, "Link inspection presents the readable target alongside its original text and raw bytes");
         var invalidInspector = new ValueInspectorViewModel(Link("invalid"));
         await invalidInspector.LoadTargetStatusAsync(new RegistryService());
         check(
@@ -115,12 +113,13 @@ internal static class RegistryLinkTests
         await browser.EditValueCommand.ExecuteAsync(null);
         await browser.DeleteCommand.ExecuteAsync(null);
         check(
-            prompts is [RegistryValueEditorViewModel edit, RegistryDeletePrompt delete] && edit.Value == value &&
-            delete.Items is [StoredRegistryItem.Value stored] && stored.Parent == source && stored.Original == value,
-            "Edit and delete prompts retain the original REG_LINK value and containing key");
+            prompts is [RegistryValueEditorViewModel edit, RegistryDeletePrompt delete]
+            && edit.Value == value
+            && delete.Items is [StoredRegistryItem.Value stored]
+            && stored.Parent == source
+            && stored.Original == value, "Edit and delete prompts retain the original REG_LINK value and containing key");
         browser.SetSelection([row, new RegistryEntry(null, value with { Name = "Other" })]);
-        check(
-            !browser.OpenLinkTargetCommand.CanExecute(null), "Multiple selection cannot open an ambiguous link target");
+        check(!browser.OpenLinkTargetCommand.CanExecute(null), "Multiple selection cannot open an ambiguous link target");
         browser.SetSelection([new RegistryEntry(null, Link("invalid"))]);
         check(!browser.OpenLinkTargetCommand.CanExecute(null), "Malformed link paths disable Open target");
         browser.CancelPending();
@@ -147,8 +146,7 @@ internal static class RegistryLinkTests
             var available = new ValueInspectorViewModel(liveRow);
             await available.LoadTargetStatusAsync(registry);
             check(available.TargetStatus == "Available", "Inspector reports an available link target");
-            var missing = new ValueInspectorViewModel(
-                RegistryEntry.ForValue(Link(liveLink.DisplayData + @"\Missing"), null, owner));
+            var missing = new ValueInspectorViewModel(RegistryEntry.ForValue(Link(liveLink.DisplayData + @"\Missing"), null, owner));
             await missing.LoadTargetStatusAsync(registry);
             check(missing.TargetStatus == "Missing", "Inspector distinguishes a missing target");
 
@@ -158,21 +156,17 @@ internal static class RegistryLinkTests
             {
                 var original = permissions.GetAccessControl(AccessControlSections.Access);
                 var denied = permissions.GetAccessControl(AccessControlSections.Access);
-                denied.AddAccessRule(
-                    new RegistryAccessRule(identity.User!, RegistryRights.QueryValues, AccessControlType.Deny));
+                denied.AddAccessRule(new RegistryAccessRule(identity.User!, RegistryRights.QueryValues, AccessControlType.Deny));
                 permissions.SetAccessControl(denied);
                 try
                 {
                     var inaccessible = new ValueInspectorViewModel(liveRow);
                     await inaccessible.LoadTargetStatusAsync(registry);
-                    check(
-                        inaccessible.TargetStatus == "Inaccessible",
-                        "Inspector distinguishes a target with denied read access");
+                    check(inaccessible.TargetStatus == "Inaccessible", "Inspector distinguishes a target with denied read access");
                 }
                 finally
                 {
-                    original.SetSecurityDescriptorBinaryForm(
-                        original.GetSecurityDescriptorBinaryForm(), AccessControlSections.Access);
+                    original.SetSecurityDescriptorBinaryForm(original.GetSecurityDescriptorBinaryForm(), AccessControlSections.Access);
                     permissions.SetAccessControl(original);
                 }
             }
@@ -187,11 +181,11 @@ internal static class RegistryLinkTests
             await capturedInspector.OpenTargetCommand!.ExecuteAsync(null);
             check(liveBrowser.Error is null, "Opening the inspector target succeeds: " + liveBrowser.Error);
             check(
-                liveBrowser.Location == destination &&
-                liveBrowser.Entries.Any(entry => entry.Value?.SameData(sentinel) == true),
-                "Inspector Open target retains its captured target after selection changes and displays target values: " +
-                liveBrowser.Location.Address + " / " + string.Join(
-                    ", ", liveBrowser.Entries.Select(entry => entry.Name)));
+                liveBrowser.Location == destination && liveBrowser.Entries.Any(entry => entry.Value?.SameData(sentinel) == true),
+                "Inspector Open target retains its captured target after selection changes and displays target values: "
+                + liveBrowser.Location.Address
+                + " / "
+                + string.Join(", ", liveBrowser.Entries.Select(entry => entry.Name)));
             await liveBrowser.NavigateAsync(owner);
             liveBrowser.SetSelection([liveBrowser.Entries.Single(entry => entry.Value?.Name == liveLink.Name)]);
             await liveBrowser.OpenLinkTargetCommand.ExecuteAsync(null);
@@ -201,13 +195,11 @@ internal static class RegistryLinkTests
             liveBrowser.EditPromptRequested += prompt => Task.FromResult(true);
             await liveBrowser.EditValueCommand.ExecuteAsync(null);
             check(
-                registry.Read(owner).Values.Single().SameData(liveLink) &&
-                registry.Read(destination).Values.Single().SameData(sentinel),
+                registry.Read(owner).Values.Single().SameData(liveLink) && registry.Read(destination).Values.Single().SameData(sentinel),
                 "Confirming a link edit preserves its REG_LINK bytes and leaves the target value unchanged");
             await liveBrowser.DeleteCommand.ExecuteAsync(null);
             check(
-                registry.Read(owner).Values.Length == 0 &&
-                registry.Read(destination).Values.Single().SameData(sentinel),
+                registry.Read(owner).Values.Length == 0 && registry.Read(destination).Values.Single().SameData(sentinel),
                 "Deleting the original link value leaves its target key and values intact");
             liveBrowser.CancelPending();
         }

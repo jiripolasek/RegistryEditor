@@ -60,14 +60,11 @@ internal static class JumpListServiceTests
             {
                 // Keep the calling thread occupied so a synchronous backend cannot hide behind an async continuation.
                 check(
-                    entered.Task.Wait(TimeSpan.FromSeconds(10)) && backendThread != callerThread &&
-                    !firstUpdate.IsCompleted,
+                    entered.Task.Wait(TimeSpan.FromSeconds(10)) && backendThread != callerThread && !firstUpdate.IsCompleted,
                     "Jump List work runs off the caller thread and UpdateAsync returns while the backend is busy");
                 secondUpdate = second.UpdateAsync();
                 await Task.Delay(100);
-                check(
-                    reads == 1 && calls == 1,
-                    "Another coordinator waits before reading settings or invoking the backend");
+                check(reads == 1 && calls == 1, "Another coordinator waits before reading settings or invoking the backend");
             }
             finally
             {
@@ -76,8 +73,7 @@ internal static class JumpListServiceTests
             }
 
             check(
-                persistedBeforePublish && secondEntries is not null &&
-                secondEntries.All(entry => entry.FavoriteId is null),
+                persistedBeforePublish && secondEntries is not null && secondEntries.All(entry => entry.FavoriteId is null),
                 "Removals persist before publication and a waiting coordinator reloads them before rebuilding");
 
             await CheckOtherProcessAsync(file, check);
@@ -150,15 +146,11 @@ internal static class JumpListServiceTests
                 }), file, NullLogger<JumpListService>.Instance);
             update = service.UpdateAsync();
             await Task.Delay(100);
-            check(
-                reads == 0 && !called,
-                "An external process's lease also prevents stale settings reads and publication");
+            check(reads == 0 && !called, "An external process's lease also prevents stale settings reads and publication");
             await process.StandardInput.WriteLineAsync("release");
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
             await update.WaitAsync(TimeSpan.FromSeconds(10));
-            check(
-                process.ExitCode == 0 && reads == 1 && called,
-                "Updating resumes after the other process releases its lease");
+            check(process.ExitCode == 0 && reads == 1 && called, "Updating resumes after the other process releases its lease");
         }
         finally
         {
@@ -183,8 +175,7 @@ internal static class JumpListServiceTests
     }
 }
 
-internal sealed class TestJumpListBackend(Func<JumpListEntry[], Action<IReadOnlySet<string>>, Task> update)
-    : IJumpListBackend
+internal sealed class TestJumpListBackend(Func<JumpListEntry[], Action<IReadOnlySet<string>>, Task> update) : IJumpListBackend
 {
     public Task UpdateAsync(JumpListEntry[] entries, Action<IReadOnlySet<string>> saveRemovedArguments)
     {

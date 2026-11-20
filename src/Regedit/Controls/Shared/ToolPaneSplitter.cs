@@ -20,6 +20,10 @@ public sealed partial class ToolPaneSplitter : UserControl
     private double? _width, _height;
     private bool _beside;
 
+    private double Maximum => this._beside
+        ? Math.Max(220, (this._availableWidth?.Invoke() ?? 0) - 200)
+        : Math.Max(100, ((this.Parent as FrameworkElement)?.ActualHeight ?? 0) - 120);
+
     public ToolPaneSplitter()
     {
         this.Content = this._thumb;
@@ -73,10 +77,6 @@ public sealed partial class ToolPaneSplitter : UserControl
             row.Height = new GridLength(PaneResize.Apply(height, 0, 100, this.Maximum));
         }
     }
-
-    private double Maximum => this._beside
-        ? Math.Max(220, (this._availableWidth?.Invoke() ?? 0) - 200)
-        : Math.Max(100, ((this.Parent as FrameworkElement)?.ActualHeight ?? 0) - 120);
 
     private void Resize(double delta)
     {

@@ -35,6 +35,62 @@ internal sealed class RegistryDialogs(MainWindow window) : IRegistryBranchDialog
         return (await picker.PickSaveFileAsync())?.Path;
     }
 
+    public Task<bool> RequestComputerNameAsync(Func<string, Task> connect)
+    {
+        var form = new NameForm(
+            "Computer name", placeholder: "SERVER01",
+            hint:
+            "Uses your Windows credentials first. If sign-in fails or access is denied, Windows asks you to sign in with another account. The remote computer must allow Remote Registry connections.");
+        return this.ShowFormAsync(
+            "Connect network registry", form, "Connect", () =>
+            {
+                var computer = form.Value;
+                return NetworkRegistryConnection.ConnectAsync(window.Handle, computer, () => connect(computer));
+            }, "Connect network registry", ContentDialogButton.Close, form.Input);
+    }
+
+    public Task<bool> ConfirmAsync(string title, string message, string accept)
+    {
+        return this.ShowFormAsync(title, message, accept, () => Task.CompletedTask, defaultButton: ContentDialogButton.Close);
+    }
+
+    public async Task<string?> RequestMountNameAsync(string file, string previous, string? error)
+    {
+        var form = new NameForm("Mount key name", previous, file);
+        var dialog = new AppDialog("Load hive", form, "Load", defaultButton: ContentDialogButton.Close);
+        dialog.FocusOnOpen(form.Input);
+        if (error is not null)
+        {
+            dialog.ShowError(error);
+        }
+
+        return await window.Dialogs.ShowAsync(dialog) == ContentDialogResult.Primary ? form.Value : null;
+    }
+
+    public async Task<ReportRange?> ChoosePrintRangeAsync(RegistryLocation location)
+    {
+        if (!PrintManager.IsSupported())
+        {
+            throw new InvalidOperationException("Printing is not available on this computer.");
+        }
+
+        var form = new PrintRangeForm(location.IsComputer);
+        return await this.ShowFormAsync(
+            "Print registry", form, "Preview", () => Task.CompletedTask, initialFocus: location.IsComputer ? null : form.Input)
+            ? form.Range
+            : null;
+    }
+
+    public Task PreviewReportAsync(string title, string report, CancellationToken token)
+    {
+        return new RegistryPrintDocument(title, report).ShowAsync(window.Handle, token);
+    }
+
+    public void ShowPermissions(RegistryLocation target)
+    {
+        SecurityEditor.Show(window.Handle, target, window.Journal);
+    }
+
     internal async Task<bool> ShowFormAsync(
         string title,
         object content,
@@ -75,63 +131,5 @@ internal sealed class RegistryDialogs(MainWindow window) : IRegistryBranchDialog
             }
         };
         return await window.Dialogs.ShowAsync(dialog) == ContentDialogResult.Primary;
-    }
-
-    public Task<bool> RequestComputerNameAsync(Func<string, Task> connect)
-    {
-        var form = new NameForm(
-            "Computer name", placeholder: "SERVER01",
-            hint:
-            "Uses your Windows credentials first. If sign-in fails or access is denied, Windows asks you to sign in with another account. The remote computer must allow Remote Registry connections.");
-        return this.ShowFormAsync(
-            "Connect network registry", form, "Connect", () =>
-            {
-                var computer = form.Value;
-                return NetworkRegistryConnection.ConnectAsync(window.Handle, computer, () => connect(computer));
-            }, "Connect network registry", ContentDialogButton.Close, form.Input);
-    }
-
-    public Task<bool> ConfirmAsync(string title, string message, string accept)
-    {
-        return this.ShowFormAsync(
-            title, message, accept, () => Task.CompletedTask, defaultButton: ContentDialogButton.Close);
-    }
-
-    public async Task<string?> RequestMountNameAsync(string file, string previous, string? error)
-    {
-        var form = new NameForm("Mount key name", previous, file);
-        var dialog = new AppDialog("Load hive", form, "Load", defaultButton: ContentDialogButton.Close);
-        dialog.FocusOnOpen(form.Input);
-        if (error is not null)
-        {
-            dialog.ShowError(error);
-        }
-
-        return await window.Dialogs.ShowAsync(dialog) == ContentDialogResult.Primary ? form.Value : null;
-    }
-
-    public async Task<ReportRange?> ChoosePrintRangeAsync(RegistryLocation location)
-    {
-        if (!PrintManager.IsSupported())
-        {
-            throw new InvalidOperationException("Printing is not available on this computer.");
-        }
-
-        var form = new PrintRangeForm(location.IsComputer);
-        return await this.ShowFormAsync(
-            "Print registry", form, "Preview", () => Task.CompletedTask,
-            initialFocus: location.IsComputer ? null : form.Input)
-            ? form.Range
-            : null;
-    }
-
-    public Task PreviewReportAsync(string title, string report, CancellationToken token)
-    {
-        return new RegistryPrintDocument(title, report).ShowAsync(window.Handle, token);
-    }
-
-    public void ShowPermissions(RegistryLocation target)
-    {
-        SecurityEditor.Show(window.Handle, target, window.Journal);
     }
 }

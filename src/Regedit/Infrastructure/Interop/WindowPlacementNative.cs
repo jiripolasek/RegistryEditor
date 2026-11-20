@@ -12,6 +12,12 @@ internal static partial class WindowPlacementNative
     internal const uint ShowMaximized = 3;
     internal const uint RestoreToMaximized = 2;
 
+    [LibraryImport("user32.dll")]
+    internal static partial int GetWindowPlacement(nint window, ref Placement placement);
+
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetDpiForWindow(nint window);
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct Placement
     {
@@ -27,10 +33,4 @@ internal static partial class WindowPlacementNative
         internal int Right;
         internal int Bottom;
     }
-
-    [LibraryImport("user32.dll")]
-    internal static partial int GetWindowPlacement(nint window, ref Placement placement);
-
-    [LibraryImport("user32.dll")]
-    internal static partial uint GetDpiForWindow(nint window);
 }

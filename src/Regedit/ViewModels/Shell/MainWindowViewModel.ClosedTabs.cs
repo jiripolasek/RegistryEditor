@@ -10,8 +10,6 @@ namespace JPSoftworks.Regedit.ViewModels.Shell;
 
 internal sealed partial class MainWindowViewModel
 {
-    private sealed record ClosedBrowserTab(RegistryLocation Location, BrowserLayout Layout, string? Value, int Index);
-
     private readonly List<ClosedBrowserTab> _closedBrowserTabs = [];
 
     private bool CanReopenClosedTab => !this.IsClosing && this._closedBrowserTabs.Count > 0;
@@ -45,4 +43,6 @@ internal sealed partial class MainWindowViewModel
         this._closedBrowserTabs.RemoveAt(this._closedBrowserTabs.Count - 1);
         this.ReopenClosedTabCommand.NotifyCanExecuteChanged();
     }
+
+    private sealed record ClosedBrowserTab(RegistryLocation Location, BrowserLayout Layout, string? Value, int Index);
 }

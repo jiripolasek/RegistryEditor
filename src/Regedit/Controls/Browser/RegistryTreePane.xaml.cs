@@ -19,11 +19,14 @@ namespace JPSoftworks.Regedit.Controls.Browser;
 
 public sealed partial class RegistryTreePane : UserControl
 {
-    private BrowserViewModel ViewModel { get; set; } = null!;
+    internal event Action<RegistryLocation>? OpenInBackground;
+
+    internal event Action<Exception>? LoadFailed;
+
+    private readonly Dictionary<TreeViewNode, Task<TreeViewNode>> _treeLoads = [];
 
     private int _treeRequest;
     private int _treeGeneration;
-    private readonly Dictionary<TreeViewNode, Task<TreeViewNode>> _treeLoads = [];
     private bool _autoSyncTree = true;
     private bool _expandInitialKey = true;
     private Action? _restoreEditViewport;
@@ -32,9 +35,7 @@ public sealed partial class RegistryTreePane : UserControl
     private string? _treeMachine;
     private RegistryView _treeView;
 
-    internal event Action<RegistryLocation>? OpenInBackground;
-
-    internal event Action<Exception>? LoadFailed;
+    private BrowserViewModel ViewModel { get; set; } = null!;
 
     internal RegistryLocation? SelectedKey => this.RegistryTree.SelectedNode?.Content as RegistryLocation;
 
@@ -104,8 +105,7 @@ public sealed partial class RegistryTreePane : UserControl
 
     internal RegistryLocation? SelectContextNode(DependencyObject? target)
     {
-        if (target is not TreeViewItem item || this.RegistryTree.NodeFromContainer(item) is not
-                { Content: RegistryLocation key } node)
+        if (target is not TreeViewItem item || this.RegistryTree.NodeFromContainer(item) is not { Content: RegistryLocation key } node)
         {
             return null;
         }
@@ -176,8 +176,7 @@ public sealed partial class RegistryTreePane : UserControl
         this._treeRequest++;
         this._treeGeneration++;
         this._treeRestoreLocation
-            = !this._autoSyncTree && this._treeMachine == this.ViewModel.Location.Machine &&
-              this._treeView == this.ViewModel.Location.View
+            = !this._autoSyncTree && this._treeMachine == this.ViewModel.Location.Machine && this._treeView == this.ViewModel.Location.View
                 ? this.RegistryTree.SelectedNode?.Content as RegistryLocation ?? this.ViewModel.Location
                 : this.ViewModel.Location;
         this._treeMachine = this.ViewModel.Location.Machine;
@@ -210,9 +209,9 @@ public sealed partial class RegistryTreePane : UserControl
 
     private TreeViewNode? FindNode(RegistryLocation location)
     {
-        if (location.View != this._treeView ||
-            !string.Equals(location.Machine, this._treeMachine, StringComparison.OrdinalIgnoreCase) ||
-            this.RegistryTree.RootNodes.FirstOrDefault() is not { } computer)
+        if (location.View != this._treeView
+            || !string.Equals(location.Machine, this._treeMachine, StringComparison.OrdinalIgnoreCase)
+            || this.RegistryTree.RootNodes.FirstOrDefault() is not { } computer)
         {
             return null;
         }
@@ -280,9 +279,7 @@ public sealed partial class RegistryTreePane : UserControl
                     return node;
                 }
 
-                return refresh
-                    ? await this.RefreshChildrenAsync(node, location, rename)
-                    : await this.LoadNodeAsync(node, location);
+                return refresh ? await this.RefreshChildrenAsync(node, location, rename) : await this.LoadNodeAsync(node, location);
             }
             catch (Exception) when (generation != this._treeGeneration || !this.IsAttached(node))
             {
@@ -290,9 +287,7 @@ public sealed partial class RegistryTreePane : UserControl
             }
             catch (FileNotFoundException) when (node.Content is RegistryLocation current && current != location)
             {
-                return refresh
-                    ? await this.RefreshChildrenAsync(node, current, rename)
-                    : await this.LoadNodeAsync(node, current);
+                return refresh ? await this.RefreshChildrenAsync(node, current, rename) : await this.LoadNodeAsync(node, current);
             }
             finally
             {
@@ -316,19 +311,17 @@ public sealed partial class RegistryTreePane : UserControl
         return node;
     }
 
-    private void UpdateChildren(
-        TreeViewNode node,
-        RegistryLocation location,
-        string[] names,
-        (string OldName, string NewName)? rename)
+    private void UpdateChildren(TreeViewNode node, RegistryLocation location, string[] names, (string OldName, string NewName)? rename)
     {
         var selected = this.RegistryTree.SelectedNode;
         var children = node.Children;
         var comparer = StringComparer.OrdinalIgnoreCase;
         TreeViewNode? moved = null;
-        if (rename is { } change && !comparer.Equals(change.OldName, change.NewName) &&
-            Array.BinarySearch(names, change.NewName, comparer) >= 0 &&
-            Array.BinarySearch(names, change.OldName, comparer) < 0 && ChildNamed(node, change.OldName) is { } original)
+        if (rename is { } change
+            && !comparer.Equals(change.OldName, change.NewName)
+            && Array.BinarySearch(names, change.NewName, comparer) >= 0
+            && Array.BinarySearch(names, change.OldName, comparer) < 0
+            && ChildNamed(node, change.OldName) is { } original)
         {
             children.Remove(original);
             Rebase(original, location.Child(change.NewName));
@@ -338,17 +331,14 @@ public sealed partial class RegistryTreePane : UserControl
         var index = 0;
         foreach (var name in names)
         {
-            while (index < children.Count &&
-                   comparer.Compare(((RegistryLocation)children[index].Content).Name, name) < 0)
+            while (index < children.Count && comparer.Compare(((RegistryLocation)children[index].Content).Name, name) < 0)
             {
                 children.RemoveAt(index);
             }
 
             if (index == children.Count || !comparer.Equals(((RegistryLocation)children[index].Content).Name, name))
             {
-                var child = moved?.Content is RegistryLocation key && comparer.Equals(key.Name, name)
-                    ? moved
-                    : Node(location.Child(name));
+                var child = moved?.Content is RegistryLocation key && comparer.Equals(key.Name, name) ? moved : Node(location.Child(name));
                 children.Insert(index, child);
             }
             else if (((RegistryLocation)children[index].Content).Name != name)
@@ -395,8 +385,9 @@ public sealed partial class RegistryTreePane : UserControl
 
     private Action? CaptureViewport()
     {
-        if (!this.IsLoaded || FindDescendant<ListView>(this.RegistryTree) is not { } list ||
-            FindDescendant<ScrollViewer>(list) is not { ViewportHeight: > 0 } scroll)
+        if (!this.IsLoaded
+            || FindDescendant<ListView>(this.RegistryTree) is not { } list
+            || FindDescendant<ScrollViewer>(list) is not { ViewportHeight: > 0 } scroll)
         {
             return null;
         }
@@ -411,8 +402,7 @@ public sealed partial class RegistryTreePane : UserControl
             foreach (var child in panel.Children)
             {
                 var y = child.TransformToVisual(scroll).TransformPoint(default).Y;
-                if (y < firstTop && y + child.RenderSize.Height > 0 &&
-                    list.ItemFromContainer(child) is TreeViewNode node)
+                if (y < firstTop && y + child.RenderSize.Height > 0 && list.ItemFromContainer(child) is TreeViewNode node)
                 {
                     anchor = node;
                     firstTop = y;
@@ -422,11 +412,8 @@ public sealed partial class RegistryTreePane : UserControl
 
         double? AnchorTop()
         {
-            var row = list.ItemsPanelRoot?.Children.FirstOrDefault(child => ReferenceEquals(
-                list.ItemFromContainer(child), anchor));
-            return anchor is not null && row is not null
-                ? row.TransformToVisual(scroll).TransformPoint(default).Y
-                : null;
+            var row = list.ItemsPanelRoot?.Children.FirstOrDefault(child => ReferenceEquals(list.ItemFromContainer(child), anchor));
+            return anchor is not null && row is not null ? row.TransformToVisual(scroll).TransformPoint(default).Y : null;
         }
 
         var top = AnchorTop();
@@ -440,8 +427,11 @@ public sealed partial class RegistryTreePane : UserControl
                 return;
             }
 
-            if (anchor is TreeViewNode old && !this.IsAttached(old) && originalSelection is not null &&
-                !this.IsAttached(originalSelection) && this.RegistryTree.SelectedNode is { } survivor)
+            if (anchor is TreeViewNode old
+                && !this.IsAttached(old)
+                && originalSelection is not null
+                && !this.IsAttached(originalSelection)
+                && this.RegistryTree.SelectedNode is { } survivor)
             {
                 list.ScrollIntoView(survivor);
                 return;
@@ -496,9 +486,7 @@ public sealed partial class RegistryTreePane : UserControl
                 return;
             }
 
-            var target = top.HasValue && AnchorTop() is { } current
-                ? scroll.VerticalOffset + current - top.Value
-                : vertical;
+            var target = top.HasValue && AnchorTop() is { } current ? scroll.VerticalOffset + current - top.Value : vertical;
             if (Math.Abs(target - scroll.VerticalOffset) > 0.5 || Math.Abs(horizontal - scroll.HorizontalOffset) > 0.5)
             {
                 scroll.ViewChanged -= ViewChanged;
@@ -594,8 +582,7 @@ public sealed partial class RegistryTreePane : UserControl
     private Task<bool> YieldToUiAsync()
     {
         var completion = new TaskCompletionSource<bool>();
-        if (!this.DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => completion.SetResult(true)))
+        if (!this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => completion.SetResult(true)))
         {
             completion.SetResult(false);
         }
@@ -757,9 +744,7 @@ public sealed partial class RegistryTreePane : UserControl
         if (RegistryKeyboardShortcuts.IsPlainControl(this.XamlRoot) && args.Key is VirtualKey.C or VirtualKey.V)
         {
             args.Handled = true;
-            ICommand command = args.Key == VirtualKey.C
-                ? this.ViewModel.CopyTreeKeyCommand
-                : this.ViewModel.PasteIntoCommand;
+            ICommand command = args.Key == VirtualKey.C ? this.ViewModel.CopyTreeKeyCommand : this.ViewModel.PasteIntoCommand;
             if (command.CanExecute(this.SelectedKey))
             {
                 command.Execute(this.SelectedKey);
@@ -771,9 +756,7 @@ public sealed partial class RegistryTreePane : UserControl
         if (args.Key is VirtualKey.F2 or VirtualKey.Delete && this.SelectedKey is { } key)
         {
             args.Handled = true;
-            var command = args.Key == VirtualKey.F2
-                ? this.ViewModel.RenameTreeKeyCommand
-                : this.ViewModel.DeleteTreeKeyCommand;
+            var command = args.Key == VirtualKey.F2 ? this.ViewModel.RenameTreeKeyCommand : this.ViewModel.DeleteTreeKeyCommand;
             if (command.CanExecute(key))
             {
                 command.Execute(key);

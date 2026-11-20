@@ -16,9 +16,7 @@ internal static class ParentKeyRowTests
     {
         var location = RegistryLocation.Parse("HKCU\\Software\\Example", RegistryView.Registry32);
         var view = new BrowserViewModel(new RegistryService(), location) { ShowKeysInList = true };
-        check(
-            view.SortColumn == RegistrySortColumn.Name && !view.SortDescending,
-            "Registry sorting starts with Name ascending");
+        check(view.SortColumn == RegistrySortColumn.Name && !view.SortDescending, "Registry sorting starts with Name ascending");
         var sortChanges = new List<string>();
         view.PropertyChanged += (_, args) =>
         {
@@ -28,23 +26,20 @@ internal static class ParentKeyRowTests
             }
         };
         view.SortCommand.Execute(RegistrySortColumn.Name);
-        check(
-            view.SortColumn == RegistrySortColumn.Name && view.SortDescending,
-            "Activating the current registry sort reverses direction");
+        check(view.SortColumn == RegistrySortColumn.Name && view.SortDescending, "Activating the current registry sort reverses direction");
         view.SortCommand.Execute(RegistrySortColumn.Type);
-        check(
-            view.SortColumn == RegistrySortColumn.Type && !view.SortDescending,
-            "Choosing another registry sort starts ascending");
+        check(view.SortColumn == RegistrySortColumn.Type && !view.SortDescending, "Choosing another registry sort starts ascending");
         view.SortCommand.Execute(RegistrySortColumn.Name);
         check(
-            sortChanges.Contains(nameof(view.SortColumn)) && sortChanges.Contains(nameof(view.SortDescending)) &&
-            view.SortColumn == RegistrySortColumn.Name && !view.SortDescending,
+            sortChanges.Contains(nameof(view.SortColumn))
+            && sortChanges.Contains(nameof(view.SortDescending))
+            && view.SortColumn == RegistrySortColumn.Name
+            && !view.SortDescending,
             "Each sort activation exposes its current column and direction without changing the initial order contract");
         check(
-            BrowserViewModel.SortLabel(RegistrySortColumn.Name, view.SortColumn, view.SortDescending) == "Name ↑" &&
-            BrowserViewModel.SortStatus(RegistrySortColumn.Name, view.SortColumn, view.SortDescending) ==
-            "Sorted ascending" &&
-            BrowserViewModel.SortStatus(RegistrySortColumn.Data, view.SortColumn, view.SortDescending) == "Not sorted",
+            BrowserViewModel.SortLabel(RegistrySortColumn.Name, view.SortColumn, view.SortDescending) == "Name ↑"
+            && BrowserViewModel.SortStatus(RegistrySortColumn.Name, view.SortColumn, view.SortDescending) == "Sorted ascending"
+            && BrowserViewModel.SortStatus(RegistrySortColumn.Data, view.SortColumn, view.SortDescending) == "Not sorted",
             "Compiled sort presentations distinguish the active direction from inactive columns");
         check(view.Entries.Count == 0, "Parent row is opt-in");
         view.ShowKeysInList = false;
@@ -53,8 +48,9 @@ internal static class ParentKeyRowTests
         view.ShowKeysInList = true;
         var parent = view.Entries.Single();
         check(
-            parent.Name == ".." && parent.ParentLocation == location.GetNavigationParent() &&
-            parent.ParentLocation?.View == RegistryView.Registry32,
+            parent.Name == ".."
+            && parent.ParentLocation == location.GetNavigationParent()
+            && parent.ParentLocation?.View == RegistryView.Registry32,
             "Parent row uses the navigation parent and retains the registry view");
         check(
             parent is
@@ -62,20 +58,19 @@ internal static class ParentKeyRowTests
                 IsParent: true, IsKey: false, IsStored: false, Key: null, Value: null, IsDefaultPlaceholder: false
             }, "Parent row is separate from stored keys, values, and default placeholders");
         check(
-            parent.Type == "Parent key" && parent.Data == parent.ParentLocation!.Address &&
-            parent.AccessibleName.Contains(parent.Data),
+            parent.Type == "Parent key" && parent.Data == parent.ParentLocation!.Address && parent.AccessibleName.Contains(parent.Data),
             "Parent row describes its destination for display and accessibility");
         check(
-            new RegistryEntry(location, null).IsStored &&
-            new RegistryEntry(null, new RegistryValue(string.Empty, RegistryValueType.String, [])).IsStored &&
-            !new RegistryEntry(null, null, true).IsStored,
-            "Stored-item actions include real default values but exclude placeholders");
+            new RegistryEntry(location, null).IsStored
+            && new RegistryEntry(null, new RegistryValue(string.Empty, RegistryValueType.String, [])).IsStored
+            && !new RegistryEntry(null, null, true).IsStored, "Stored-item actions include real default values but exclude placeholders");
         view.SelectedEntry = parent;
         var parentEntries = view.Entries;
         await view.SortCommand.ExecuteAsync(RegistrySortColumn.Name);
         check(
-            ReferenceEquals(view.Entries, parentEntries) && ReferenceEquals(view.Entries.Single(), parent) &&
-            ReferenceEquals(view.SelectedEntry, parent),
+            ReferenceEquals(view.Entries, parentEntries)
+            && ReferenceEquals(view.Entries.Single(), parent)
+            && ReferenceEquals(view.SelectedEntry, parent),
             "Sorting an unchanged parent-only list preserves the collection, row identity and selection");
         view.ShowKeysInList = false;
         check(
@@ -88,17 +83,12 @@ internal static class ParentKeyRowTests
         foreach (var address in new[] { "HKCU", "\\\\SERVER\\HKLM", "\\\\SERVER\\HKLM\\Software" })
         {
             var target = RegistryLocation.Parse(address, RegistryView.Registry32);
-            var other = new BrowserViewModel(new RegistryService(), target)
-            {
-                ShowKeysInList = true, ShowParentKeyInList = true
-            };
+            var other = new BrowserViewModel(new RegistryService(), target) { ShowKeysInList = true, ShowParentKeyInList = true };
             check(
                 other.Entries.Single().ParentLocation == target.GetNavigationParent(),
                 $"Parent row preserves the navigation scope of {address}");
             await other.NavigateAsync(target.GetComputer());
-            check(
-                other.Entries.All(entry => !entry.IsParent) && !other.CanGoUp,
-                $"Computer root has no parent row for {address}");
+            check(other.Entries.All(entry => !entry.IsParent) && !other.CanGoUp, $"Computer root has no parent row for {address}");
         }
 
         var directory = Directory.CreateTempSubdirectory("RegeditParentRow.");
@@ -141,9 +131,7 @@ internal static class ParentKeyRowTests
             service.CreateKey(fixture, "Child");
             service.CreateKey(fixture, "..");
             service.Write(
-                fixture,
-                new RegistryValue(
-                    "Marker", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "value")),
+                fixture, new RegistryValue("Marker", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "value")),
                 null);
             view = new BrowserViewModel(service, fixture) { ShowKeysInList = true, ShowParentKeyInList = true };
             await view.NavigateAsync(fixture);
@@ -152,8 +140,7 @@ internal static class ParentKeyRowTests
                 "Virtual parent row coexists with a real key named ..");
             var stored = view.Entries.Where(entry => entry.IsStored).ToArray();
             check(
-                stored.Length == 3 && stored.All(entry => !entry.IsParent),
-                "Stored-item selection excludes parent and unset-default rows");
+                stored.Length == 3 && stored.All(entry => !entry.IsParent), "Stored-item selection excludes parent and unset-default rows");
             var parentRow = view.Entries[0];
             var valueRow = view.Entries.Single(entry => entry.Name == "Marker");
             view.SetSelection([parentRow, valueRow]);
@@ -167,8 +154,7 @@ internal static class ParentKeyRowTests
             }
 
             check(
-                ReferenceEquals(view.Entries[0], parentRow) &&
-                view.SelectedEntries.ToHashSet().SetEquals([parentRow, valueRow]),
+                ReferenceEquals(view.Entries[0], parentRow) && view.SelectedEntries.ToHashSet().SetEquals([parentRow, valueRow]),
                 "Reordering preserves selection of the same parent and value row instances");
 
             view.Filter = "Marker";
@@ -186,9 +172,7 @@ internal static class ParentKeyRowTests
                 view.Entries[0].ParentLocation == fixture && !view.HasSubKeys && view.Status == "0 keys · 0 values",
                 "A parent row does not make a leaf report child keys");
             await view.NavigateAsync(view.Entries[0].ParentLocation!);
-            check(
-                view.Location == fixture && view.Error is null,
-                "Activating the parent target navigates to the containing key");
+            check(view.Location == fixture && view.Error is null, "Activating the parent target navigates to the containing key");
             await view.BackCommand.ExecuteAsync(null);
             check(view.Location == fixture.Child("Child"), "Parent navigation participates in back history");
             var singular = fixture.Child("Singular");
@@ -196,9 +180,7 @@ internal static class ParentKeyRowTests
             service.CreateKey(singular, "OnlyChild");
             service.Write(
                 singular,
-                new RegistryValue(
-                    "OnlyValue", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "one")),
-                null);
+                new RegistryValue("OnlyValue", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "one")), null);
             await view.NavigateAsync(singular);
             check(view.Status == "1 key · 1 value", "Browser status uses singular key and value labels");
         }

@@ -45,8 +45,7 @@ internal sealed partial class RegistryTargetViewModel(bool watch) : ObservableOb
             throw new ArgumentException("Choose a registry view.");
         }
 
-        var location = RegistryLocation.Parse(
-            this.Address.Trim(), this.ViewIndex == 1 ? RegistryView.Registry32 : RegistryView.Registry64);
+        var location = RegistryLocation.Parse(this.Address.Trim(), this.ViewIndex == 1 ? RegistryView.Registry32 : RegistryView.Registry64);
         RegistryWorkspace.ValidateLocation(location);
         if (this.IsWatch && location.Machine is not null)
         {

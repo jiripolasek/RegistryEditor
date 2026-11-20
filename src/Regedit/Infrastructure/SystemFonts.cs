@@ -20,18 +20,13 @@ internal static class SystemFonts
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static string GetDefaultMonospaceFontFamily()
     {
-        var preferred
-            = MonospaceFonts.FindTerminalFont(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+        var preferred = MonospaceFonts.FindTerminalFont(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
         if (preferred is not null)
         {
             using var fonts = CanvasFontSet.GetSystemFontSet();
             using var matches = fonts.GetMatchingFonts(
             [
-                new CanvasFontProperty
-                {
-                    Identifier = CanvasFontPropertyIdentifier.FamilyName, Value = preferred, Locale = ""
-                }
+                new CanvasFontProperty { Identifier = CanvasFontPropertyIdentifier.FamilyName, Value = preferred, Locale = "" }
             ]);
             var monospaced = false;
             foreach (var face in matches.Fonts)

@@ -38,10 +38,7 @@ internal static class ListContextMenu
             }
             else
             {
-                menu.ShowAt(
-                    list.SelectedItem is { } selected
-                        ? list.ContainerFromItem(selected) as FrameworkElement ?? list
-                        : list);
+                menu.ShowAt(list.SelectedItem is { } selected ? list.ContainerFromItem(selected) as FrameworkElement ?? list : list);
             }
 
             args.Handled = true;

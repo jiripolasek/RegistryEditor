@@ -33,8 +33,8 @@ internal static class WatchSurfaceTests
             "Empty delivery is silent and one observation uses the native Add fast path");
         collection.AddRange([2, 3]);
         check(
-            notifications.SequenceEqual([NotifyCollectionChangedAction.Add, NotifyCollectionChangedAction.Reset]) &&
-            collection.SequenceEqual([1, 2, 3]), "Multiple observations use one bulk notification");
+            notifications.SequenceEqual([NotifyCollectionChangedAction.Add, NotifyCollectionChangedAction.Reset])
+            && collection.SequenceEqual([1, 2, 3]), "Multiple observations use one bulk notification");
         var threw = false;
         try
         {
@@ -49,16 +49,13 @@ internal static class WatchSurfaceTests
             threw && collection.SequenceEqual([1, 2, 3]) && notifications.Count == 2,
             "A failed delivery enumeration cannot partially mutate retained observations");
         collection.AddRange(collection);
-        check(
-            collection.SequenceEqual([1, 2, 3, 1, 2, 3]),
-            "Bulk append materializes a source that aliases its destination");
+        check(collection.SequenceEqual([1, 2, 3, 1, 2, 3]), "Bulk append materializes a source that aliases its destination");
 
         var registry = new RegistryService();
         var settings = new AppSettings();
         var shell = new MainWindowViewModel(
-            settings, new InvestigationStore(settings, () => { }), registry,
-            location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(settings));
+            settings, new InvestigationStore(settings, () => { }), registry, location => new BrowserViewModel(registry, location),
+            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
         var panel = new WatchSurfaceViewModel(shell);
         var tab = new WatchSurfaceViewModel(shell);
         panel.Activate();
@@ -72,19 +69,20 @@ internal static class WatchSurfaceTests
             shell.OpenBrowser(target);
             shell.ContextBrowser!.SelectedEntry = new RegistryEntry(null, null, true);
             check(
-                panel.StartBranchCommand.CanExecute(null) && panel.StartValueCommand.CanExecute(null) &&
-                panel.BranchTarget.Contains(target.Address) && panel.BranchTarget.Contains("32-bit") &&
-                panel.BranchTarget.Contains(Environment.MachineName) && panel.BranchTarget.EndsWith("Branch") &&
-                panel.ValueTarget.EndsWith("Value: (Default)"),
+                panel.StartBranchCommand.CanExecute(null)
+                && panel.StartValueCommand.CanExecute(null)
+                && panel.BranchTarget.Contains(target.Address)
+                && panel.BranchTarget.Contains("32-bit")
+                && panel.BranchTarget.Contains(Environment.MachineName)
+                && panel.BranchTarget.EndsWith("Branch")
+                && panel.ValueTarget.EndsWith("Value: (Default)"),
                 "Before Start the surface distinguishes the exact local branch, view and unset default value");
             shell.ContextBrowser!.SetSelection(
             [
                 new RegistryEntry(null, new RegistryValue("One", RegistryValueType.Binary, [])),
                 new RegistryEntry(null, new RegistryValue("Two", RegistryValueType.Binary, []))
             ]);
-            check(
-                !panel.StartValueCommand.CanExecute(null),
-                "Multiple selected values cannot silently choose a watch target");
+            check(!panel.StartValueCommand.CanExecute(null), "Multiple selected values cannot silently choose a watch target");
             shell.ContextBrowser.SelectedEntry = new RegistryEntry(null, null, true);
             WatchDefinition? proposal = null;
             shell.WatchProposed += definition => proposal = definition;
@@ -96,8 +94,9 @@ internal static class WatchSurfaceTests
             var branchProposal = proposal;
             shell.OpenBrowser(new RegistryLocation());
             check(
-                branchProposal is { ValueName: null } && branchProposal.Location == target &&
-                shell.StartProposedWatchCommand.CanExecute(branchProposal),
+                branchProposal is { ValueName: null }
+                && branchProposal.Location == target
+                && shell.StartProposedWatchCommand.CanExecute(branchProposal),
                 "Changing browser context cannot change an already displayed branch proposal");
             check(!panel.StartBranchCommand.CanExecute(null), "Computer overview cannot start a branch watch");
             if (!registryTests)
@@ -128,8 +127,7 @@ internal static class WatchSurfaceTests
         try
         {
             shell.OpenBrowser(new RegistryLocation());
-            Func<Task<WatchDefinition?>> request = () =>
-                Task.FromResult<WatchDefinition?>(new WatchDefinition(root, string.Empty));
+            Func<Task<WatchDefinition?>> request = () => Task.FromResult<WatchDefinition?>(new WatchDefinition(root, string.Empty));
             panel.TargetRequested += request;
             await panel.NewCommand.ExecuteAsync(null);
             panel.TargetRequested -= request;
@@ -152,8 +150,8 @@ internal static class WatchSurfaceTests
             {
                 return new WatchObservation(
                     new RegistryDifference(
-                        root, RegistryChangeKind.ValueAdded,
-                        After: new RegistryValue(name, RegistryValueType.Binary, [value])), DateTimeOffset.UtcNow);
+                        root, RegistryChangeKind.ValueAdded, After: new RegistryValue(name, RegistryValueType.Binary, [value])),
+                    DateTimeOffset.UtcNow);
             }
 
             var first = Observation("ExactOne", 1);
@@ -171,26 +169,35 @@ internal static class WatchSurfaceTests
             panel.PauseViewingCommand.Execute(null);
             original.Observations.Add(Observation("Other", 2));
             check(
-                panel.IsViewingPaused && !panel.IsFollowing && panel.PendingCount == 1 &&
-                panel.VisibleObservations.Count == 1 && ReferenceEquals(panel.SelectedObservations.Single(), first) &&
-                tab.VisibleObservations.Count == 2 && original.IsRunning,
-                "Paused viewing retains its rows and selection while capture and the other surface continue");
+                panel.IsViewingPaused
+                && !panel.IsFollowing
+                && panel.PendingCount == 1
+                && panel.VisibleObservations.Count == 1
+                && ReferenceEquals(panel.SelectedObservations.Single(), first)
+                && tab.VisibleObservations.Count == 2
+                && original.IsRunning, "Paused viewing retains its rows and selection while capture and the other surface continue");
             check(
                 panel.PendingText == "Viewing paused · 1 new observation · Capture continues",
                 "A single pending watch change uses singular observation grammar");
             tab.CopyFrom(panel);
             check(
-                tab.Query == panel.Query && tab.IsViewingPaused && !tab.IsFollowing &&
-                ReferenceEquals(tab.Selected, original) && ReferenceEquals(tab.SelectedObservations.Single(), first),
+                tab.Query == panel.Query
+                && tab.IsViewingPaused
+                && !tab.IsFollowing
+                && ReferenceEquals(tab.Selected, original)
+                && ReferenceEquals(tab.SelectedObservations.Single(), first),
                 "Panel and tab handoff copies view state without creating another watch");
             original.Observations.Add(Observation("ExactOne", 3));
             panel.PauseViewingCommand.Execute(null);
             check(
-                panel.VisibleObservations.Count == 2 && panel.PendingCount == 0 && appends == 1 &&
-                ReferenceEquals(panel.VisibleObservations[0], first) &&
-                ReferenceEquals(panel.SelectedObservations.Single(), first) && tab.IsViewingPaused &&
-                tab.VisibleObservations.Count == 1 && tab.PendingCount == 2,
-                "Resuming appends pending matches once and leaves an independent paused reader stable");
+                panel.VisibleObservations.Count == 2
+                && panel.PendingCount == 0
+                && appends == 1
+                && ReferenceEquals(panel.VisibleObservations[0], first)
+                && ReferenceEquals(panel.SelectedObservations.Single(), first)
+                && tab.IsViewingPaused
+                && tab.VisibleObservations.Count == 1
+                && tab.PendingCount == 2, "Resuming appends pending matches once and leaves an independent paused reader stable");
             panel.FollowLatestCommand.Execute(null);
             check(panel.IsFollowing && !panel.IsViewingPaused, "Follow latest resumes live viewing explicitly");
             tab.Deactivate();
@@ -215,9 +222,13 @@ internal static class WatchSurfaceTests
             panel.Activate();
             tab.Activate();
             check(
-                panel.VisibleObservations.Count == 4 && !panel.VisibleObservations.Contains(first) &&
-                panel.SelectedObservations.Count == 0 && tab.IsViewingPaused && tab.VisibleObservations.Count == 0 &&
-                tab.PendingCount == 4 && tab.SelectedObservations.Count == 0,
+                panel.VisibleObservations.Count == 4
+                && !panel.VisibleObservations.Contains(first)
+                && panel.SelectedObservations.Count == 0
+                && tab.IsViewingPaused
+                && tab.VisibleObservations.Count == 0
+                && tab.PendingCount == 4
+                && tab.SelectedObservations.Count == 0,
                 "Detached clear and refill replaces stale rows and selection even when the new count is at least the old count");
 
             tab.StartBranchCommand.Execute(null);
@@ -226,8 +237,7 @@ internal static class WatchSurfaceTests
             check(
                 !ReferenceEquals(branch, original) && shell.Watches.Count == 2 && shell.RunningWatchCount == 2,
                 "The branch and unnamed value are distinct window-owned targets");
-            check(
-                !tab.RemoveCommand.CanExecute(null) && !shell.RemoveWatch(branch), "A running watch cannot be removed");
+            check(!tab.RemoveCommand.CanExecute(null) && !shell.RemoveWatch(branch), "A running watch cannot be removed");
             var failures = new List<WatchSession>();
             shell.WatchFailed += failures.Add;
             tab.StopCommand.Execute(null);
@@ -246,8 +256,11 @@ internal static class WatchSurfaceTests
                 failures.Count == 0 && shell.RunningWatchCount == 0 && original.Observations.Count == 5,
                 "Typed Stop is quiet and retains stopped evidence");
             check(
-                !panel.IsViewingPaused && panel.PendingCount == 0 && panel.VisibleObservations.Count == 5 &&
-                !panel.PauseViewingCommand.CanExecute(null) && !panel.FollowLatestCommand.CanExecute(null),
+                !panel.IsViewingPaused
+                && panel.PendingCount == 0
+                && panel.VisibleObservations.Count == 5
+                && !panel.PauseViewingCommand.CanExecute(null)
+                && !panel.FollowLatestCommand.CanExecute(null),
                 "Stopping a paused reader reveals every retained observation without a disabled Resume action");
             tab.Activate();
             check(
@@ -256,18 +269,20 @@ internal static class WatchSurfaceTests
             panel.Deactivate();
             tab.Deactivate();
             original.Observations.Clear();
-            ((BulkObservableCollection<WatchObservation>)original.Observations).AddRange(
-                Enumerable.Repeat(first, 10000));
+            ((BulkObservableCollection<WatchObservation>)original.Observations).AddRange(Enumerable.Repeat(first, 10000));
             panel.Activate();
             panel.Selected = original;
             panel.RestartCommand.Execute(null);
             var restarted = panel.Selected!;
             await Ready(restarted);
             check(
-                !ReferenceEquals(restarted, original) && original.Observations.Count == 10000 &&
-                restarted.Observations.Count == 0 && restarted.IsRunning && shell.Watches.Contains(original) &&
-                original.DisplayTitle.Contains("Stopped") &&
-                original.DisplayTitle.Contains(original.Started.ToString("HH:mm:ss.fff")),
+                !ReferenceEquals(restarted, original)
+                && original.Observations.Count == 10000
+                && restarted.Observations.Count == 0
+                && restarted.IsRunning
+                && shell.Watches.Contains(original)
+                && original.DisplayTitle.Contains("Stopped")
+                && original.DisplayTitle.Contains(original.Started.ToString("HH:mm:ss.fff")),
                 "Restart creates a fresh baseline and distinguishable session even when stopped evidence is full");
             tab.Activate();
             tab.Selected = branch;
@@ -287,8 +302,10 @@ internal static class WatchSurfaceTests
             var failed = shell.StartWatch(root.Child("Missing"), null, shell.DispatchWatchUpdate);
             await failed.Completion.WaitAsync(TimeSpan.FromSeconds(10));
             check(
-                failures.Count == 1 && ReferenceEquals(failures[0], failed) && failed.Error is FileNotFoundException &&
-                shell.Watches.Contains(failed), "An unexpected stop is reported once with its retained exact session");
+                failures.Count == 1
+                && ReferenceEquals(failures[0], failed)
+                && failed.Error is FileNotFoundException
+                && shell.Watches.Contains(failed), "An unexpected stop is reported once with its retained exact session");
             WatchSession? revealed = null;
             shell.WatchOpened += session => revealed = session;
             shell.RevealWatchCommand.Execute(failed);

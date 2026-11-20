@@ -26,8 +26,8 @@ internal static class InvestigationViewModelTests
         var registry = new RegistryService();
         var store = new InvestigationStore(settings, () => { });
         var shell = new MainWindowViewModel(
-            settings, store, registry, target => new BrowserViewModel(registry, target),
-            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
+            settings, store, registry, target => new BrowserViewModel(registry, target), NullLogger<MainWindowViewModel>.Instance,
+            NotesStoreTests.CreateStore(settings));
         var origin = RegistryLocation.Parse(@"\\server\HKLM\Software", RegistryView.Registry32);
         var bytes = new byte[128 * 1024];
         var large = new RegistrySearchMatch(
@@ -35,8 +35,10 @@ internal static class InvestigationViewModelTests
         var matches = Enumerable.Range(0, 250).Select(_ => new InvestigationRow(large)).ToArray();
         bytes[0] = 0xAF;
         check(
-            matches.All(row => row.Title == "Large") && matches[3].Before.Contains("Raw preview: AF00") &&
-            matches[3].Before.Length < 6000 && ReferenceEquals(matches[3].Before, matches[3].Before),
+            matches.All(row => row.Title == "Large")
+            && matches[3].Before.Contains("Raw preview: AF00")
+            && matches[3].Before.Length < 6000
+            && ReferenceEquals(matches[3].Before, matches[3].Before),
             "Large search results retain the typed source and format a bounded row preview once when selected");
         shell.OpenBrowser(origin);
         var source = (BrowserTab)shell.ActiveTab!;
@@ -58,19 +60,21 @@ internal static class InvestigationViewModelTests
             results.RunCommand.IsRunning && !captured.IsCancellationRequested && shell.ActiveTab == results,
             "Closing a search's originating browser keeps its results scan alive");
         var hit = new RegistrySearchMatch(
-            origin.Child("Match"), string.Empty, new RegistryValue(string.Empty, RegistryValueType.Binary, [0, 255]),
-            "Value name", "needle");
+            origin.Child("Match"), string.Empty, new RegistryValue(string.Empty, RegistryValueType.Binary, [0, 255]), "Value name",
+            "needle");
         gate.SetResult(new RegistrySearchResults(Enumerable.Repeat(hit, 10000).ToArray(), 2, false));
         await running;
         check(
-            searchChanges is [NotifyCollectionChangedAction.Reset] && results.Rows.Count == 10000 &&
-            results.Description.Contains("2 inaccessible") && !results.OpenCommand.CanExecute(null),
-            "A completed 10000-match search publishes one reset and requires a selection");
+            searchChanges is [NotifyCollectionChangedAction.Reset]
+            && results.Rows.Count == 10000
+            && results.Description.Contains("2 inaccessible")
+            && !results.OpenCommand.CanExecute(null), "A completed 10000-match search publishes one reset and requires a selection");
         results.Selected = [results.Rows[0]];
         results.OpenInBackgroundCommand.Execute(results.Rows[0]);
         check(
-            shell.ActiveTab == results && shell.Tabs[^1] is BrowserTab { InitialValue: "" } background &&
-            background.Browser.Location == hit.Location,
+            shell.ActiveTab == results
+            && shell.Tabs[^1] is BrowserTab { InitialValue: "" } background
+            && background.Browser.Location == hit.Location,
             "Middle-open preserves the original machine, 32-bit view, key and unnamed value");
         results.OpenCommand.Execute(null);
         check(
@@ -141,8 +145,7 @@ internal static class InvestigationViewModelTests
             return Task.FromResult(consent);
         };
         await workspaces.OpenCommand.ExecuteAsync(null);
-        check(
-            restored == 0 && machines is ["server"], "Declining a workspace's deduplicated remote hosts opens nothing");
+        check(restored == 0 && machines is ["server"], "Declining a workspace's deduplicated remote hosts opens nothing");
         consent = true;
         await workspaces.OpenCommand.ExecuteAsync(null);
         check(restored == 1, "The confirmed workspace is restored through the shell");
@@ -156,21 +159,24 @@ internal static class InvestigationViewModelTests
         workspaceTab.Selected = [workspaceTab.Rows.Single()];
         shell.OpenSavedSearchesCommand.Execute(null);
         check(
-            shell.ActiveTab == savedTab && ReferenceEquals(savedTab.Selected.Single().Source, search) &&
-            shell.Tabs.OfType<SavedSearchesViewModel>().Count() == 1,
+            shell.ActiveTab == savedTab
+            && ReferenceEquals(savedTab.Selected.Single().Source, search)
+            && shell.Tabs.OfType<SavedSearchesViewModel>().Count() == 1,
             "Reopening Saved searches preserves the selected query in the existing tab");
         shell.OpenWorkspacesCommand.Execute(null);
         check(
-            shell.ActiveTab == workspaceTab && ReferenceEquals(workspaceTab.Selected.Single().Source, workspace) &&
-            shell.Tabs.OfType<WorkspacesViewModel>().Count() == 1,
+            shell.ActiveTab == workspaceTab
+            && ReferenceEquals(workspaceTab.Selected.Single().Source, workspace)
+            && shell.Tabs.OfType<WorkspacesViewModel>().Count() == 1,
             "Reopening Workspaces preserves the selected workspace in the existing tab");
 
         store.SaveSearch(search with { Name = "Another query" });
         var replacement = workspace with { Name = workspace.Name.ToUpperInvariant() };
         store.SaveWorkspace(replacement);
         check(
-            savedTab.Rows.Count == 2 && ReferenceEquals(savedTab.Selected.Single().Source, search) && ReferenceEquals(
-                workspaceTab.Selected.Single().Source, replacement),
+            savedTab.Rows.Count == 2
+            && ReferenceEquals(savedTab.Selected.Single().Source, search)
+            && ReferenceEquals(workspaceTab.Selected.Single().Source, replacement),
             "A collection update retains other selected rows and follows a replacement with the same name");
 
         var many = new AppSettings();
@@ -184,8 +190,10 @@ internal static class InvestigationViewModelTests
         ((INotifyPropertyChanged)bulk.Rows).PropertyChanged += (_, args) => properties.Add(args.PropertyName);
         bulkStore.RemoveSearches(new HashSet<SavedSearch> { many.Searches[5000] });
         check(
-            changes is [NotifyCollectionChangedAction.Reset] && properties is ["Count", "Item[]"] &&
-            bulk.Rows.Count == 9999 && bulk.Selected.SequenceEqual([bulk.Rows[0], bulk.Rows[^1]]),
+            changes is [NotifyCollectionChangedAction.Reset]
+            && properties is ["Count", "Item[]"]
+            && bulk.Rows.Count == 9999
+            && bulk.Selected.SequenceEqual([bulk.Rows[0], bulk.Rows[^1]]),
             "A bulk refresh notifies once and restores only the surviving rows of a multiple selection");
         var first = bulk.Rows[0];
         try
@@ -202,7 +210,9 @@ internal static class InvestigationViewModelTests
         bulk.Rows.ReplaceAll(bulk.Rows.Take(2));
         bulk.Rows.Add(first);
         check(
-            bulk.Rows.Count == 3 && bulk.Rows[0] == first && changes is
+            bulk.Rows.Count == 3
+            && bulk.Rows[0] == first
+            && changes is
             [
                 NotifyCollectionChangedAction.Reset, NotifyCollectionChangedAction.Reset,
                 NotifyCollectionChangedAction.Add
@@ -213,15 +223,15 @@ internal static class InvestigationViewModelTests
         check(
             reopened.Types == "4, 99" && reopened.CreateSearch().Options.Types!.SequenceEqual(previousOptions.Types!),
             "Advanced Find reopens known and unknown type filters as parseable numeric codes");
-        var form = new FindOptionsViewModel(
-            origin, " ", new SearchOptions("old", false, Types: [RegistryValueType.DWord]))
+        var form = new FindOptionsViewModel(origin, " ", new SearchOptions("old", false, Types: [RegistryValueType.DWord]))
         {
             ScopeIndex = 1, Types = "REG_BINARY"
         };
         var exact = form.CreateSearch();
         check(
-            exact.Options is { Text: " ", Keys: false, Types: [RegistryValueType.Binary] } && exact.Roots.Length > 1 &&
-            exact.Roots.All(root => root.Machine == origin.Machine && root.View == RegistryView.Registry32),
+            exact.Options is { Text: " ", Keys: false, Types: [RegistryValueType.Binary] }
+            && exact.Roots.Length > 1
+            && exact.Roots.All(root => root.Machine == origin.Machine && root.View == RegistryView.Registry32),
             "Advanced Find preserves literal whitespace and applies the selected types across the original machine and registry view");
 
         var requested = new List<SavedSearch>();
@@ -241,8 +251,8 @@ internal static class InvestigationViewModelTests
         };
         await searchInput.FindCommand.ExecuteAsync(null);
         check(
-            requested.Count == 2 && requested[1].Options is { Text: "advanced", Types: [RegistryValueType.DWord] } &&
-            notices.Count == 0, "Advanced Find always creates a result set with the chosen options");
+            requested.Count == 2 && requested[1].Options is { Text: "advanced", Types: [RegistryValueType.DWord] } && notices.Count == 0,
+            "Advanced Find always creates a result set with the chosen options");
         searchInput.Close();
         searchInput.QuickSearchCommand.Execute(null);
         await searchInput.FindCommand.ExecuteAsync(null);

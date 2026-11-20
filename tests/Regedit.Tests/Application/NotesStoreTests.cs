@@ -46,16 +46,14 @@ internal static class NotesStoreTests
             var key = RegistryLocation.Parse("HKCU\\Software\\Autosave", RegistryView.Registry64);
             var note = notes.Get(key);
             check(
-                ReferenceEquals(note, notes.Get(key with { SubKey = key.SubKey.ToUpperInvariant() })) &&
-                !ReferenceEquals(note, notes.Get(key with { View = RegistryView.Registry32 })),
+                ReferenceEquals(note, notes.Get(key with { SubKey = key.SubKey.ToUpperInvariant() }))
+                && !ReferenceEquals(note, notes.Get(key with { View = RegistryView.Registry32 })),
                 "Notes share canonical drafts while preserving exact registry views");
             var sawSaving = false;
             note.PropertyChanged += (_, _) => sawSaving |= note.IsSaving;
             note.Text = "First edit";
             note.Text = "Latest edit: 日本語";
-            check(
-                saves == 0 && delays.Count == 2 && note.IsDirty,
-                "Typing debounces note persistence instead of saving every keystroke");
+            check(saves == 0 && delays.Count == 2 && note.IsDirty, "Typing debounces note persistence instead of saving every keystroke");
             delays[0].SetResult();
             delays[1].SetResult();
             await Until(() => !note.IsDirty);
@@ -70,8 +68,10 @@ internal static class NotesStoreTests
                 "Autosaving a cleared note removes it while retaining the text for Undo");
             notes.UndoDelete(note);
             check(
-                note.Text == "Latest edit: 日本語" && !note.IsDirty && !note.CanUndoDelete &&
-                AppSettings.Load(path).Notes.Single().Text == note.Text,
+                note.Text == "Latest edit: 日本語"
+                && !note.IsDirty
+                && !note.CanUndoDelete
+                && AppSettings.Load(path).Notes.Single().Text == note.Text,
                 "Undo clearing restores the full note and persists it immediately");
 
             var savedText = note.Text;
@@ -82,13 +82,18 @@ internal static class NotesStoreTests
             delays[^1].SetResult();
             await Until(() => note.SaveError is not null && failures == 1);
             check(
-                note.IsDirty && note.Text == "Retained failed draft" && failures == 1 &&
-                AppSettings.Load(path).Notes.Single().Text == savedText && settings.Notes.Single().Text == savedText,
+                note.IsDirty
+                && note.Text == "Retained failed draft"
+                && failures == 1
+                && AppSettings.Load(path).Notes.Single().Text == savedText
+                && settings.Notes.Single().Text == savedText,
                 "An autosave failure preserves the draft, rolls back settings and reports the error");
             failSave = false;
             check(
-                notes.TrySave(note) && !note.IsDirty && note.SaveError is null &&
-                AppSettings.Load(path).Notes.Single().Text == "Retained failed draft",
+                notes.TrySave(note)
+                && !note.IsDirty
+                && note.SaveError is null
+                && AppSettings.Load(path).Notes.Single().Text == "Retained failed draft",
                 "Save now retries a failed autosave without losing text");
 
             failSave = true;
@@ -100,8 +105,7 @@ internal static class NotesStoreTests
             catch (IOException)
             {
                 check(
-                    note.Text == "Retained failed draft" && !note.IsDirty &&
-                    AppSettings.Load(path).Notes.Single().Text == note.Text,
+                    note.Text == "Retained failed draft" && !note.IsDirty && AppSettings.Load(path).Notes.Single().Text == note.Text,
                     "Failed explicit deletion preserves both the complete draft and stored note");
             }
 
@@ -124,15 +128,15 @@ internal static class NotesStoreTests
             var pausedDelays = delays.Count;
             notes.Resume();
             check(
-                delays.Count == pausedDelays + 1 && note.IsDirty,
-                "Canceling closure resumes autosave for edits made while it was paused");
+                delays.Count == pausedDelays + 1 && note.IsDirty, "Canceling closure resumes autosave for edits made while it was paused");
             var dueBeforeDispose = delays[^1];
             notes.Dispose();
             dueBeforeDispose.SetResult();
             await Task.Delay(20);
             check(
-                saves == beforeFlush + 1 && note.IsDirty && AppSettings.Load(path).Notes.Single().Text ==
-                "Flush before switching or closing",
+                saves == beforeFlush + 1
+                && note.IsDirty
+                && AppSettings.Load(path).Notes.Single().Text == "Flush before switching or closing",
                 "Disposed window scopes cancel pending writes and cannot save a discarded draft later");
         }
         finally

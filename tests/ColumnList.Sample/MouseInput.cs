@@ -46,8 +46,7 @@ internal static partial class MouseInput
 
                 if (GetForegroundWindow() != _targetWindow)
                 {
-                    throw new InvalidOperationException(
-                        "The component test window could not receive foreground input.");
+                    throw new InvalidOperationException("The component test window could not receive foreground input.");
                 }
             }
             finally
@@ -79,11 +78,12 @@ internal static partial class MouseInput
         }
 
         await Task.Delay(30);
-        if (!GetCursorPos(out var actual) || actual.X != to.X || actual.Y != to.Y ||
-            GetAncestor(WindowFromPoint(new NativePoint { X = to.X, Y = to.Y }), 2) != _targetWindow)
+        if (!GetCursorPos(out var actual)
+            || actual.X != to.X
+            || actual.Y != to.Y
+            || GetAncestor(WindowFromPoint(new NativePoint { X = to.X, Y = to.Y }), 2) != _targetWindow)
         {
-            throw new InvalidOperationException(
-                $"The test window is not under the cursor at {to}; actual {actual.X},{actual.Y}.");
+            throw new InvalidOperationException($"The test window is not under the cursor at {to}; actual {actual.X},{actual.Y}.");
         }
     }
 

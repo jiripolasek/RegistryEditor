@@ -66,9 +66,7 @@ internal static class CommandIconChecks
         bar.PrimaryCommands.Add(host);
         panel.Children.Add(bar);
         window.Content = panel;
-        var accent = new AccessibilitySettings().HighContrast
-            ? null
-            : (Style)Application.Current.Resources["CommandIconAccentStyle"];
+        var accent = new AccessibilitySettings().HighContrast ? null : (Style)Application.Current.Resources["CommandIconAccentStyle"];
         try
         {
             await WaitAsync(() => icon.IsLoaded);
@@ -107,8 +105,7 @@ internal static class CommandIconChecks
                 check(icon.Style is null, $"Reloaded icon restores the owner subscription ({cycle})");
                 host.IsEnabled = true;
                 await WaitAsync(() => ReferenceEquals(icon.Style, accent));
-                check(
-                    ReferenceEquals(icon.Style, accent), $"Reloaded icon keeps its enabled and theme policy ({cycle})");
+                check(ReferenceEquals(icon.Style, accent), $"Reloaded icon keeps its enabled and theme policy ({cycle})");
             }
 
             var nextHost = new AppBarButton { Label = "New owner", Width = 140 };
@@ -119,9 +116,7 @@ internal static class CommandIconChecks
             bar.PrimaryCommands.Add(nextHost);
             await WaitAsync(() => icon.IsLoaded);
             host.IsEnabled = false;
-            check(
-                ReferenceEquals(icon.Style, accent),
-                "The former owner's enabled state does not override the new owner");
+            check(ReferenceEquals(icon.Style, accent), "The former owner's enabled state does not override the new owner");
             nextHost.IsEnabled = false;
             await WaitAsync(() => icon.Style is null);
             check(icon.Style is null, "Changing owners subscribes to the new owner");

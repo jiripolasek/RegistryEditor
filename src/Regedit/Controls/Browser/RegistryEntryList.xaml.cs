@@ -24,7 +24,11 @@ namespace JPSoftworks.Regedit.Controls.Browser;
 
 public sealed partial class RegistryEntryList : UserControl
 {
-    public BrowserViewModel ViewModel { get; private set; } = null!;
+    internal event Action<RegistryEntry>? OpenInBackground;
+
+    internal event Action<char>? FilterTyped;
+
+    internal event Action<string>? RenameRejected;
 
     private bool _showPreview;
     private bool _syncingSelection;
@@ -33,11 +37,7 @@ public sealed partial class RegistryEntryList : UserControl
     private RegistryFont? _dataFont;
     private FontFamily? _dataFamily;
 
-    internal event Action<RegistryEntry>? OpenInBackground;
-
-    internal event Action<char>? FilterTyped;
-
-    internal event Action<string>? RenameRejected;
+    public BrowserViewModel ViewModel { get; private set; } = null!;
 
     private ListView EntriesList => this.Entries.ListView;
 
@@ -52,21 +52,15 @@ public sealed partial class RegistryEntryList : UserControl
         list.PreviewKeyDown += this.Entries_KeyDown;
         list.SelectionChanged += this.Entries_SelectionChanged;
         this.Entries.ItemAutomationName = item => (item as RegistryEntry)?.AccessibleName;
-        this.Entries.CanEditItem = (item, _) =>
-            item is RegistryEntry entry && this.ViewModel?.CanRenameEntry(entry) == true;
+        this.Entries.CanEditItem = (item, _) => item is RegistryEntry entry && this.ViewModel?.CanRenameEntry(entry) == true;
         this.Entries.FindColumn(nameof(RegistrySortColumn.Name))!.EditText = item => (item as RegistryEntry)?.Name;
         this.EntriesList.AddHandler(PointerPressedEvent, new PointerEventHandler(this.Entries_PointerPressed), true);
         MiddleClick.Attach(
-            this.EntriesList,
-            args => MiddleClick.Container<ListViewItem>(this.EntriesList, args)?.Content as RegistryEntry,
+            this.EntriesList, args => MiddleClick.Container<ListViewItem>(this.EntriesList, args)?.Content as RegistryEntry,
             entry => this.OpenInBackground?.Invoke(entry));
     }
 
-    internal void Initialize(
-        BrowserViewModel viewModel,
-        SettingsViewModel preferences,
-        MenuFlyout entries,
-        MenuFlyout background)
+    internal void Initialize(BrowserViewModel viewModel, SettingsViewModel preferences, MenuFlyout entries, MenuFlyout background)
     {
         this.ViewModel = viewModel;
         this._preferences = preferences;
@@ -80,8 +74,7 @@ public sealed partial class RegistryEntryList : UserControl
         {
             command.PropertyChanged += async (_, args) =>
             {
-                if (args.PropertyName == nameof(command.IsRunning) &&
-                    command is { IsRunning: true, ExecutionTask: { } edit })
+                if (args.PropertyName == nameof(command.IsRunning) && command is { IsRunning: true, ExecutionTask: { } edit })
                 {
                     await this.KeepPlaceAsync(() => edit);
                 }
@@ -100,8 +93,9 @@ public sealed partial class RegistryEntryList : UserControl
                 this.ApplyColumnLayout();
             }
 
-            if (args.PropertyName is nameof(this.ViewModel.SelectedEntries) or nameof(this.ViewModel.IsUpdatingValue) &&
-                !this.ViewModel.IsUpdatingValue && !this._syncingSelection)
+            if (args.PropertyName is nameof(this.ViewModel.SelectedEntries) or nameof(this.ViewModel.IsUpdatingValue)
+                && !this.ViewModel.IsUpdatingValue
+                && !this._syncingSelection)
             {
                 this._syncingSelection = true;
                 try
@@ -123,9 +117,7 @@ public sealed partial class RegistryEntryList : UserControl
 
             if (args.PropertyName == nameof(this.ViewModel.VisibleEntryCount))
             {
-                this.EmptyState.Visibility = this.ViewModel.VisibleEntryCount == 0
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+                this.EmptyState.Visibility = this.ViewModel.VisibleEntryCount == 0 ? Visibility.Visible : Visibility.Collapsed;
             }
         };
         this.ApplyColumnLayout();
@@ -138,10 +130,9 @@ public sealed partial class RegistryEntryList : UserControl
     {
         var visible = this._preferences.ListColumns;
         return new ColumnLayout(
-            visible.Select(column => new ColumnState(column.ToString(), this.ViewModel.Layout.Width(column), true))
-                .Concat(
-                    RegistryColumns.All.Where(column => !visible.Contains(column)).Select(column =>
-                        new ColumnState(column.ToString(), this.ViewModel.Layout.Width(column), false))).ToArray());
+            visible.Select(column => new ColumnState(column.ToString(), this.ViewModel.Layout.Width(column), true)).Concat(
+                RegistryColumns.All.Where(column => !visible.Contains(column)).Select(column => new ColumnState(
+                    column.ToString(), this.ViewModel.Layout.Width(column), false))).ToArray());
     }
 
     private void ApplyColumnLayout()
@@ -165,8 +156,7 @@ public sealed partial class RegistryEntryList : UserControl
         {
             foreach (var state in layout.Columns)
             {
-                if (RegistryColumns.TryParse(state.Id, out var column) &&
-                    state.Width != this.ViewModel.Layout.Width(column))
+                if (RegistryColumns.TryParse(state.Id, out var column) && state.Width != this.ViewModel.Layout.Width(column))
                 {
                     this.ViewModel.SetColumnWidth(column, state.Width);
                 }
@@ -199,8 +189,9 @@ public sealed partial class RegistryEntryList : UserControl
 
     private void Entries_VisibleItemsChanged(object? sender, EventArgs args)
     {
-        if (this.ViewModel is not null && this._preferences is not null &&
-            this._preferences.ListColumns.Any(RegistryColumns.NeedsKeyDetails))
+        if (this.ViewModel is not null
+            && this._preferences is not null
+            && this._preferences.ListColumns.Any(RegistryColumns.NeedsKeyDetails))
         {
             _ = this.ViewModel.LoadVisibleDetailsAsync(this.Entries.VisibleItems.OfType<RegistryEntry>());
         }
@@ -376,8 +367,9 @@ public sealed partial class RegistryEntryList : UserControl
     // F2 renames in place when the row allows it, otherwise (several rows, list hidden) through the dialog.
     private bool BeginInlineRename()
     {
-        return this.ViewModel.SelectedEntries.Count == 1 && this.ViewModel.SelectedEntry is { } entry &&
-               this.Entries.BeginEdit(entry, nameof(RegistrySortColumn.Name));
+        return this.ViewModel.SelectedEntries.Count == 1
+               && this.ViewModel.SelectedEntry is { } entry
+               && this.Entries.BeginEdit(entry, nameof(RegistrySortColumn.Name));
     }
 
     private void Entries_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args)
@@ -492,10 +484,11 @@ public sealed partial class RegistryEntryList : UserControl
 
     private void Entries_CharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs args)
     {
-        if (char.IsControl(args.Character) || char.IsWhiteSpace(args.Character) ||
-            FocusManager.GetFocusedElement(this.XamlRoot) is TextBox ||
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0 ||
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0)
+        if (char.IsControl(args.Character)
+            || char.IsWhiteSpace(args.Character)
+            || FocusManager.GetFocusedElement(this.XamlRoot) is TextBox
+            || (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0
+            || (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0)
         {
             return;
         }

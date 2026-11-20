@@ -44,10 +44,7 @@ internal static class RegistryColumns
         return column is RegistrySortColumn.LastWrite or RegistrySortColumn.Children or RegistrySortColumn.LinkTarget;
     }
 
-    internal static IEnumerable<RegistryEntry> Sort(
-        IEnumerable<RegistryEntry> entries,
-        RegistrySortColumn column,
-        bool descending)
+    internal static IEnumerable<RegistryEntry> Sort(IEnumerable<RegistryEntry> entries, RegistrySortColumn column, bool descending)
     {
         var grouped = entries.OrderByDescending(item => item.IsKey).ThenByDescending(item => item.IsDefaultValue);
 

@@ -22,9 +22,7 @@ internal static class JournalArchiveTests
             var first = JournalHistoryTests.Entry("Original", 0) with { Kind = JournalOperation.CreateValue };
             var later = JournalHistoryTests.Entry("Later", 0) with
             {
-                Time = first.Time.AddSeconds(1),
-                Before = [JournalHistoryTests.State(1, 0)],
-                After = [JournalHistoryTests.State(2, 0)]
+                Time = first.Time.AddSeconds(1), Before = [JournalHistoryTests.State(1, 0)], After = [JournalHistoryTests.State(2, 0)]
             };
             var unknown = later with
             {
@@ -44,15 +42,9 @@ internal static class JournalArchiveTests
                 Before = later.After!,
                 After = later.Before
             };
-            var legacy = JournalHistoryTests.Entry("Create value", 2) with
-            {
-                Time = first.Time.AddSeconds(4), Kind = null
-            };
+            var legacy = JournalHistoryTests.Entry("Create value", 2) with { Time = first.Time.AddSeconds(4), Kind = null };
             var unnamed = JournalHistoryTests.Entry("Unnamed", 3);
-            unnamed = unnamed with
-            {
-                Before = unnamed.Before.Select(Unnamed).ToArray(), After = unnamed.After!.Select(Unnamed).ToArray()
-            };
+            unnamed = unnamed with { Before = unnamed.Before.Select(Unnamed).ToArray(), After = unnamed.After!.Select(Unnamed).ToArray() };
             foreach (var entry in new[] { first, later, unknown, revert, legacy, unnamed })
             {
                 Write(folder.FullName, entry);
@@ -62,8 +54,7 @@ internal static class JournalArchiveTests
                 path => path, path => (Bytes: File.ReadAllBytes(path), Written: File.GetLastWriteTimeUtc(path)));
             var journal = new RegistryJournal(folder.FullName);
             var model = new JournalViewModel(journal, NullLogger<JournalViewModel>.Instance);
-            var secondWindow = new JournalViewModel(
-                new RegistryJournal(folder.FullName), NullLogger<JournalViewModel>.Instance);
+            var secondWindow = new JournalViewModel(new RegistryJournal(folder.FullName), NullLogger<JournalViewModel>.Instance);
             check(!model.ArchiveAllCommand.CanExecute(null), "Archive all is disabled for empty history");
             await model.RefreshAsync();
             await secondWindow.RefreshAsync();
@@ -74,47 +65,36 @@ internal static class JournalArchiveTests
             try
             {
                 panel.Query = ToolPresentation.JournalTarget(first);
-                check(
-                    panel.VisibleEntries.Any(entry => entry.Id == first.Id),
-                    "Journal search preserves the exact joined visible target");
+                check(panel.VisibleEntries.Any(entry => entry.Id == first.Id), "Journal search preserves the exact joined visible target");
                 panel.Query = ToolPresentation.JournalTarget(unnamed);
-                check(
-                    panel.VisibleEntries.Single().Id == unnamed.Id,
-                    "Journal search preserves the joined unnamed-value target");
+                check(panel.VisibleEntries.Single().Id == unnamed.Id, "Journal search preserves the joined unnamed-value target");
                 panel.Query = "Completed · Reverted";
-                check(
-                    panel.VisibleEntries.Single().Id == later.Id, "Journal search preserves the full displayed status");
+                check(panel.VisibleEntries.Single().Id == later.Id, "Journal search preserves the full displayed status");
                 panel.Query = string.Empty;
-                panel.OperationFilter
-                    = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.Unknown);
+                panel.OperationFilter = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.Unknown);
                 check(
                     panel.VisibleEntries.Single().Id == unknown.Id,
                     "Typed operation filtering groups unknown future identifiers without depending on their labels");
-                panel.OperationFilter
-                    = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.CreateValue);
+                panel.OperationFilter = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.CreateValue);
                 check(
-                    panel.VisibleEntries.Any(entry => entry.Id == legacy.Id) && new InvestigationRow(
-                            "Changed label", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty,
-                            legacy)
-                        .Glyph == ToolPresentation.JournalGlyph(JournalOperation.CreateValue),
+                    panel.VisibleEntries.Any(entry => entry.Id == legacy.Id)
+                    && new InvestigationRow("Changed label", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, legacy)
+                        .Glyph
+                    == ToolPresentation.JournalGlyph(JournalOperation.CreateValue),
                     "Legacy operations retain typed filtering and icons independently from display labels");
 
                 tab.SelectedEntry = unknown;
                 await tab.ToggleArchiveCommand.ExecuteAsync(null);
                 check(
-                    journal.ReadArchiveState().ArchivedIds.Contains(unknown.Id) &&
-                    new RegistryJournal(folder.FullName).ReadArchiveState().ArchivedIds.Contains(unknown.Id) &&
-                    new FileInfo(Path.Combine(folder.FullName, unknown.Id.ToString("N") + ".archive")).Length == 1,
+                    journal.ReadArchiveState().ArchivedIds.Contains(unknown.Id)
+                    && new RegistryJournal(folder.FullName).ReadArchiveState().ArchivedIds.Contains(unknown.Id)
+                    && new FileInfo(Path.Combine(folder.FullName, unknown.Id.ToString("N") + ".archive")).Length == 1,
                     "Archive commands persist one-byte per-entry metadata across reopening");
-                check(
-                    !secondWindow.ArchivedIds.Contains(unknown.Id),
-                    "Another window keeps its current presentation until refresh");
+                check(!secondWindow.ArchivedIds.Contains(unknown.Id), "Another window keeps its current presentation until refresh");
                 await secondWindow.RefreshAsync();
                 check(secondWindow.ArchivedIds.Contains(unknown.Id), "The next window refresh observes archived state");
                 panel.OperationFilter = panel.OperationChoices[0];
-                check(
-                    !panel.VisibleEntries.Any(entry => entry.Id == unknown.Id),
-                    "Archived entries are hidden by default");
+                check(!panel.VisibleEntries.Any(entry => entry.Id == unknown.Id), "Archived entries are hidden by default");
                 tab.ArchiveFilter = tab.ArchiveChoices.Single(choice => choice.View == JournalArchiveView.Archived);
                 check(
                     tab.VisibleEntries.Single().Id == unknown.Id && panel.VisibleEntries.Count() == 5,
@@ -124,8 +104,7 @@ internal static class JournalArchiveTests
                 await model.SetSelectionAsync(panel, first);
                 var blocker = panel.Links.Single(link => link.Target.Id == unknown.Id);
                 panel.Query = "Original";
-                panel.OperationFilter
-                    = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.CreateValue);
+                panel.OperationFilter = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.CreateValue);
                 JournalEntry? requested = null;
                 panel.EntryRequested += entry =>
                 {
@@ -134,9 +113,11 @@ internal static class JournalArchiveTests
                 };
                 blocker.Command.Execute(blocker.EntryId);
                 check(
-                    requested?.Id == unknown.Id && panel.VisibleEntries.Any(entry => entry.Id == unknown.Id) &&
-                    panel.ArchiveFilter!.View == JournalArchiveView.All && panel.OperationFilter!.Operation is null &&
-                    tab.ArchiveFilter!.View == JournalArchiveView.Archived,
+                    requested?.Id == unknown.Id
+                    && panel.VisibleEntries.Any(entry => entry.Id == unknown.Id)
+                    && panel.ArchiveFilter!.View == JournalArchiveView.All
+                    && panel.OperationFilter!.Operation is null
+                    && tab.ArchiveFilter!.View == JournalArchiveView.Archived,
                     "An explicit blocker link reveals its archived filtered target in only the requesting surface");
                 var refused = false;
                 try
@@ -155,20 +136,19 @@ internal static class JournalArchiveTests
                 panel.SelectedEntry = later;
                 tab.SelectedEntry = revert;
                 check(
-                    panel.Links.Any(link => link.Target.Id == revert.Id && link.Label.StartsWith("Revert edit")) &&
-                    tab.Links.Any(link => link.Target.Id == later.Id && link.Label.StartsWith("Original edit")),
+                    panel.Links.Any(link => link.Target.Id == revert.Id && link.Label.StartsWith("Revert edit"))
+                    && tab.Links.Any(link => link.Target.Id == later.Id && link.Label.StartsWith("Original edit")),
                     "Original edits and their Revert entries expose links in both directions");
                 panel.SelectedEntry = unknown;
                 await panel.ToggleArchiveCommand.ExecuteAsync(null);
                 check(
-                    !journal.ReadArchiveState().ArchivedIds.Contains(unknown.Id) &&
-                    panel.ArchiveAction == "Archive edit",
+                    !journal.ReadArchiveState().ArchivedIds.Contains(unknown.Id) && panel.ArchiveAction == "Archive edit",
                     "Unarchive durably restores an entry without deleting its history");
                 check(
                     saved.All(pair =>
-                        File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value.Bytes) &&
-                        File.GetLastWriteTimeUtc(pair.Key) == pair.Value.Written) &&
-                    Directory.GetFiles(folder.FullName, "*.tmp").Length == 0,
+                        File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value.Bytes)
+                        && File.GetLastWriteTimeUtc(pair.Key) == pair.Value.Written)
+                    && Directory.GetFiles(folder.FullName, "*.tmp").Length == 0,
                     "Archive and unarchive never rewrite journal JSON or leak temporary files");
                 panel.SelectedEntry = null;
                 check(!panel.ToggleArchiveCommand.CanExecute(null), "Archive requires one inspected entry");
@@ -177,8 +157,10 @@ internal static class JournalArchiveTests
                 File.WriteAllBytes(marker, [2]);
                 await model.RefreshAsync();
                 check(
-                    model.Error is null && model.ArchiveError is not null && model.Entries.Length == saved.Count &&
-                    panel.VisibleEntries.Any(entry => entry.Id == unknown.Id),
+                    model.Error is null
+                    && model.ArchiveError is not null
+                    && model.Entries.Length == saved.Count
+                    && panel.VisibleEntries.Any(entry => entry.Id == unknown.Id),
                     "Malformed archive display metadata leaves readable history visible and separate from integrity errors");
                 using (var cancellation = new CancellationTokenSource())
                 {
@@ -200,14 +182,14 @@ internal static class JournalArchiveTests
 
                 panel.Query = "No matching edit";
                 panel.ScopeIndex = 1;
-                panel.OperationFilter
-                    = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.Unknown);
+                panel.OperationFilter = panel.OperationChoices.Single(choice => choice.Operation == JournalOperation.Unknown);
                 check(model.ArchiveAllCommand.CanExecute(null), "Archive all requires no selection or matching rows");
                 await model.ArchiveAllCommand.ExecuteAsync(null);
                 check(
-                    model.ArchivedIds.Count == saved.Count &&
-                    new RegistryJournal(folder.FullName).ReadArchiveState().ArchivedIds.Count == saved.Count &&
-                    model.ArchiveError is null && !model.ArchiveAllCommand.CanExecute(null),
+                    model.ArchivedIds.Count == saved.Count
+                    && new RegistryJournal(folder.FullName).ReadArchiveState().ArchivedIds.Count == saved.Count
+                    && model.ArchiveError is null
+                    && !model.ArchiveAllCommand.CanExecute(null),
                     "Archive all persists every entry regardless of filters and repairs unreadable archive markers");
                 panel.Query = string.Empty;
                 panel.ScopeIndex = 0;
@@ -217,8 +199,9 @@ internal static class JournalArchiveTests
                     !panel.VisibleEntries.Any() && tab.VisibleEntries.Count() == saved.Count,
                     "Archive all clears active history while the archived surface retains every entry");
                 check(
-                    saved.All(pair => File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value.Bytes) &&
-                                      File.GetLastWriteTimeUtc(pair.Key) == pair.Value.Written),
+                    saved.All(pair =>
+                        File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value.Bytes)
+                        && File.GetLastWriteTimeUtc(pair.Key) == pair.Value.Written),
                     "Archive all preserves every journal record and its timestamp");
 
                 var next = first with { Id = Guid.NewGuid(), Time = first.Time.AddDays(1) };
@@ -245,9 +228,11 @@ internal static class JournalArchiveTests
                 };
                 await model.ArchiveAllCommand.ExecuteAsync(null);
                 check(
-                    failure == "Could not archive all edits" && model.ArchivedIds.Contains(first.Id) &&
-                    !model.ArchivedIds.Contains(later.Id) && panel.VisibleEntries.Single().Id == later.Id &&
-                    model.ArchiveAllCommand.CanExecute(null),
+                    failure == "Could not archive all edits"
+                    && model.ArchivedIds.Contains(first.Id)
+                    && !model.ArchivedIds.Contains(later.Id)
+                    && panel.VisibleEntries.Single().Id == later.Id
+                    && model.ArchiveAllCommand.CanExecute(null),
                     "A partial archive failure reports the error and refreshes completed writes for retry");
             }
             finally
@@ -350,9 +335,9 @@ internal static class JournalArchiveTests
             journal.SetArchived(independent.Id, true);
             journal.Revert(independent.Id);
             check(
-                raw.ReadValue(root, "independent") is null &&
-                journal.ReadArchiveState().ArchivedIds.Contains(independent.Id) &&
-                journal.ReadEntries().Last().Reverts == independent.Id,
+                raw.ReadValue(root, "independent") is null
+                && journal.ReadArchiveState().ArchivedIds.Contains(independent.Id)
+                && journal.ReadEntries().Last().Reverts == independent.Id,
                 "Archiving is reversible presentation and does not prevent an otherwise safe explicit Revert");
         }
         finally

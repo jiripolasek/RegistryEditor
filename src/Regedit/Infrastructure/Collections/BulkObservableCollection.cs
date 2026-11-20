@@ -30,8 +30,7 @@ internal sealed class BulkObservableCollection<T> : ObservableCollection<T>
             this.Items.Add(item);
             if (!reset)
             {
-                this.OnCollectionChanged(
-                    new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, this.Count - 1));
+                this.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, this.Count - 1));
             }
         }
 

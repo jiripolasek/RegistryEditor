@@ -12,14 +12,21 @@ namespace JPSoftworks.Regedit.Core.Journal;
 
 internal sealed partial class AdministratorJournalDirectory : IDisposable
 {
+    private const AccessControlSections Sections = AccessControlSections.Owner | AccessControlSections.Access;
     private static readonly SecurityIdentifier Administrators = new(WellKnownSidType.BuiltinAdministratorsSid, null);
     private static readonly SecurityIdentifier SystemAccount = new(WellKnownSidType.LocalSystemSid, null);
 
-    private static readonly SecurityIdentifier TrustedInstaller
-        = new("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
+    private static readonly SecurityIdentifier TrustedInstaller = new("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
 
     private readonly List<SafeFileHandle> _handles = [];
-    private const AccessControlSections Sections = AccessControlSections.Owner | AccessControlSections.Access;
+
+    public void Dispose()
+    {
+        for (var index = this._handles.Count - 1; index >= 0; index--)
+        {
+            this._handles[index].Dispose();
+        }
+    }
 
     public static AdministratorJournalDirectory Open(string folder)
     {
@@ -42,8 +49,7 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
 
             foreach (var directory in directories)
             {
-                var isPrivate = directory.FullName.StartsWith(
-                    data + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+                var isPrivate = directory.FullName.StartsWith(data + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
                 if (isPrivate)
                 {
                     directory.Create(DirectoryDescriptor());
@@ -55,8 +61,7 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
                 {
                     var error = Marshal.GetLastPInvokeError();
                     handle.Dispose();
-                    throw new IOException(
-                        "The administrator journal directory could not be secured.", new Win32Exception(error));
+                    throw new IOException("The administrator journal directory could not be secured.", new Win32Exception(error));
                 }
 
                 lease._handles.Add(handle);
@@ -133,8 +138,7 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
         foreach (var sid in new[] { Administrators, SystemAccount })
         {
             security.AddAccessRule(
-                new FileSystemAccessRule(
-                    sid, FileSystemRights.FullControl, inheritance, PropagationFlags.None, AccessControlType.Allow));
+                new FileSystemAccessRule(sid, FileSystemRights.FullControl, inheritance, PropagationFlags.None, AccessControlType.Allow));
         }
     }
 
@@ -163,9 +167,7 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
         }
 
         var rules = Rules(security);
-        var inheritance = directory
-            ? InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit
-            : InheritanceFlags.None;
+        var inheritance = directory ? InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit : InheritanceFlags.None;
         if (rules.Count != 2)
         {
             throw UnsafeStore();
@@ -174,10 +176,13 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
         var identities = new HashSet<IdentityReference>();
         foreach (FileSystemAccessRule rule in rules)
         {
-            if (!IsAdministrator(rule.IdentityReference) || !identities.Add(rule.IdentityReference) ||
-                rule.AccessControlType != AccessControlType.Allow ||
-                rule.FileSystemRights != FileSystemRights.FullControl || rule.InheritanceFlags != inheritance ||
-                rule.PropagationFlags != PropagationFlags.None || rule.IsInherited)
+            if (!IsAdministrator(rule.IdentityReference)
+                || !identities.Add(rule.IdentityReference)
+                || rule.AccessControlType != AccessControlType.Allow
+                || rule.FileSystemRights != FileSystemRights.FullControl
+                || rule.InheritanceFlags != inheritance
+                || rule.PropagationFlags != PropagationFlags.None
+                || rule.IsInherited)
             {
                 throw UnsafeStore();
             }
@@ -194,12 +199,17 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
 
         foreach (FileSystemAccessRule rule in Rules(security))
         {
-            if (rule.AccessControlType == AccessControlType.Allow &&
-                (rule.PropagationFlags & PropagationFlags.InheritOnly) == 0 &&
-                !IsAdministrator(rule.IdentityReference) && !TrustedInstaller.Equals(rule.IdentityReference) &&
-                (rule.FileSystemRights & (FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles |
-                                          FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership |
-                                          (FileSystemRights)0x10000000)) != 0)
+            if (rule.AccessControlType == AccessControlType.Allow
+                && (rule.PropagationFlags & PropagationFlags.InheritOnly) == 0
+                && !IsAdministrator(rule.IdentityReference)
+                && !TrustedInstaller.Equals(rule.IdentityReference)
+                && (rule.FileSystemRights
+                    & (FileSystemRights.Delete
+                       | FileSystemRights.DeleteSubdirectoriesAndFiles
+                       | FileSystemRights.ChangePermissions
+                       | FileSystemRights.TakeOwnership
+                       | (FileSystemRights)0x10000000))
+                != 0)
             {
                 throw UnsafeStore();
             }
@@ -212,16 +222,7 @@ internal sealed partial class AdministratorJournalDirectory : IDisposable
             "The administrator journal has unsafe ownership, permissions, or a redirected path. Registry edits require a secure journal. Repair or move the journal using an administrator account; it cannot fall back to the user profile.");
     }
 
-    public void Dispose()
-    {
-        for (var index = this._handles.Count - 1; index >= 0; index--)
-        {
-            this._handles[index].Dispose();
-        }
-    }
-
-    [LibraryImport(
-        "kernel32.dll", EntryPoint = "CreateFileW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     private static partial SafeFileHandle OpenDirectory(
         string path,
         uint access,

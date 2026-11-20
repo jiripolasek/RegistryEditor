@@ -11,23 +11,15 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 public sealed partial class BrowserViewModel
 {
-    private sealed record EditAction(
-        Guid[] Entries,
-        string Label,
-        RegistryLocation Target,
-        string? ValueName,
-        bool HasKeys,
-        string? BlockedReason = null);
+    internal event Action<string, string, bool>? HistoryNotice;
+
+    internal event Func<Guid, Task>? HistoryJournalRequested;
 
     private readonly List<EditAction> _undoEdits = [];
     private readonly List<EditAction> _redoEdits = [];
     private Guid _historyJournalEntry;
     private RegistryLocation? _historyTarget;
     private string? _historyValue;
-
-    internal event Action<string, string, bool>? HistoryNotice;
-
-    internal event Func<Guid, Task>? HistoryJournalRequested;
 
     internal Func<string, string, Task<bool>>? ConfirmHistoryChange { get; set; }
 
@@ -45,25 +37,22 @@ public sealed partial class BrowserViewModel
 
     private static string HistoryLabel(List<EditAction> stack, string verb)
     {
-        return stack.LastOrDefault() is { } edit
-            ? edit.BlockedReason is null ? verb + " " + edit.Label : verb + " unavailable"
-            : verb;
+        return stack.LastOrDefault() is { } edit ? edit.BlockedReason is null ? verb + " " + edit.Label : verb + " unavailable" : verb;
     }
 
     private static string HistoryTarget(EditAction edit)
     {
-        return edit.Target.Address + $" · {edit.Target.Machine ?? "This computer"}" +
-               $" · {(edit.Target.View == RegistryView.Registry32 ? "32-bit" : "64-bit")} registry" +
-               (edit.ValueName is null
-                   ? string.Empty
-                   : "\n" + (edit.ValueName.Length == 0 ? "(Default)" : edit.ValueName));
+        return edit.Target.Address
+               + $" · {edit.Target.Machine ?? "This computer"}"
+               + $" · {(edit.Target.View == RegistryView.Registry32 ? "32-bit" : "64-bit")} registry"
+               + (edit.ValueName is null ? string.Empty : "\n" + (edit.ValueName.Length == 0 ? "(Default)" : edit.ValueName));
     }
 
     private static string HistoryHelp(List<EditAction> stack, string verb, string shortcut)
     {
         return stack.LastOrDefault() is { } edit
-            ? $"{HistoryLabel(stack, verb)} ({shortcut})\n{HistoryTarget(edit)}" +
-              (edit.BlockedReason is null ? string.Empty : "\n" + edit.BlockedReason)
+            ? $"{HistoryLabel(stack, verb)} ({shortcut})\n{HistoryTarget(edit)}"
+              + (edit.BlockedReason is null ? string.Empty : "\n" + edit.BlockedReason)
             : $"{verb} ({shortcut})\nNo edits to {verb.ToLowerInvariant()} in this tab.";
     }
 
@@ -88,8 +77,7 @@ public sealed partial class BrowserViewModel
         if (!succeeded || changed.Any(entry => entry.After is null || entry.Error is not null))
         {
             this.BlockHistory(
-                changed,
-                "An edit failed or its final state could not be recorded. Inspect it in the Journal before continuing.");
+                changed, "An edit failed or its final state could not be recorded. Inspect it in the Journal before continuing.");
             return;
         }
 
@@ -125,8 +113,7 @@ public sealed partial class BrowserViewModel
         this._historyJournalEntry = entry.Id;
         this._undoEdits.Add(
             new EditAction(
-                recorded.Select(item => item.Id).ToArray(), "incomplete edit", entry.Before[0].Scope.Location, null,
-                false, reason));
+                recorded.Select(item => item.Id).ToArray(), "incomplete edit", entry.Before[0].Scope.Location, null, false, reason));
         this._redoEdits.Clear();
         this.HistoryChanged();
         this.HistoryNotice?.Invoke("Undo history needs review", reason, true);
@@ -148,8 +135,7 @@ public sealed partial class BrowserViewModel
     {
         var from = redo ? this._redoEdits : this._undoEdits;
         var to = redo ? this._undoEdits : this._redoEdits;
-        if (!this.CanPrompt || from.LastOrDefault() is not { BlockedReason: null } edit ||
-            this.Registry.Journal is not { } journal)
+        if (!this.CanPrompt || from.LastOrDefault() is not { BlockedReason: null } edit || this.Registry.Journal is not { } journal)
         {
             return;
         }
@@ -159,10 +145,12 @@ public sealed partial class BrowserViewModel
         var recorded = new List<JournalEntry>();
         try
         {
-            if (edit.HasKeys && this.ConfirmHistoryChange is { } confirm && !await confirm(
+            if (edit.HasKeys
+                && this.ConfirmHistoryChange is { } confirm
+                && !await confirm(
                     verb + " " + edit.Label + "?",
-                    HistoryTarget(edit) +
-                    "\n\nThis can change an entire key and its subkeys. Registry writes are not atomic. Recreated keys restore owner, group and access rules, but not auditing or other key metadata."))
+                    HistoryTarget(edit)
+                    + "\n\nThis can change an entire key and its subkeys. Registry writes are not atomic. Recreated keys restore owner, group and access rules, but not auditing or other key metadata."))
             {
                 return;
             }
@@ -176,8 +164,7 @@ public sealed partial class BrowserViewModel
             this._historyJournalEntry = edit.Entries.Last();
             try
             {
-                await Task.Run(() => journal.TrackEdits(
-                    () => journal.Revert(edit.Entries, this._editCancellation.Token), recorded));
+                await Task.Run(() => journal.TrackEdits(() => journal.Revert(edit.Entries, this._editCancellation.Token), recorded));
             }
             catch (Exception ex)
             {
@@ -197,9 +184,7 @@ public sealed partial class BrowserViewModel
                 if (changed.Length > 0)
                 {
                     this.BlockHistory(
-                        changed,
-                        verb + " may have partially changed the registry. Inspect the Journal before recovery. " +
-                        ex.Message);
+                        changed, verb + " may have partially changed the registry. Inspect the Journal before recovery. " + ex.Message);
                     await this.RefreshHistoryViewsAsync(recorded);
                 }
                 else
@@ -220,9 +205,7 @@ public sealed partial class BrowserViewModel
             this._historyTarget = restored.Scope.ValueNames is null && restored.Snapshot.Keys.Length == 0
                 ? restored.Scope.Location.Parent ?? restored.Scope.Location
                 : restored.Scope.Location;
-            this._historyValue = restored.Scope.ValueNames is null
-                ? null
-                : restored.Snapshot.Keys[0].Values.FirstOrDefault()?.Name;
+            this._historyValue = restored.Scope.ValueNames is null ? null : restored.Snapshot.Keys[0].Values.FirstOrDefault()?.Name;
             this.RegistryChanged?.Invoke(this, EventArgs.Empty);
             if (await this.RefreshHistoryViewsAsync(recorded) && !this._closed)
             {
@@ -251,8 +234,7 @@ public sealed partial class BrowserViewModel
         {
             this.EditFailed?.Invoke(ex);
             this.HistoryNotice?.Invoke(
-                "Couldn't refresh the view",
-                "The registry has changed. Review the Journal to confirm the result.\n" + ex.Message, true);
+                "Couldn't refresh the view", "The registry has changed. Review the Journal to confirm the result.\n" + ex.Message, true);
             return false;
         }
     }
@@ -276,32 +258,31 @@ public sealed partial class BrowserViewModel
             foreach (var pair in entry.Before.Zip(entry.After!))
             {
                 var removed = pair.First.Scope.Location;
-                if (pair.First.Scope.ValueNames is null && pair.First.Snapshot.Keys.Length > 0 &&
-                    pair.Second.Snapshot.Keys.Length == 0 && this.LocationAfterKeyChange(removed, null) is { } parent)
+                if (pair.First.Scope.ValueNames is null
+                    && pair.First.Snapshot.Keys.Length > 0
+                    && pair.Second.Snapshot.Keys.Length == 0
+                    && this.LocationAfterKeyChange(removed, null) is { } parent)
                 {
-                    var replacement = entry.After!.FirstOrDefault(state => state.Scope.ValueNames is null &&
-                                                                           state.Snapshot.Keys.Length > 0 &&
-                                                                           state.Scope.Location.Parent ==
-                                                                           removed.Parent)?.Scope.Location;
-                    destination = replacement is null
-                        ? parent
-                        : this.LocationAfterKeyChange(removed, replacement.Name) ?? parent;
+                    var replacement = entry.After!.FirstOrDefault(state =>
+                            state.Scope.ValueNames is null
+                            && state.Snapshot.Keys.Length > 0
+                            && state.Scope.Location.Parent == removed.Parent)
+                        ?.Scope.Location;
+                    destination = replacement is null ? parent : this.LocationAfterKeyChange(removed, replacement.Name) ?? parent;
                 }
             }
         }
 
         this.TreeRefreshRequested?.Invoke();
         await this.NavigateAsync(destination, !destination.IsSameLocation(this.Location));
-        if (selectChangedValue && this._historyTarget?.IsSameLocation(this.Location) == true &&
-            this._historyValue is { } name)
+        if (selectChangedValue && this._historyTarget?.IsSameLocation(this.Location) == true && this._historyValue is { } name)
         {
             this.SelectedEntry = this.Entries.FirstOrDefault(entry =>
                 entry.Value?.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == true);
         }
         else if (selectChangedValue && this._historyTarget?.Parent?.IsSameLocation(this.Location) == true)
         {
-            this.SelectedEntry
-                = this.Entries.FirstOrDefault(entry => entry.Key?.IsSameLocation(this._historyTarget) == true);
+            this.SelectedEntry = this.Entries.FirstOrDefault(entry => entry.Key?.IsSameLocation(this._historyTarget) == true);
         }
     }
 
@@ -326,4 +307,12 @@ public sealed partial class BrowserViewModel
                 entry.Value?.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == true);
         }
     }
+
+    private sealed record EditAction(
+        Guid[] Entries,
+        string Label,
+        RegistryLocation Target,
+        string? ValueName,
+        bool HasKeys,
+        string? BlockedReason = null);
 }

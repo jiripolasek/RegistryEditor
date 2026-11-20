@@ -13,40 +13,24 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed partial class JournalViewModel
 {
+    internal event EventHandler? Changed;
+
+    internal event EventHandler? EligibilityChanged;
+
+    internal event Action<string, string, NoticeKind>? Notice;
+
     private readonly ILogger<JournalViewModel> _logger;
     private readonly JournalHistoryReader _reader;
-    private int _request;
-    private int _completedRequest;
-    private int _historyVersion;
     private readonly object _eligibilityGate = new();
     private readonly Dictionary<object, Guid> _selections = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<Guid, Eligibility> _eligibility = [];
+
+    private readonly Func<IReadOnlyList<JournalEntry>, JournalEntry, IReadOnlySet<Guid>, JournalConflict?> _findConflict;
+
+    private int _request;
+    private int _completedRequest;
+    private int _historyVersion;
     private Dictionary<Guid, JournalEntry> _byId = [];
-
-    private readonly Func<IReadOnlyList<JournalEntry>, JournalEntry, IReadOnlySet<Guid>, JournalConflict?>
-        _findConflict;
-
-    private sealed record Eligibility(JournalEntry Entry, int Version)
-    {
-        internal Task Work { get; set; } = Task.CompletedTask;
-
-        internal bool Ready { get; set; }
-
-        internal JournalConflict? Conflict { get; set; }
-
-        internal string? Error { get; set; }
-    }
-
-    internal JournalViewModel(
-        RegistryJournal journal,
-        ILogger<JournalViewModel> logger,
-        Func<IReadOnlyList<JournalEntry>, JournalEntry, IReadOnlySet<Guid>, JournalConflict?>? findConflict = null)
-    {
-        this.Journal = journal;
-        this._reader = new JournalHistoryReader(journal);
-        this._logger = logger;
-        this._findConflict = findConflict ?? RegistryJournal.FindLaterConflict;
-    }
 
     internal RegistryJournal Journal { get; }
 
@@ -60,15 +44,22 @@ internal sealed partial class JournalViewModel
 
     internal string? Error { get; private set; }
 
-    internal event EventHandler? Changed;
-
-    internal event EventHandler? EligibilityChanged;
-
     internal Func<JournalEntry, Task<bool>>? ConfirmRevert { get; set; }
 
     internal Func<Task>? RefreshBrowser { get; set; }
 
-    internal event Action<string, string, NoticeKind>? Notice;
+    private bool CanArchiveAll => this.Entries.Any(entry => !this.ArchivedIds.Contains(entry.Id));
+
+    internal JournalViewModel(
+        RegistryJournal journal,
+        ILogger<JournalViewModel> logger,
+        Func<IReadOnlyList<JournalEntry>, JournalEntry, IReadOnlySet<Guid>, JournalConflict?>? findConflict = null)
+    {
+        this.Journal = journal;
+        this._reader = new JournalHistoryReader(journal);
+        this._logger = logger;
+        this._findConflict = findConflict ?? RegistryJournal.FindLaterConflict;
+    }
 
     internal JournalEntry? FindEntry(Guid id)
     {
@@ -105,8 +96,6 @@ internal sealed partial class JournalViewModel
         }
     }
 
-    private bool CanArchiveAll => this.Entries.Any(entry => !this.ArchivedIds.Contains(entry.Id));
-
     [RelayCommand(CanExecute = nameof(CanArchiveAll))]
     private async Task ArchiveAllAsync(CancellationToken token)
     {
@@ -133,8 +122,7 @@ internal sealed partial class JournalViewModel
         catch (Exception ex)
         {
             this._logger.LogFailure(LogLevel.Warning, "Archive all journal edits", ex);
-            this.Notice?.Invoke(
-                "Could not archive all edits", "Some entries may already be archived. " + ex.Message, NoticeKind.Error);
+            this.Notice?.Invoke("Could not archive all edits", "Some entries may already be archived. " + ex.Message, NoticeKind.Error);
             return;
         }
         finally
@@ -143,8 +131,7 @@ internal sealed partial class JournalViewModel
         }
 
         this.Notice?.Invoke(
-            "Edits archived", "The entries remain in history. Choose All or Archived history to find them.",
-            NoticeKind.Success);
+            "Edits archived", "The entries remain in history. Choose All or Archived history to find them.", NoticeKind.Success);
     }
 
     private (JournalHistory History, JournalArchiveState Archive, string? ArchiveError) ReadPresentation()
@@ -158,8 +145,7 @@ internal sealed partial class JournalViewModel
                     ? null
                     : $"Unreadable archive markers: {archive.DamagedFiles.Length}. Affected entries remain visible.");
         }
-        catch (Exception ex) when
-            (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
             return (history, new JournalArchiveState(new HashSet<Guid>(), []), ex.Message);
         }
@@ -186,8 +172,8 @@ internal sealed partial class JournalViewModel
     {
         lock (this._eligibilityGate)
         {
-            return this.BasicRevertUnavailableReason(selected) ??
-                   (this._eligibility.TryGetValue(selected!.Id, out var eligibility) && eligibility.Ready
+            return this.BasicRevertUnavailableReason(selected)
+                   ?? (this._eligibility.TryGetValue(selected!.Id, out var eligibility) && eligibility.Ready
                        ? eligibility.Error ?? eligibility.Conflict?.Reason
                        : "Checking for later journal edits…");
         }
@@ -197,9 +183,7 @@ internal sealed partial class JournalViewModel
     {
         lock (this._eligibilityGate)
         {
-            return this._eligibility.TryGetValue(selected.Id, out var eligibility) && eligibility.Ready
-                ? eligibility.Conflict
-                : null;
+            return this._eligibility.TryGetValue(selected.Id, out var eligibility) && eligibility.Ready ? eligibility.Conflict : null;
         }
     }
 
@@ -242,10 +226,7 @@ internal sealed partial class JournalViewModel
         return eligibility.Work;
     }
 
-    private async Task CheckEligibilityAsync(
-        Eligibility eligibility,
-        JournalEntry[] entries,
-        IReadOnlySet<Guid> reverted)
+    private async Task CheckEligibilityAsync(Eligibility eligibility, JournalEntry[] entries, IReadOnlySet<Guid> reverted)
     {
         JournalConflict? conflict = null;
         Exception? failure = null;
@@ -260,9 +241,9 @@ internal sealed partial class JournalViewModel
 
         lock (this._eligibilityGate)
         {
-            if (eligibility.Version != this._historyVersion ||
-                !this._eligibility.TryGetValue(eligibility.Entry.Id, out var current) ||
-                !ReferenceEquals(current, eligibility))
+            if (eligibility.Version != this._historyVersion
+                || !this._eligibility.TryGetValue(eligibility.Entry.Id, out var current)
+                || !ReferenceEquals(current, eligibility))
             {
                 return;
             }
@@ -294,8 +275,7 @@ internal sealed partial class JournalViewModel
             return;
         }
 
-        using var connection
-            = RemoteRegistryCredentials.Retain(selected.Before.Select(state => state.Scope.Location.Machine));
+        using var connection = RemoteRegistryCredentials.Retain(selected.Before.Select(state => state.Scope.Location.Machine));
         try
         {
             if (!await confirm(selected))
@@ -358,8 +338,8 @@ internal sealed partial class JournalViewModel
 
             var error = history.DamagedFiles.Length == 0
                 ? null
-                : $"Unreadable journal files: {history.DamagedFiles.Length} (including {history.DamagedFiles[0]}). " +
-                  "Intact entries are available for inspection. Revert requires the complete history.";
+                : $"Unreadable journal files: {history.DamagedFiles.Length} (including {history.DamagedFiles[0]}). "
+                  + "Intact entries are available for inspection. Revert requires the complete history.";
             lock (this._eligibilityGate)
             {
                 if (request != this._request)
@@ -367,8 +347,9 @@ internal sealed partial class JournalViewModel
                     return;
                 }
 
-                var changed = this.Error != error || this.Entries.Length != history.Entries.Length ||
-                              !this.Entries.Zip(history.Entries).All(pair => ReferenceEquals(pair.First, pair.Second));
+                var changed = this.Error != error
+                              || this.Entries.Length != history.Entries.Length
+                              || !this.Entries.Zip(history.Entries).All(pair => ReferenceEquals(pair.First, pair.Second));
                 this.Entries = history.Entries;
                 this._byId = history.Entries.ToDictionary(entry => entry.Id);
                 this.RevertedIds = JournalEntry.GetRevertedIds(history.Entries);
@@ -421,5 +402,16 @@ internal sealed partial class JournalViewModel
         {
             _ = this.RefreshAsync();
         }
+    }
+
+    private sealed record Eligibility(JournalEntry Entry, int Version)
+    {
+        internal Task Work { get; set; } = Task.CompletedTask;
+
+        internal bool Ready { get; set; }
+
+        internal JournalConflict? Conflict { get; set; }
+
+        internal string? Error { get; set; }
     }
 }

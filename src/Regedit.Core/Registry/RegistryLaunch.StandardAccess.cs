@@ -39,8 +39,7 @@ public static partial class RegistryLaunch
             using var identity = new WindowsIdentity(token.DangerousGetHandle());
             if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
             {
-                throw new InvalidOperationException(
-                    "The Windows desktop shell is elevated. Standard access is unavailable.");
+                throw new InvalidOperationException("The Windows desktop shell is elevated. Standard access is unavailable.");
             }
 
             var startup = new StartupInfo { Size = (uint)sizeof(StartupInfo) };
@@ -54,8 +53,7 @@ public static partial class RegistryLaunch
             fixed (char* command = commandLine)
             {
                 // The desktop user's profile is already loaded; loading it again requires additional token rights.
-                if (CreateProcessWithTokenW(
-                        launchToken, 0, executable, command, 0, 0, null, ref startup, out var created) == 0)
+                if (CreateProcessWithTokenW(launchToken, 0, executable, command, 0, 0, null, ref startup, out var created) == 0)
                 {
                     throw new Win32Exception(Marshal.GetLastPInvokeError());
                 }
@@ -69,8 +67,10 @@ public static partial class RegistryLaunch
     internal static string StandardAccessCommandLine(string executable, RegistryLocation location)
     {
         RegistryWorkspace.ValidateLocation(location, true);
-        var command = QuoteArgument(executable) + " " + QuoteArgument(location.Address) +
-                      (location.View == RegistryView.Registry32 ? " --32" : string.Empty);
+        var command = QuoteArgument(executable)
+                      + " "
+                      + QuoteArgument(location.Address)
+                      + (location.View == RegistryView.Registry32 ? " --32" : string.Empty);
         if (command.Length >= 1024)
         {
             throw new ArgumentException("This registry path is too long to open in a standard-access window.");
@@ -99,23 +99,6 @@ public static partial class RegistryLaunch
         return quoted.Append('\\', slashes * 2).Append('"').ToString();
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct StartupInfo
-    {
-        public uint Size;
-        public nint Reserved, Desktop, Title;
-        public uint X, Y, Width, Height, XChars, YChars, FillAttribute, Flags;
-        public ushort ShowWindow, ReservedSize;
-        public nint ReservedData, StandardInput, StandardOutput, StandardError;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct ProcessInformation
-    {
-        public nint Process, Thread;
-        public uint ProcessId, ThreadId;
-    }
-
     [LibraryImport("user32.dll")]
     private static partial nint GetShellWindow();
 
@@ -126,10 +109,7 @@ public static partial class RegistryLaunch
     private static partial SafeProcessHandle OpenProcess(uint access, int inheritHandle, uint processId);
 
     [LibraryImport("advapi32.dll", SetLastError = true)]
-    private static partial int OpenProcessToken(
-        SafeProcessHandle process,
-        TokenAccessLevels access,
-        out SafeAccessTokenHandle token);
+    private static partial int OpenProcessToken(SafeProcessHandle process, TokenAccessLevels access, out SafeAccessTokenHandle token);
 
     [LibraryImport("advapi32.dll", SetLastError = true)]
     private static partial int DuplicateTokenEx(
@@ -151,4 +131,21 @@ public static partial class RegistryLaunch
         string? directory,
         ref StartupInfo startup,
         out ProcessInformation process);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct StartupInfo
+    {
+        public uint Size;
+        public nint Reserved, Desktop, Title;
+        public uint X, Y, Width, Height, XChars, YChars, FillAttribute, Flags;
+        public ushort ShowWindow, ReservedSize;
+        public nint ReservedData, StandardInput, StandardOutput, StandardError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ProcessInformation
+    {
+        public nint Process, Thread;
+        public uint ProcessId, ThreadId;
+    }
 }

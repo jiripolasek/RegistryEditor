@@ -65,8 +65,7 @@ public sealed partial class MainWindow
 
             args.Handled = true;
             args.AcceptedOperation = DataPackageOperation.None;
-            if (!this.ViewModel.CanOpenRegistryFile || this.ViewModel.IsDialogOpen ||
-                this.RegistryMenu.ImportCommand.IsRunning)
+            if (!this.ViewModel.CanOpenRegistryFile || this.ViewModel.IsDialogOpen || this.RegistryMenu.ImportCommand.IsRunning)
             {
                 return;
             }

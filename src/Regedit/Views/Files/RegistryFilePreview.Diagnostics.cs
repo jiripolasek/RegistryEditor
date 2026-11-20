@@ -60,8 +60,7 @@ public sealed partial class RegistryFilePreview
     {
         if (args.Margin == DiagnosticMargin && this.ViewModel is { } model)
         {
-            var diagnostic
-                = model.Diagnostics.FirstOrDefault(error => error.Line == sender.LineFromPosition(args.Position) + 1);
+            var diagnostic = model.Diagnostics.FirstOrDefault(error => error.Line == sender.LineFromPosition(args.Position) + 1);
             if (model.GoToDiagnosticCommand.CanExecute(diagnostic))
             {
                 model.GoToDiagnosticCommand.Execute(diagnostic);
@@ -83,8 +82,7 @@ public sealed partial class RegistryFilePreview
 
     private void Problem_ItemClick(object sender, ItemClickEventArgs args)
     {
-        if (args.ClickedItem is RegistryFileDiagnostic diagnostic &&
-            this.ViewModel.GoToDiagnosticCommand.CanExecute(diagnostic))
+        if (args.ClickedItem is RegistryFileDiagnostic diagnostic && this.ViewModel.GoToDiagnosticCommand.CanExecute(diagnostic))
         {
             this.ViewModel.GoToDiagnosticCommand.Execute(diagnostic);
         }

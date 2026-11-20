@@ -6,8 +6,7 @@ namespace JPSoftworks.Regedit.Persistence;
 
 public sealed partial class AppSettings
 {
-    internal IReadOnlySet<string> HiddenJumpListFavorites { get; private set; }
-        = new HashSet<string>(StringComparer.Ordinal);
+    internal IReadOnlySet<string> HiddenJumpListFavorites { get; private set; } = new HashSet<string>(StringComparer.Ordinal);
 
     internal void HideJumpListFavorites(IReadOnlySet<string> ids, string? filePath = null)
     {

@@ -38,11 +38,7 @@ internal static class AppLogging
         }
     }
 
-    internal static void LogFailure(
-        this Microsoft.Extensions.Logging.ILogger logger,
-        LogLevel level,
-        string operation,
-        Exception exception)
+    internal static void LogFailure(this Microsoft.Extensions.Logging.ILogger logger, LogLevel level, string operation, Exception exception)
     {
         if (!logger.IsEnabled(level))
         {
@@ -51,7 +47,7 @@ internal static class AppLogging
 
         // Exception messages can contain registry values, note text, or launch arguments.
         logger.Log(
-            level, "{Operation} failed ({ExceptionType}, 0x{HResult:X8}). {StackTrace}", operation,
-            exception.GetType().FullName, exception.HResult, new StackTrace(exception, false).ToString());
+            level, "{Operation} failed ({ExceptionType}, 0x{HResult:X8}). {StackTrace}", operation, exception.GetType().FullName,
+            exception.HResult, new StackTrace(exception, false).ToString());
     }
 }

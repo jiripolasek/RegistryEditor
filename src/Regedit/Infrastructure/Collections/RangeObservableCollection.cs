@@ -28,6 +28,8 @@ public sealed class RangeObservableCollection<T> : ObservableCollection<T>, IRan
     private bool _deferredChange;
     private int _deferredCount;
 
+    public bool IsDeferring => this._deferDepth > 0;
+
     public RangeObservableCollection()
     {
     }
@@ -37,7 +39,20 @@ public sealed class RangeObservableCollection<T> : ObservableCollection<T>, IRan
     {
     }
 
-    public bool IsDeferring => this._deferDepth > 0;
+    void IRangeList.ReplaceAll(IEnumerable items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        var typed = new List<T>();
+        foreach (var item in items)
+        {
+            typed.Add(
+                item is T value || (item is null && default(T) is null)
+                    ? (T)item!
+                    : throw new ArgumentException($"Items must be of type {typeof(T).Name}.", nameof(items)));
+        }
+
+        this.ReplaceAll(typed);
+    }
 
     public void AddRange(IEnumerable<T> items)
     {
@@ -124,21 +139,6 @@ public sealed class RangeObservableCollection<T> : ObservableCollection<T>, IRan
         }
 
         this.NotifyBatch(before);
-    }
-
-    void IRangeList.ReplaceAll(IEnumerable items)
-    {
-        ArgumentNullException.ThrowIfNull(items);
-        var typed = new List<T>();
-        foreach (var item in items)
-        {
-            typed.Add(
-                item is T value || (item is null && default(T) is null)
-                    ? (T)item!
-                    : throw new ArgumentException($"Items must be of type {typeof(T).Name}.", nameof(items)));
-        }
-
-        this.ReplaceAll(typed);
     }
 
     /// <summary>

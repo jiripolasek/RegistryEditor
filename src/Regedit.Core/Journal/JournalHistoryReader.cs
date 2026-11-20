@@ -18,15 +18,13 @@ public sealed partial class JournalHistoryReader
     private Dictionary<string, CachedFile> _current = new(StringComparer.OrdinalIgnoreCase);
     private FileGeneration? _generation;
 
-    private sealed record CachedFile(FileGeneration Generation, JournalEntry Entry);
+    internal int CachedFileCount => this._files.Count;
 
     public JournalHistoryReader(RegistryJournal journal)
     {
         ArgumentNullException.ThrowIfNull(journal);
         this._journal = journal;
     }
-
-    internal int CachedFileCount => this._files.Count;
 
     public JournalHistory ReadHistory()
     {
@@ -41,8 +39,7 @@ public sealed partial class JournalHistoryReader
     internal JournalEntry? Find(string file, FileStream stream)
     {
         this._generation = ReadGeneration(stream);
-        return this._generation is { } generation && this._files.TryGetValue(file, out var cached) &&
-               cached.Generation == generation
+        return this._generation is { } generation && this._files.TryGetValue(file, out var cached) && cached.Generation == generation
             ? cached.Entry
             : null;
     }
@@ -61,23 +58,26 @@ public sealed partial class JournalHistoryReader
         this._files = this._current;
     }
 
-    internal readonly record struct FileGeneration(
-        long ChangeTime,
-        ulong Volume,
-        ulong IdLow,
-        ulong IdHigh,
-        long Length);
-
     internal static FileGeneration? ReadGeneration(FileStream stream)
     {
-        if (GetBasicInfo(stream.SafeFileHandle, FileBasicInfoClass, out var basic, BasicInfoBytes) == 0 || GetIdInfo(
-                stream.SafeFileHandle, FileIdInfoClass, out var id, IdInfoBytes) == 0)
+        if (GetBasicInfo(stream.SafeFileHandle, FileBasicInfoClass, out var basic, BasicInfoBytes) == 0
+            || GetIdInfo(stream.SafeFileHandle, FileIdInfoClass, out var id, IdInfoBytes) == 0)
         {
             return null;
         }
 
         return new FileGeneration(basic.ChangeTime, id.VolumeSerialNumber, id.IdLow, id.IdHigh, stream.Length);
     }
+
+    [LibraryImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx")]
+    private static partial int GetBasicInfo(SafeFileHandle file, int informationClass, out FileBasicInfo info, uint size);
+
+    [LibraryImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx")]
+    private static partial int GetIdInfo(SafeFileHandle file, int informationClass, out FileIdInfo info, uint size);
+
+    private sealed record CachedFile(FileGeneration Generation, JournalEntry Entry);
+
+    internal readonly record struct FileGeneration(long ChangeTime, ulong Volume, ulong IdLow, ulong IdHigh, long Length);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct FileBasicInfo
@@ -96,14 +96,4 @@ public sealed partial class JournalHistoryReader
         internal ulong IdLow;
         internal ulong IdHigh;
     }
-
-    [LibraryImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx")]
-    private static partial int GetBasicInfo(
-        SafeFileHandle file,
-        int informationClass,
-        out FileBasicInfo info,
-        uint size);
-
-    [LibraryImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx")]
-    private static partial int GetIdInfo(SafeFileHandle file, int informationClass, out FileIdInfo info, uint size);
 }

@@ -19,20 +19,21 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed partial class WatchSurfaceViewModel : ObservableObject
 {
+    internal event Func<Task<WatchDefinition?>>? TargetRequested;
+
+    internal event Action<string, Exception>? ActionFailed;
+
     private readonly MainWindowViewModel _window;
     private BrowserViewModel? _browser;
     private bool _active;
     private int _seenCount;
     private WatchObservation? _lastSeen;
 
-    internal WatchSurfaceViewModel(MainWindowViewModel window) { this._window = window; }
-
     internal BulkObservableCollection<WatchObservation> VisibleObservations { get; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(Context), nameof(CaptureStatus), nameof(PendingText), nameof(Target), nameof(HasCapture),
-        nameof(IsCapturing))]
+        nameof(Context), nameof(CaptureStatus), nameof(PendingText), nameof(Target), nameof(HasCapture), nameof(IsCapturing))]
     public partial WatchSession? Selected { get; set; }
 
     [ObservableProperty]
@@ -81,7 +82,33 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
 
     public string CaptureStatus => this.Selected?.Status ?? string.Empty;
 
-    internal event Func<Task<WatchDefinition?>>? TargetRequested;
+    private RegistryLocation? CurrentLocation =>
+        this._window.ContextLocation is { IsComputer: false, Machine: null } location ? location : null;
+
+    private RegistryEntry? CurrentValue =>
+        this._window.ContextBrowser?.SelectedEntries is [var row] && row is { IsKey: false, IsParent: false } ? row : null;
+
+    public string BranchTarget => FormatTarget(this._window.ContextLocation, null);
+
+    public string ValueTarget => this.CurrentValue is { } row
+        ? FormatTarget(this._window.ContextLocation, row.Value?.Name ?? string.Empty)
+        : "Select one value in the registry tab, including (Default) if it has not been set.";
+
+    private bool CanStartBranch =>
+        this.CurrentLocation is not null && !this._window.IsClosing && !this._window.CanCloseWindow;
+
+    private bool CanStartValue => this.CanStartBranch && this.CurrentValue is not null;
+
+    private bool CanStop => this.Selected?.IsRunning == true;
+
+    private bool CanRestart =>
+        this.Selected?.IsRunning == false && !this._window.IsClosing && !this._window.CanCloseWindow;
+
+    private bool HasSession => this.Selected is not null;
+
+    private bool HasObservations => this.Selected?.Observations.Count > 0;
+
+    internal WatchSurfaceViewModel(MainWindowViewModel window) { this._window = window; }
 
     [RelayCommand]
     private async Task NewAsync()
@@ -99,31 +126,16 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
         }
     }
 
-    private RegistryLocation? CurrentLocation =>
-        this._window.ContextLocation is { IsComputer: false, Machine: null } location ? location : null;
-
-    private RegistryEntry? CurrentValue => this._window.ContextBrowser?.SelectedEntries is [var row] &&
-                                           row is { IsKey: false, IsParent: false }
-        ? row
-        : null;
-
-    public string BranchTarget => FormatTarget(this._window.ContextLocation, null);
-
-    public string ValueTarget => this.CurrentValue is { } row
-        ? FormatTarget(this._window.ContextLocation, row.Value?.Name ?? string.Empty)
-        : "Select one value in the registry tab, including (Default) if it has not been set.";
-
     internal static string FormatTarget(RegistryLocation? location, string? valueName)
     {
         return location is null
             ? "Select a registry key first. Live watches support local keys only."
-            : (location.Machine ?? Environment.MachineName) + " · " + location.Address +
-              (location.View == RegistryView.Registry32 ? " · 32-bit" : " · 64-bit") + (valueName is null
-                  ? " · Branch"
-                  : " · Value: " + (valueName.Length == 0 ? "(Default)" : valueName));
+            : (location.Machine ?? Environment.MachineName)
+              + " · "
+              + location.Address
+              + (location.View == RegistryView.Registry32 ? " · 32-bit" : " · 64-bit")
+              + (valueName is null ? " · Branch" : " · Value: " + (valueName.Length == 0 ? "(Default)" : valueName));
     }
-
-    internal event Action<string, Exception>? ActionFailed;
 
     partial void OnSelectedChanging(WatchSession? value) { this.DetachSession(); }
 
@@ -216,8 +228,7 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
 
     private void WindowChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(MainWindowViewModel.ContextBrowser)
-            or nameof(MainWindowViewModel.ContextLocation))
+        if (args.PropertyName is nameof(MainWindowViewModel.ContextBrowser) or nameof(MainWindowViewModel.ContextLocation))
         {
             this.UpdateTargets();
         }
@@ -277,16 +288,15 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
     private bool Matches(WatchObservation observation)
     {
         var change = observation.Change;
-        return new[] { change.Change, change.Name, change.Location.Address, change.Types }.Any(text =>
-            text.Contains(this.Query, StringComparison.OrdinalIgnoreCase));
+        return new[] { change.Change, change.Name, change.Location.Address, change.Types }.Any(text => text.Contains(
+            this.Query, StringComparison.OrdinalIgnoreCase));
     }
 
     private void RefreshVisible(bool replace)
     {
         var observations = this.Selected?.Observations;
         var count = observations?.Count ?? 0;
-        if (this._seenCount > 0 && (count < this._seenCount ||
-                                    !ReferenceEquals(observations![this._seenCount - 1], this._lastSeen)))
+        if (this._seenCount > 0 && (count < this._seenCount || !ReferenceEquals(observations![this._seenCount - 1], this._lastSeen)))
         {
             this._seenCount = 0;
             this._lastSeen = null;
@@ -301,8 +311,7 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
         }
         else
         {
-            this.VisibleObservations.AddRange(
-                observations?.Skip(this._seenCount).Take(end - this._seenCount).Where(this.Matches) ?? []);
+            this.VisibleObservations.AddRange(observations?.Skip(this._seenCount).Take(end - this._seenCount).Where(this.Matches) ?? []);
         }
 
         this._seenCount = end;
@@ -330,20 +339,6 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
         this.OpenBackgroundCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanStartBranch =>
-        this.CurrentLocation is not null && !this._window.IsClosing && !this._window.CanCloseWindow;
-
-    private bool CanStartValue => this.CanStartBranch && this.CurrentValue is not null;
-
-    private bool CanStop => this.Selected?.IsRunning == true;
-
-    private bool CanRestart =>
-        this.Selected?.IsRunning == false && !this._window.IsClosing && !this._window.CanCloseWindow;
-
-    private bool HasSession => this.Selected is not null;
-
-    private bool HasObservations => this.Selected?.Observations.Count > 0;
-
     [RelayCommand(CanExecute = nameof(CanStartBranch))]
     private void StartBranch()
     {
@@ -367,8 +362,7 @@ internal sealed partial class WatchSurfaceViewModel : ObservableObject
         try
         {
             this.Error = null;
-            this.Selected = this._window.StartWatch(
-                definition.Location, definition.ValueName, this._window.DispatchWatchUpdate);
+            this.Selected = this._window.StartWatch(definition.Location, definition.ValueName, this._window.DispatchWatchUpdate);
         }
         catch (Exception error)
         {

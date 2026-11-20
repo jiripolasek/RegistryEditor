@@ -12,6 +12,14 @@ namespace JPSoftworks.Notifications;
 /// </remarks>
 public sealed class NotificationSession : INotificationService, IDisposable
 {
+    /// <summary>Occurs when active notifications or retained history change.</summary>
+    /// <remarks>
+    /// Raised synchronously on the thread making the change, outside the session lock. Asynchronous action completion
+    /// may raise it on a background thread. No UI context is captured, and concurrent callers may raise concurrently.
+    /// Subscribers that access UI must marshal to their dispatcher.
+    /// </remarks>
+    public event EventHandler? Changed;
+
     /// <summary>Specifies the separate limits for active entries and retained history entries.</summary>
     /// <remarks>
     /// Each limit is 50. When active capacity is reached, eviction prefers the oldest entry with a finite duration
@@ -27,15 +35,6 @@ public sealed class NotificationSession : INotificationService, IDisposable
     private bool _disposed;
     private int _omittedCount;
 
-    /// <summary>Initializes an empty notification session.</summary>
-    /// <param name="minimumDuration">A nonnegative minimum visible lifetime for notifications with a finite duration.</param>
-    /// <exception cref="ArgumentOutOfRangeException">The minimum duration is negative.</exception>
-    public NotificationSession(TimeSpan minimumDuration = default)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(minimumDuration, TimeSpan.Zero);
-        this._minimumDuration = minimumDuration;
-    }
-
     /// <summary>Gets the number of closed history entries discarded because the history limit was exceeded.</summary>
     public int OmittedCount
     {
@@ -46,6 +45,15 @@ public sealed class NotificationSession : INotificationService, IDisposable
                 return this._omittedCount;
             }
         }
+    }
+
+    /// <summary>Initializes an empty notification session.</summary>
+    /// <param name="minimumDuration">A nonnegative minimum visible lifetime for notifications with a finite duration.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The minimum duration is negative.</exception>
+    public NotificationSession(TimeSpan minimumDuration = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(minimumDuration, TimeSpan.Zero);
+        this._minimumDuration = minimumDuration;
     }
 
     /// <summary>Clears session content and cancels the session's action token.</summary>
@@ -100,9 +108,7 @@ public sealed class NotificationSession : INotificationService, IDisposable
         lock (this._gate)
         {
             ObjectDisposedException.ThrowIf(this._disposed, this);
-            var existing = notification.Key is null
-                ? null
-                : this._active.Find(entry => entry.Content.Key == notification.Key);
+            var existing = notification.Key is null ? null : this._active.Find(entry => entry.Content.Key == notification.Key);
             if (existing is not null)
             {
                 existing.Replace(notification);
@@ -112,9 +118,8 @@ public sealed class NotificationSession : INotificationService, IDisposable
             {
                 if (this._active.Count == Capacity)
                 {
-                    var oldest
-                        = this._active.Find(entry => entry.Content.Duration is not null && !entry.IsActionRunning) ??
-                          this._active[0];
+                    var oldest = this._active.Find(entry => entry.Content.Duration is not null && !entry.IsActionRunning)
+                                 ?? this._active[0];
                     this.Archive(oldest);
                 }
 
@@ -127,22 +132,13 @@ public sealed class NotificationSession : INotificationService, IDisposable
         return new NotificationHandle(this, id);
     }
 
-    /// <summary>Occurs when active notifications or retained history change.</summary>
-    /// <remarks>
-    /// Raised synchronously on the thread making the change, outside the session lock. Asynchronous action completion
-    /// may raise it on a background thread. No UI context is captured, and concurrent callers may raise concurrently.
-    /// Subscribers that access UI must marshal to their dispatcher.
-    /// </remarks>
-    public event EventHandler? Changed;
-
     /// <summary>Captures the current active entries.</summary>
     /// <returns>An independent array in entry-creation order, oldest first; keyed replacement preserves that order.</returns>
     public NotificationSnapshot[] GetActive()
     {
         lock (this._gate)
         {
-            return this._active
-                .Select(entry => new NotificationSnapshot(entry.Id, entry.Content, entry.IsActionRunning)).ToArray();
+            return this._active.Select(entry => new NotificationSnapshot(entry.Id, entry.Content, entry.IsActionRunning)).ToArray();
         }
     }
 
@@ -167,11 +163,9 @@ public sealed class NotificationSession : INotificationService, IDisposable
                 return;
             }
 
-            if (notification.Key is not null &&
-                this._active.Any(item => item.Id != id && item.Content.Key == notification.Key))
+            if (notification.Key is not null && this._active.Any(item => item.Id != id && item.Content.Key == notification.Key))
             {
-                throw new ArgumentException(
-                    "The notification key already belongs to another active message.", nameof(notification));
+                throw new ArgumentException("The notification key already belongs to another active message.", nameof(notification));
             }
 
             entry.Replace(notification);
@@ -236,8 +230,10 @@ public sealed class NotificationSession : INotificationService, IDisposable
         {
             foreach (var entry in this._active.ToArray())
             {
-                if (entry.IsActionRunning || entry.Content.Progress is not null ||
-                    entry.Content.Duration is not { } duration || !presented.Contains(entry.Id))
+                if (entry.IsActionRunning
+                    || entry.Content.Progress is not null
+                    || entry.Content.Duration is not { } duration
+                    || !presented.Contains(entry.Id))
                 {
                     continue;
                 }
@@ -289,8 +285,7 @@ public sealed class NotificationSession : INotificationService, IDisposable
             }
 
             var currentAction = expected is null
-                ? current.Content.Actions.FirstOrDefault(item => item.IsDefault) ??
-                  current.Content.Actions.FirstOrDefault()
+                ? current.Content.Actions.FirstOrDefault(item => item.IsDefault) ?? current.Content.Actions.FirstOrDefault()
                 : current.Content.Actions.FirstOrDefault(item => ReferenceEquals(item, expected));
             if (currentAction is null)
             {
@@ -322,11 +317,7 @@ public sealed class NotificationSession : INotificationService, IDisposable
             {
                 if (this._active.Contains(entry) && entry.Revision == revision && !token.IsCancellationRequested)
                 {
-                    entry.Replace(
-                        entry.Content with
-                        {
-                            Message = error.Message, Severity = NotificationSeverity.Error, Duration = null
-                        });
+                    entry.Replace(entry.Content with { Message = error.Message, Severity = NotificationSeverity.Error, Duration = null });
                 }
             }
 
@@ -369,17 +360,16 @@ public sealed class NotificationSession : INotificationService, IDisposable
             ArgumentException.ThrowIfNullOrWhiteSpace(notification.DismissLabel);
         }
 
-        if (!Enum.IsDefined(notification.Severity) || notification.Duration <= TimeSpan.Zero ||
-            notification.Key is not null && string.IsNullOrWhiteSpace(notification.Key))
+        if (!Enum.IsDefined(notification.Severity)
+            || notification.Duration <= TimeSpan.Zero
+            || notification.Key is not null && string.IsNullOrWhiteSpace(notification.Key))
         {
-            throw new ArgumentException(
-                "The notification has an invalid severity, duration, or key.", nameof(notification));
+            throw new ArgumentException("The notification has an invalid severity, duration, or key.", nameof(notification));
         }
 
         if (notification.Progress?.Value is { } value && (!double.IsFinite(value) || value < 0 || value > 1))
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(notification), "Progress must be a finite fraction between zero and one.");
+            throw new ArgumentOutOfRangeException(nameof(notification), "Progress must be a finite fraction between zero and one.");
         }
 
         ArgumentNullException.ThrowIfNull(notification.Actions);
@@ -401,12 +391,6 @@ public sealed class NotificationSession : INotificationService, IDisposable
 
     private sealed class Entry
     {
-        internal Entry(Guid id, Notification content)
-        {
-            this.Id = id;
-            this.Content = content;
-        }
-
         internal Guid Id { get; }
 
         internal Notification Content { get; private set; }
@@ -416,6 +400,12 @@ public sealed class NotificationSession : INotificationService, IDisposable
         internal long Revision { get; private set; }
 
         internal bool IsActionRunning { get; set; }
+
+        internal Entry(Guid id, Notification content)
+        {
+            this.Id = id;
+            this.Content = content;
+        }
 
         internal void Replace(Notification content)
         {

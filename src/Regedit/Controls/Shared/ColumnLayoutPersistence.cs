@@ -17,10 +17,7 @@ internal sealed class ColumnLayoutPersistence
     private readonly Dictionary<string, ColumnLayout> _pending = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<WeakReference<ColumnListView>>> _lists = new(StringComparer.Ordinal);
 
-    internal ColumnLayoutPersistence(
-        DispatcherQueue dispatcher,
-        Func<string, ColumnLayout?> load,
-        Action<string, ColumnLayout> save)
+    internal ColumnLayoutPersistence(DispatcherQueue dispatcher, Func<string, ColumnLayout?> load, Action<string, ColumnLayout> save)
     {
         this._load = load;
         this._save = save;
