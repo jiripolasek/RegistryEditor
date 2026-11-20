@@ -53,6 +53,14 @@ internal static class RegistryFilePreviewViewModelTests
             NullLogger.Instance);
     }
 
+    private static List<(string Title, string Message, NoticeKind Kind)> CaptureNotices(
+        RegistryFilePreviewViewModel model)
+    {
+        var notices = new List<(string Title, string Message, NoticeKind Kind)>();
+        model.Notice += (title, message, kind) => notices.Add((title, message, kind));
+        return notices;
+    }
+
     private static async Task<string> WriteAsync(string directory, string name, string text = Source)
     {
         var path = Path.Combine(directory, name);
@@ -79,6 +87,7 @@ internal static class RegistryFilePreviewViewModelTests
         var file = await WriteAsync(directory, "document.reg");
         var dialogs = new Dialogs();
         var model = Create(dialogs);
+        var notices = CaptureNotices(model);
         check(
             !model.SaveCommand.CanExecute(null) && !model.ImportCommand.CanExecute(null) &&
             model.OpenCommand.CanExecute(null) && model.Layout == RegistryFileLayout.Split,
@@ -117,7 +126,7 @@ internal static class RegistryFilePreviewViewModelTests
         model.Text = Header + "[" + Key + "]\r\n\"Broken\"=unknown\r\n";
         await SettledAsync(model);
         check(
-            !model.ImportCommand.CanExecute(null) && model.DiagnosticLine == 3 && !model.IsNoticeOpen &&
+            !model.ImportCommand.CanExecute(null) && model.DiagnosticLine == 3 && notices.Count == 0 &&
             model.HasDiagnostics && model.IsProblemsExpanded,
             "Invalid source disables import and opens Problems without an operation notice");
         model.Layout = RegistryFileLayout.Preview;
@@ -133,7 +142,7 @@ internal static class RegistryFilePreviewViewModelTests
         model.Text = Source;
         await SettledAsync(model);
         check(
-            !model.IsDirty && model.Document?.Diagnostics.Count == 0 && !model.IsNoticeOpen &&
+            !model.IsDirty && model.Document?.Diagnostics.Count == 0 && notices.Count == 0 &&
             model.Rows[1].Data == "original",
             "Rapid edits publish only the current preview and restoring saved text clears dirty state");
         model.OpenKeyCommand.Execute(null);
@@ -165,6 +174,7 @@ internal static class RegistryFilePreviewViewModelTests
             directory, "other.reg", Source.Replace("original", "other", StringComparison.Ordinal));
         var dialogs = new Dialogs();
         var model = Create(dialogs);
+        var notices = CaptureNotices(model);
         await model.OpenAsync(file);
         var saves = 0;
         model.Saved += () => saves++;
@@ -197,7 +207,7 @@ internal static class RegistryFilePreviewViewModelTests
         await File.WriteAllTextAsync(file, Source + "; external\r\n", new UTF8Encoding(true, true));
         await model.SaveCommand.ExecuteAsync(null);
         check(
-            model.IsDirty && saves == 1 && model.NoticeKind == NoticeKind.Error &&
+            model.IsDirty && saves == 1 && notices.LastOrDefault().Kind == NoticeKind.Error &&
             (await File.ReadAllTextAsync(file)).Contains("; external", StringComparison.Ordinal),
             "An external edit prevents overwrite, retains dirty state and publishes a recoverable error");
 
@@ -227,13 +237,14 @@ internal static class RegistryFilePreviewViewModelTests
         var invalid = Header + "[" + Key + "]\r\n\"First\"=unknown\r\n\"Second\"=dword:invalid\r\n";
         var file = await WriteAsync(directory, "problems.reg", invalid);
         var model = Create(new Dialogs());
+        var notices = CaptureNotices(model);
         var jumps = new List<(int Line, bool Focus)>();
         model.SourceLineRequested += (line, focus) => jumps.Add((line, focus));
         await model.OpenAsync(file);
         check(
             model.Diagnostics.Select(error => error.Line).SequenceEqual([3, 4]) &&
             model.Diagnostics.All(error => error.Message.Length > 0) && model.DiagnosticsSummary == "2 errors" &&
-            model.HasDiagnostics && !model.HasNoDiagnostics && model.IsProblemsExpanded && !model.IsNoticeOpen,
+            model.HasDiagnostics && !model.HasNoDiagnostics && model.IsProblemsExpanded && notices.Count == 0,
             "Problems exposes every parser error with its line and message without using an InfoBar");
         check(jumps.Count == 0, "Publishing diagnostics never requests a caret jump");
 
@@ -282,13 +293,14 @@ internal static class RegistryFilePreviewViewModelTests
     {
         var file = await WriteAsync(directory, "diagnostic-notice.reg");
         var model = Create(new Dialogs());
+        var notices = CaptureNotices(model);
         await model.OpenAsync(file);
         model.Text = Header + "[" + Key + "]\r\n\"Broken\"=invalid\r\n";
         await SettledAsync(model);
         await model.SaveCommand.ExecuteAsync(null);
         check(
-            model.NoticeTitle == "File saved" && model.DiagnosticLine == 3 && model.GoToErrorCommand.CanExecute(null) &&
-            !model.ImportCommand.CanExecute(null),
+            notices.LastOrDefault().Title == "File saved" && model.DiagnosticLine == 3 &&
+            model.GoToErrorCommand.CanExecute(null) && !model.ImportCommand.CanExecute(null),
             "Saving invalid source preserves diagnostic navigation independently of the operation notice");
         var requestedLine = 0;
         model.SourceLineRequested += (line, _) => requestedLine = line;
@@ -298,7 +310,7 @@ internal static class RegistryFilePreviewViewModelTests
         await SettledAsync(model);
         check(
             model.DiagnosticLine is null && !model.GoToErrorCommand.CanExecute(null) &&
-            model.ImportCommand.CanExecute(null) && model.IsNoticeOpen && model.NoticeTitle == "File saved",
+            model.ImportCommand.CanExecute(null) && notices.Count == 1 && notices.LastOrDefault().Title == "File saved",
             "Correcting the source clears diagnostic navigation while preserving the operation notice");
         await model.TryCloseAsync();
     }
@@ -324,6 +336,7 @@ internal static class RegistryFilePreviewViewModelTests
                     throw new IOException("Test import failure");
                 }
             });
+        var notices = CaptureNotices(model);
         await model.OpenAsync(file);
         model.Text = Header + ";Requires=Logoff\r\n[" + Key + "]\r\n\"Value\"=\"unsaved\"\r\n";
         await SettledAsync(model);
@@ -350,17 +363,18 @@ internal static class RegistryFilePreviewViewModelTests
             await File.ReadAllTextAsync(file) == Source,
             "Import uses the confirmed unsaved snapshot and target view, then removes the temporary file");
         check(
-            model.NoticeTitle == "Import complete" && model.NoticeKind == NoticeKind.Success &&
-            model.NoticeMessage.Contains("File recommends: Sign out.", StringComparison.Ordinal),
+            notices.LastOrDefault().Title == "Import complete" && notices.LastOrDefault().Kind == NoticeKind.Success &&
+            notices.LastOrDefault().Message.Contains("File recommends: Sign out.", StringComparison.Ordinal),
             "Successful import follow-up comes from the imported snapshot metadata");
 
         dialogs.OnImportConfirmation = null;
         failImport = true;
         await model.ImportCommand.ExecuteAsync(null);
         check(
-            model.NoticeTitle == "Registry file operation failed" && model.NoticeKind == NoticeKind.Error &&
-            model.CanInteract && snapshot is not null && !File.Exists(snapshot) &&
-            !model.NoticeMessage.Contains("File recommends", StringComparison.Ordinal),
+            notices.LastOrDefault().Title == "Couldn't import the registry file" &&
+            notices.LastOrDefault().Kind == NoticeKind.Error && model.CanInteract && snapshot is not null &&
+            !File.Exists(snapshot) &&
+            !notices.LastOrDefault().Message.Contains("File recommends", StringComparison.Ordinal),
             "Failed imports restore command availability, remove snapshots and do not publish success follow-up");
         model.Text = Header + "[" + Key + "]\r\n\"Value\"=bad\r\n";
         var confirmations = dialogs.ImportCalls;
@@ -377,6 +391,7 @@ internal static class RegistryFilePreviewViewModelTests
         var file = await WriteAsync(directory, "close.reg");
         var dialogs = new Dialogs { Choice = RegistryFileSaveChoice.Cancel };
         var model = Create(dialogs);
+        var notices = CaptureNotices(model);
         await model.OpenAsync(file);
         model.Text += "; edited\r\n";
         var closed = 0;
@@ -398,21 +413,30 @@ internal static class RegistryFilePreviewViewModelTests
             (await File.ReadAllTextAsync(file)).Contains("; edited", StringComparison.Ordinal),
             "Saving during close persists edits and requests one native close");
         check(await model.TryCloseAsync() && closed == 1, "An approved close is idempotent");
+        var failures = new List<(string Title, string Message, NoticeKind Kind)>();
+        model.Notice += (title, message, kind) => failures.Add((title, message, kind));
         model.ReportFailure(new IOException("Native window close failed"));
         check(
-            model.NoticeKind == NoticeKind.Error && model.IsNoticeOpen &&
-            model.NoticeMessage == "Native window close failed",
+            notices.LastOrDefault().Kind == NoticeKind.Error && notices.Count > 0 &&
+            notices.LastOrDefault().Message == "Native window close failed",
             "The native close boundary can publish an observed error through the file model");
+
+        model.ReportFailure(new IOException("Native window close failed"));
+        check(
+            failures.Count == 2 && failures.All(notice =>
+                notice.Message == "Native window close failed" && notice.Kind == NoticeKind.Error),
+            "Repeated file-operation failures each publish a notification event");
 
         var failedSaveFile = await WriteAsync(directory, "failed-close-save.reg");
         var failedSaveDialogs = new Dialogs { Choice = RegistryFileSaveChoice.Save };
         var failedSave = Create(failedSaveDialogs);
+        var failedSaveNotices = CaptureNotices(failedSave);
         await failedSave.OpenAsync(failedSaveFile);
         failedSave.Text += "; unsaved close\u005cn";
         await File.WriteAllTextAsync(failedSaveFile, Source + "; external change\u005cn", new UTF8Encoding(true, true));
         check(
             !await failedSave.TryCloseAsync() && failedSave.IsDirty && !failedSave.IsClosed && failedSave.CanInteract &&
-            failedSave.NoticeKind == NoticeKind.Error,
+            failedSaveNotices.LastOrDefault().Kind == NoticeKind.Error,
             "A failed save prevents close and leaves the edited document available for recovery");
         failedSaveDialogs.Choice = RegistryFileSaveChoice.Discard;
         check(await failedSave.TryCloseAsync(), "A failed close can be retried with an explicit discard");
@@ -491,6 +515,7 @@ internal static class RegistryFilePreviewViewModelTests
         var firstDialogs = new Dialogs { Choice = RegistryFileSaveChoice.Discard };
         var secondDialogs = new Dialogs { Choice = RegistryFileSaveChoice.Cancel };
         var first = Create(firstDialogs);
+        var firstNotices = CaptureNotices(first);
         var second = Create(secondDialogs);
         await first.OpenAsync(file);
         await second.OpenAsync(file);
@@ -524,8 +549,8 @@ internal static class RegistryFilePreviewViewModelTests
         var activation = 0;
         first.ActivationRequested += () => activation++;
         check(
-            !await first.TryCloseAsync() && activation == 1 &&
-            first.NoticeMessage == "Finish the current operation before closing.",
+            !await first.TryCloseAsync() && activation == 1 && firstNotices.LastOrDefault().Message ==
+            "Finish the current operation before closing.",
             "Closing an occupied preview provides feedback and requests activation");
 
         first.Text += "; programmatic edit after approval\r\n";

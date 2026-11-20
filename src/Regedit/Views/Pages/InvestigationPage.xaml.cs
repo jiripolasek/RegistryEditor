@@ -3,6 +3,8 @@
 // ------------------------------------------------------------
 
 using CommunityToolkit.Mvvm.Input;
+using JPSoftworks.Notifications;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Core.Search;
@@ -31,6 +33,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
     private readonly WindowDialogPresenter _dialogs;
     private readonly ToolCommand _inspectCommand;
     private readonly List<ToolCommand> _itemCommands = [];
+    private NotificationHandle? _notification;
     private bool _detailsExpanded, _detailsCollapsed;
     private bool _docked;
     private bool _restoringSelection;
@@ -67,6 +70,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
     internal InvestigationPage(
         InvestigationViewModel viewModel,
         WindowDialogPresenter dialogs,
+        INotificationService notifications,
         double listSpacing,
         ColumnLayoutPersistence? layouts = null)
     {
@@ -123,9 +127,11 @@ public sealed partial class InvestigationPage : Page, IPanelView
         this.Details.InspectValueRequested += this.InspectValue;
         this.Details.CopyBytesRequested += value => viewModel.CopyExactBytesCommand.Execute(value);
         viewModel.CopyTextRequested += ClipboardText.Set;
+        var notificationKey = "investigation-" + Guid.NewGuid().ToString("N");
         viewModel.Notice += (title, message, kind) =>
         {
-            StatusNotice.Show(this.Notice, title, message, (InfoBarSeverity)kind);
+            this._notification = StatusNotifications.Show(
+                notifications, title, message, kind, key: notificationKey);
         };
         viewModel.NameRequested += this.RequestNameAsync;
         Action? restoreViewport = null;
@@ -157,7 +163,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
 
         if (this.Search is { } search)
         {
-            search.RunStarted += () => this.Notice.IsOpen = false;
+            search.RunStarted += this.DismissNotification;
             search.ResultSelected += row =>
             {
                 this._restoringSelection = true;
@@ -383,6 +389,12 @@ public sealed partial class InvestigationPage : Page, IPanelView
         // The panel header renders the filter and item commands; the page keeps its own bar in place.
         this.LocalControls.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
         this.ShowSelection(this.ViewModel.Selected);
+    }
+
+    internal void DismissNotification()
+    {
+        this._notification?.Dismiss();
+        this._notification = null;
     }
 
     private void Selection_Changed(object sender, SelectionChangedEventArgs args)

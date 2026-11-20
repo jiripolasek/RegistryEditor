@@ -1,0 +1,592 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:JPSoftworks.Notifications.WinUI"
+    xmlns:themes="using:JPSoftworks.Notifications.WinUI.Themes">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Notifications/WinUI/Themes/NotificationResources.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+    <ControlTemplate x:Key="NotificationCardFluent2Template" TargetType="local:NotificationCard">
+        <Grid>
+            <Border
+                x:Name="PART_Surface"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid>
+
+                    <Grid Padding="{TemplateBinding Padding}" RowSpacing="{TemplateBinding ContentSpacing}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid
+                            x:Name="StatusSlot"
+                            Width="16"
+                            Margin="0,2,12,0"
+                            VerticalAlignment="Top"
+                            Visibility="{TemplateBinding StatusVisibility}">
+                            <FontIcon
+                                x:Name="StatusIcon"
+                                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Glyph="{ThemeResource NotificationInformationGlyph}"
+                                Visibility="{TemplateBinding SeverityIconVisibility}" />
+                            <Viewbox
+                                Width="16"
+                                Height="16"
+                                IsHitTestVisible="False"
+                                Visibility="{TemplateBinding CustomIconVisibility}">
+                                <ContentPresenter
+                                    x:Name="PART_CustomIcon"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Foreground="{TemplateBinding IconForeground}" />
+                            </Viewbox>
+                        </Grid>
+                        <ProgressRing
+                            x:Name="BusyRing"
+                            Width="16"
+                            Height="16"
+                            Margin="0,2,12,0"
+                            VerticalAlignment="Top"
+                            AutomationProperties.Name="{TemplateBinding BusyText}"
+                            Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                            IsActive="{TemplateBinding IsIndeterminate}"
+                            Visibility="{TemplateBinding BusyVisibility}" />
+                        <TextBlock
+                            x:Name="TitleText"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="{TemplateBinding FontSize}"
+                            FontWeight="SemiBold"
+                            Text="{TemplateBinding Title}"
+                            TextWrapping="Wrap" />
+                        <Button
+                            x:Name="PART_CloseButton"
+                            Grid.Column="2"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Top"
+                            AutomationProperties.Name="{TemplateBinding DismissNotificationText}"
+                            Style="{StaticResource NotificationDismissButtonStyle}"
+                            ToolTipService.ToolTip="{TemplateBinding DismissLabel}"
+                            Visibility="{TemplateBinding DismissIconVisibility}">
+                            <FontIcon
+                                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                FontSize="12"
+                                Glyph="&#xE711;" />
+                        </Button>
+                        <StackPanel
+                            x:Name="DetailsPanel"
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            Spacing="{TemplateBinding DetailSpacing}"
+                            Visibility="{TemplateBinding DetailsVisibility}">
+                            <TextBlock
+                                FontSize="{TemplateBinding FontSize}"
+                                Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                                IsTextSelectionEnabled="True"
+                                Text="{TemplateBinding Message}"
+                                TextWrapping="Wrap"
+                                Visibility="{TemplateBinding BodyVisibility}" />
+                            <ProgressBar
+                                Height="2"
+                                AutomationProperties.Name="{TemplateBinding ProgressText}"
+                                Foreground="{ThemeResource NotificationNeutralIconBrush}"
+                                Maximum="1"
+                                Minimum="0"
+                                Visibility="{TemplateBinding DeterminateProgressVisibility}"
+                                Value="{TemplateBinding ProgressValue}" />
+                            <TextBlock
+                                FontSize="{TemplateBinding FontSize}"
+                                Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                                Text="{TemplateBinding ProgressLabel}"
+                                TextWrapping="Wrap"
+                                Visibility="{TemplateBinding ProgressLabelVisibility}" />
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="{TemplateBinding ActionSpacing}"
+                                Visibility="{TemplateBinding ActionsVisibility}">
+                                <ContentPresenter x:Name="PART_ActionsPresenter" Visibility="{TemplateBinding ActionItemsVisibility}" />
+                                <HyperlinkButton
+                                    x:Name="PART_DismissAction"
+                                    HorizontalAlignment="Left"
+                                    Content="{TemplateBinding DismissLabel}"
+                                    Style="{TemplateBinding ActionLinkStyle}"
+                                    Visibility="{TemplateBinding DismissLinkVisibility}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="Materials">
+                    <VisualState x:Name="Solid" />
+                    <VisualState x:Name="Acrylic">
+                        <VisualState.Setters>
+                            <Setter Target="PART_Surface.Background" Value="{ThemeResource NotificationAcrylicBackgroundBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="Severities">
+                    <VisualState x:Name="SeverityNeutral" />
+                    <VisualState x:Name="SeverityInformation">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationInformationGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationNeutralIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeveritySuccess">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationSuccessGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationSuccessIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityWarning">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationWarningGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationWarningIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityError">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationErrorGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationErrorIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="NotificationCardAccentRailTemplate" TargetType="local:NotificationCard">
+        <Grid>
+            <Border
+                x:Name="PART_Surface"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid>
+                    <Border
+                        x:Name="Rail"
+                        Width="3"
+                        Margin="4,8,0,8"
+                        HorizontalAlignment="Left"
+                        CornerRadius="1.5"
+                        Visibility="{TemplateBinding SeverityIndicatorVisibility}" />
+                    <Grid Padding="{TemplateBinding Padding}" RowSpacing="{TemplateBinding ContentSpacing}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid
+                            x:Name="StatusSlot"
+                            Width="16"
+                            Margin="0,2,12,0"
+                            VerticalAlignment="Top"
+                            Visibility="{TemplateBinding StatusVisibility}">
+                            <FontIcon
+                                x:Name="StatusIcon"
+                                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Glyph="{ThemeResource NotificationInformationGlyph}"
+                                Visibility="{TemplateBinding SeverityIconVisibility}" />
+                            <Viewbox
+                                Width="16"
+                                Height="16"
+                                IsHitTestVisible="False"
+                                Visibility="{TemplateBinding CustomIconVisibility}">
+                                <ContentPresenter
+                                    x:Name="PART_CustomIcon"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Foreground="{TemplateBinding IconForeground}" />
+                            </Viewbox>
+                        </Grid>
+                        <ProgressRing
+                            x:Name="BusyRing"
+                            Width="16"
+                            Height="16"
+                            Margin="0,2,12,0"
+                            VerticalAlignment="Top"
+                            AutomationProperties.Name="{TemplateBinding BusyText}"
+                            Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                            IsActive="{TemplateBinding IsIndeterminate}"
+                            Visibility="{TemplateBinding BusyVisibility}" />
+                        <TextBlock
+                            x:Name="TitleText"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="{TemplateBinding FontSize}"
+                            FontWeight="SemiBold"
+                            Text="{TemplateBinding Title}"
+                            TextWrapping="Wrap" />
+                        <Button
+                            x:Name="PART_CloseButton"
+                            Grid.Column="2"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Top"
+                            AutomationProperties.Name="{TemplateBinding DismissNotificationText}"
+                            Style="{StaticResource NotificationDismissButtonStyle}"
+                            ToolTipService.ToolTip="{TemplateBinding DismissLabel}"
+                            Visibility="{TemplateBinding DismissIconVisibility}">
+                            <FontIcon
+                                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                FontSize="12"
+                                Glyph="&#xE711;" />
+                        </Button>
+                        <StackPanel
+                            x:Name="DetailsPanel"
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            Spacing="{TemplateBinding DetailSpacing}"
+                            Visibility="{TemplateBinding DetailsVisibility}">
+                            <TextBlock
+                                FontSize="{TemplateBinding FontSize}"
+                                Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                                IsTextSelectionEnabled="True"
+                                Text="{TemplateBinding Message}"
+                                TextWrapping="Wrap"
+                                Visibility="{TemplateBinding BodyVisibility}" />
+                            <ProgressBar
+                                Height="2"
+                                AutomationProperties.Name="{TemplateBinding ProgressText}"
+                                Foreground="{ThemeResource NotificationNeutralIconBrush}"
+                                Maximum="1"
+                                Minimum="0"
+                                Visibility="{TemplateBinding DeterminateProgressVisibility}"
+                                Value="{TemplateBinding ProgressValue}" />
+                            <TextBlock
+                                FontSize="{TemplateBinding FontSize}"
+                                Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                                Text="{TemplateBinding ProgressLabel}"
+                                TextWrapping="Wrap"
+                                Visibility="{TemplateBinding ProgressLabelVisibility}" />
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="{TemplateBinding ActionSpacing}"
+                                Visibility="{TemplateBinding ActionsVisibility}">
+                                <ContentPresenter x:Name="PART_ActionsPresenter" Visibility="{TemplateBinding ActionItemsVisibility}" />
+                                <HyperlinkButton
+                                    x:Name="PART_DismissAction"
+                                    HorizontalAlignment="Left"
+                                    Content="{TemplateBinding DismissLabel}"
+                                    Style="{TemplateBinding ActionLinkStyle}"
+                                    Visibility="{TemplateBinding DismissLinkVisibility}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="Materials">
+                    <VisualState x:Name="Solid" />
+                    <VisualState x:Name="Acrylic">
+                        <VisualState.Setters>
+                            <Setter Target="PART_Surface.Background" Value="{ThemeResource NotificationAcrylicBackgroundBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="Severities">
+                    <VisualState x:Name="SeverityNeutral" />
+                    <VisualState x:Name="SeverityInformation">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationInformationGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationNeutralIconBrush}" />
+                            <Setter Target="Rail.Background" Value="{ThemeResource NotificationNeutralIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeveritySuccess">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationSuccessGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationSuccessIconBrush}" />
+                            <Setter Target="Rail.Background" Value="{ThemeResource NotificationSuccessIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityWarning">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationWarningGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationWarningIconBrush}" />
+                            <Setter Target="Rail.Background" Value="{ThemeResource NotificationWarningIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityError">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationErrorGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationErrorIconBrush}" />
+                            <Setter Target="Rail.Background" Value="{ThemeResource NotificationErrorIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="NotificationCardMinimalTemplate" TargetType="local:NotificationCard">
+        <Grid>
+            <Border
+                x:Name="PART_Surface"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid Padding="{TemplateBinding Padding}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        x:Name="StatusSlot"
+                        Width="16"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Visibility="{TemplateBinding StatusVisibility}">
+                        <FontIcon
+                            x:Name="StatusIcon"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Glyph="{ThemeResource NotificationInformationGlyph}"
+                            Visibility="{TemplateBinding SeverityIconVisibility}" />
+                        <Viewbox
+                            Width="16"
+                            Height="16"
+                            IsHitTestVisible="False"
+                            Visibility="{TemplateBinding CustomIconVisibility}">
+                            <ContentPresenter
+                                x:Name="PART_CustomIcon"
+                                AutomationProperties.AccessibilityView="Raw"
+                                Foreground="{TemplateBinding IconForeground}" />
+                        </Viewbox>
+                    </Grid>
+                    <ProgressRing
+                        x:Name="BusyRing"
+                        Width="16"
+                        Height="16"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{TemplateBinding BusyText}"
+                        Foreground="{ThemeResource NotificationSecondaryForegroundBrush}"
+                        IsActive="{TemplateBinding IsIndeterminate}"
+                        Visibility="{TemplateBinding BusyVisibility}" />
+                    <TextBlock
+                        x:Name="TitleText"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        FontSize="{TemplateBinding FontSize}"
+                        FontWeight="SemiBold"
+                        Text="{TemplateBinding Title}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <StackPanel
+                        Grid.Column="2"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="{TemplateBinding ActionSpacing}"
+                        Visibility="{TemplateBinding ActionsVisibility}">
+                        <ContentPresenter x:Name="PART_ActionsPresenter" Visibility="{TemplateBinding ActionItemsVisibility}" />
+                        <HyperlinkButton
+                            x:Name="PART_DismissAction"
+                            HorizontalAlignment="Left"
+                            Content="{TemplateBinding DismissLabel}"
+                            Style="{TemplateBinding ActionLinkStyle}"
+                            Visibility="{TemplateBinding DismissLinkVisibility}" />
+                    </StackPanel>
+                    <Button
+                        x:Name="PART_CloseButton"
+                        Grid.Column="3"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{TemplateBinding DismissNotificationText}"
+                        Style="{StaticResource NotificationDismissButtonStyle}"
+                        ToolTipService.ToolTip="{TemplateBinding DismissLabel}"
+                        Visibility="{TemplateBinding DismissIconVisibility}">
+                        <FontIcon
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="12"
+                            Glyph="&#xE711;" />
+                    </Button>
+                </Grid>
+            </Border>
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="Materials">
+                    <VisualState x:Name="Solid" />
+                    <VisualState x:Name="Acrylic">
+                        <VisualState.Setters>
+                            <Setter Target="PART_Surface.Background" Value="{ThemeResource NotificationAcrylicBackgroundBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="Severities">
+                    <VisualState x:Name="SeverityNeutral" />
+                    <VisualState x:Name="SeverityInformation">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationInformationGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationNeutralIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeveritySuccess">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationSuccessGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationSuccessIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityWarning">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationWarningGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationWarningIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityError">
+                        <VisualState.Setters>
+                            <Setter Target="StatusIcon.Glyph" Value="{ThemeResource NotificationErrorGlyph}" />
+                            <Setter Target="StatusIcon.Foreground" Value="{ThemeResource NotificationErrorIconBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="NotificationCardNativeTemplate" TargetType="local:NotificationCard">
+        <Grid>
+            <themes:NotificationInfoBar
+                x:Name="PART_NativeNotice"
+                Title="{TemplateBinding Title}"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                IconSource="{TemplateBinding IconSource}"
+                IsClosable="{TemplateBinding IsClosable}"
+                IsIconVisible="{TemplateBinding HasIcon}"
+                IsOpen="True"
+                Message="{TemplateBinding Message}">
+                <themes:NotificationInfoBar.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.ThemeDictionaries>
+                            <ResourceDictionary x:Key="Light">
+                                <StaticResource x:Key="InfoBarInformationalSeverityIconBackground" ResourceKey="NotificationNeutralIconBrush" />
+                            </ResourceDictionary>
+                            <ResourceDictionary x:Key="Dark">
+                                <StaticResource x:Key="InfoBarInformationalSeverityIconBackground" ResourceKey="NotificationNeutralIconBrush" />
+                            </ResourceDictionary>
+                            <ResourceDictionary x:Key="HighContrast">
+                                <StaticResource x:Key="InfoBarInformationalSeverityIconBackground" ResourceKey="SystemColorHighlightColorBrush" />
+                            </ResourceDictionary>
+                        </ResourceDictionary.ThemeDictionaries>
+                    </ResourceDictionary>
+                </themes:NotificationInfoBar.Resources>
+                <InfoBar.Content>
+                    <StackPanel Spacing="{TemplateBinding DetailSpacing}">
+                        <ProgressBar
+                            AutomationProperties.Name="{TemplateBinding ProgressText}"
+                            IsIndeterminate="{TemplateBinding IsIndeterminate}"
+                            Maximum="1"
+                            Minimum="0"
+                            Visibility="{TemplateBinding ProgressVisibility}"
+                            Value="{TemplateBinding ProgressValue}" />
+                        <ContentPresenter x:Name="PART_ActionsPresenter" Visibility="{TemplateBinding ActionItemsVisibility}" />
+                        <HyperlinkButton
+                            x:Name="PART_DismissAction"
+                            HorizontalAlignment="Left"
+                            Content="{TemplateBinding DismissLabel}"
+                            Style="{TemplateBinding ActionLinkStyle}"
+                            Visibility="{TemplateBinding DismissLinkVisibility}" />
+                    </StackPanel>
+                </InfoBar.Content>
+            </themes:NotificationInfoBar>
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="Materials">
+                    <VisualState x:Name="Solid" />
+                    <VisualState x:Name="Acrylic">
+                        <VisualState.Setters>
+                            <Setter Target="PART_NativeNotice.Background" Value="{ThemeResource NotificationAcrylicBackgroundBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="Severities">
+                    <VisualState x:Name="SeverityNeutral" />
+                    <VisualState x:Name="SeverityInformation" />
+                    <VisualState x:Name="SeveritySuccess">
+                        <VisualState.Setters>
+                            <Setter Target="PART_NativeNotice.Severity" Value="Success" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityWarning">
+                        <VisualState.Setters>
+                            <Setter Target="PART_NativeNotice.Severity" Value="Warning" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="SeverityError">
+                        <VisualState.Setters>
+                            <Setter Target="PART_NativeNotice.Severity" Value="Error" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Grid>
+    </ControlTemplate>
+    <Style x:Key="DefaultNotificationCardStyle" TargetType="local:NotificationCard">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="{ThemeResource NotificationBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource NotificationBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{ThemeResource NotificationCornerRadius}" />
+        <Setter Property="Foreground" Value="{ThemeResource NotificationForegroundBrush}" />
+        <Setter Property="IconForeground" Value="{ThemeResource NotificationCustomIconBrush}" />
+        <Setter Property="Padding" Value="{ThemeResource NotificationPadding}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="ShadowDepth" Value="16" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="DetailSpacing" Value="{ThemeResource NotificationDetailSpacing}" />
+        <Setter Property="ActionSpacing" Value="{ThemeResource NotificationActionSpacing}" />
+        <Setter Property="ActionPanelStyle" Value="{StaticResource NotificationActionPanelStyle}" />
+        <Setter Property="ActionLinkStyle" Value="{StaticResource NotificationActionLinkStyle}" />
+        <Setter Property="DefaultActionLinkStyle" Value="{StaticResource NotificationDefaultActionLinkStyle}" />
+        <Setter Property="ActionButtonStyle" Value="{StaticResource NotificationActionButtonStyle}" />
+        <Setter Property="DefaultActionButtonStyle" Value="{StaticResource NotificationDefaultActionButtonStyle}" />
+        <Setter Property="Template" Value="{StaticResource NotificationCardFluent2Template}" />
+    </Style>
+    <Style BasedOn="{StaticResource DefaultNotificationCardStyle}" TargetType="local:NotificationCard" />
+    <Style
+        x:Key="NotificationCardFluent2Style"
+        BasedOn="{StaticResource DefaultNotificationCardStyle}"
+        TargetType="local:NotificationCard" />
+    <Style
+        x:Key="NotificationCardAccentRailStyle"
+        BasedOn="{StaticResource DefaultNotificationCardStyle}"
+        TargetType="local:NotificationCard">
+        <Setter Property="CornerRadius" Value="{ThemeResource NotificationRoundedCornerRadius}" />
+        <Setter Property="Template" Value="{StaticResource NotificationCardAccentRailTemplate}" />
+    </Style>
+    <Style
+        x:Key="NotificationCardCompactStyle"
+        BasedOn="{StaticResource DefaultNotificationCardStyle}"
+        TargetType="local:NotificationCard">
+        <Setter Property="Padding" Value="{ThemeResource NotificationCompactPadding}" />
+        <Setter Property="DetailSpacing" Value="{ThemeResource NotificationCompactDetailSpacing}" />
+    </Style>
+    <Style
+        x:Key="NotificationCardNativeStyle"
+        BasedOn="{StaticResource DefaultNotificationCardStyle}"
+        TargetType="local:NotificationCard">
+        <Setter Property="Template" Value="{StaticResource NotificationCardNativeTemplate}" />
+    </Style>
+    <Style
+        x:Key="NotificationCardMinimalStyle"
+        BasedOn="{StaticResource DefaultNotificationCardStyle}"
+        TargetType="local:NotificationCard">
+        <Setter Property="Padding" Value="{ThemeResource NotificationCompactPadding}" />
+        <Setter Property="CornerRadius" Value="{ThemeResource NotificationRoundedCornerRadius}" />
+        <Setter Property="Template" Value="{StaticResource NotificationCardMinimalTemplate}" />
+    </Style>
+</ResourceDictionary>

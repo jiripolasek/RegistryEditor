@@ -58,6 +58,9 @@ public sealed class UxNotificationObserver : IDisposable {
     private readonly AutomationEventHandler _handler;
     private readonly List<UxNotification> _events = new();
     public UxNotification[] Events { get { lock (_events) return _events.ToArray(); } }
+    public bool CancelNextExport { get; set; }
+    public volatile bool CancelWasInvoked;
+    public string CancelError { get; private set; } = string.Empty;
 
     public UxNotificationObserver(IntPtr window) {
         _root = AutomationElement.FromHandle(window);
@@ -69,6 +72,21 @@ public sealed class UxNotificationObserver : IDisposable {
         if (args is NotificationEventArgs notice) {
             lock (_events) _events.Add(new((int)notice.NotificationKind, (int)notice.NotificationProcessing,
                 notice.DisplayString, notice.ActivityId));
+            if (CancelNextExport && notice.DisplayString.StartsWith("Exporting", StringComparison.Ordinal)) {
+                CancelNextExport = false;
+                try {
+                    var card = sender as AutomationElement ?? _root;
+                    var buttons = card.FindAll(TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.NameProperty, "Cancel"));
+                    foreach (AutomationElement button in buttons) {
+                        if (!button.Current.AutomationId.StartsWith("NotificationAction_", StringComparison.Ordinal)) continue;
+                        ((InvokePattern)button.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+                        CancelWasInvoked = true;
+                        return;
+                    }
+                    CancelError = "The progress toast has no Cancel action.";
+                } catch (Exception error) { CancelError = error.Message; }
+            }
         }
     }
 
@@ -599,7 +617,7 @@ function Open-VerifiedPrintPreview([switch] $MultiplePages) {
             Wait-PrintPreviewClosed
             return
         }
-        $errors = @(Read-Ui | Where-Object { $_.name -in 'Windows could not complete the print job.', 'Windows could not open print preview.', "Couldn't complete the operation" })
+        $errors = @(Read-Ui | Where-Object { $_.name -in 'Windows could not complete the print job.', 'Windows could not open print preview.', "Couldn't print the registry report" })
         if ($errors.Count) { throw "Print failed before verified preview: $($errors[0].name)" }
         Start-Sleep -Milliseconds 150
     } while ($timer.Elapsed.TotalSeconds -lt 50)
@@ -619,6 +637,7 @@ function Expect-HistoryLocation([string] $Target) {
         $crumbs.Count -gt 0 -and $crumbs[-1].name -eq ($Target -split '\\')[-1] -and $items.name -notcontains 'Address'
     }
     Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+    Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' }).Count -eq 1 }
     $input = Pick 'Edit' 'Address'
     if ($input.value -ne $Target) { throw "Navigation reached '$($input.value)' instead of '$Target'." }
     Ui @('send-keys', 'esc', '--via', 'send-input', '--target', $input.selector) | Out-Null
@@ -626,6 +645,7 @@ function Expect-HistoryLocation([string] $Target) {
 function Go-ToKey([string] $Path) {
     Set-TestWindowForeground
     Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+    Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' }).Count -eq 1 }
     $input = Pick 'Edit' 'Address'
     Ui @('set-value', $input.selector, $Path) | Out-Null
     Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
@@ -1823,6 +1843,35 @@ try {
         if ((Cell-Heights)['needle one'] -ne $before['needle one']) { throw 'Data did not return to the standard UI font.' }
     }
 
+    Test-Ui 'Export completion offers its folder without moving the workspace' {
+        Browser
+        $before = @(Read-Ui | Where-Object automationId -eq 'EntriesList')[0]
+        $output = Join-Path $ArtifactDirectory 'completed export.reg'
+        Press 'Export…'; File-Picker 'Save' $output
+        Wait-Ui { param($items) $items.name -contains 'Export complete' -and $items.name -contains 'Open folder' }
+        $items = Read-Ui
+        $after = @($items | Where-Object automationId -eq 'EntriesList')[0]
+        if (-not $before -or -not $after -or $before.x -ne $after.x -or $before.y -ne $after.y -or
+            $before.width -ne $after.width -or $before.height -ne $after.height) {
+            throw 'The export toast changed the registry workspace geometry.'
+        }
+        if (-not [IO.File]::Exists($output)) { throw 'The export completion appeared before the output existed.' }
+        $folder = @($items | Where-Object { $_.name -eq 'Open folder' -and $_.automationId -like 'NotificationAction_*' })
+        if ($folder.Count -ne 1 -or -not $folder[0].isEnabled) { throw 'The completed export has no usable folder action.' }
+        $folderId = $folder[0].automationId
+        Ui @('send-keys', 'f5', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains $folderId }
+        Go-ToKey 'HKEY_CURRENT_USER\Software'
+        Wait-Ui { param($items) $items.automationId -contains $folderId }
+        Go-ToKey $address
+        Wait-Ui { param($items) $items.automationId -contains $folderId }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'export-folder-action.png')) | Out-Null
+        Open-Menu 'Recent notifications'
+        Wait-Ui { param($items) $items.automationId -contains 'NotificationHistoryList' -and $items.name -contains 'Open folder' }
+        Ui @('invoke', 'DismissAllNotifications', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'NotificationHistoryList' }
+    }
+
     Test-Ui 'Browser status emits completion cancel and error notifications without moving focus' {
         Browser
         function Wait-Notification($Observer, [string] $Title) {
@@ -1835,15 +1884,22 @@ try {
         }
         $observer = [UxNotificationObserver]::new([IntPtr]$mainWindow)
         try {
+            $workspaceBefore = @(Read-Ui | Where-Object automationId -eq 'EntriesList')[0]
             $snapshotFile = Join-Path $ArtifactDirectory 'status-notification.regsnap'
             Snapshot-Action 'Capture branch snapshot…'
             File-Picker 'Save' $snapshotFile
             Wait-Notification $observer 'Snapshot saved'
             if (@($observer.Events | Where-Object { $_.Text.Contains('Snapshot saved') }).Count -ne 1) { throw 'Snapshot completion was announced more than once.' }
-            $before = @($observer.Events | Where-Object Activity -eq 'RegistryStatus').Count
+            $workspaceAfter = @(Read-Ui | Where-Object automationId -eq 'EntriesList')[0]
+            if (-not $workspaceBefore -or -not $workspaceAfter -or
+                $workspaceBefore.x -ne $workspaceAfter.x -or $workspaceBefore.y -ne $workspaceAfter.y -or
+                $workspaceBefore.width -ne $workspaceAfter.width -or $workspaceBefore.height -ne $workspaceAfter.height) {
+                throw 'A completion toast changed the registry workspace geometry.'
+            }
+            $before = @($observer.Events | Where-Object { $_.Activity -in 'RegistryStatus','InAppNotification' }).Count
             Press 'Filter'; Fill 'Filter this key' 'Counter'
             Select-Row 'Counter' | Out-Null
-            if (@($observer.Events | Where-Object Activity -eq 'RegistryStatus').Count -ne $before) { throw 'Filtering or row selection announced an operation status.' }
+            if (@($observer.Events | Where-Object { $_.Activity -in 'RegistryStatus','InAppNotification' }).Count -ne $before) { throw 'Filtering or row selection announced an operation status.' }
             Press 'Clear filter'
 
             $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)
@@ -1851,10 +1907,13 @@ try {
             finally { $key.Dispose() }
             $exported = Join-Path $ArtifactDirectory 'canceled-status.reg'
             try {
+                $observer.CancelNextExport = $true
                 Press 'Export…'; File-Picker 'Save' $exported
                 Wait-Notification $observer 'Exporting'
-                Ui @('send-keys', 'esc', '--via', 'send-input', '--target', 'EntriesList') | Out-Null
-                Wait-Notification $observer 'Canceled'
+                $null = [Threading.SpinWait]::SpinUntil(
+                    [Func[bool]] { $observer.CancelWasInvoked -or $observer.CancelError.Length -gt 0 }, 10000)
+                if (-not $observer.CancelWasInvoked) { throw "The progress action did not run: $($observer.CancelError)" }
+                Wait-Notification $observer 'Export canceled'
                 if ([IO.File]::Exists($exported) -and ([IO.FileInfo]::new($exported)).Length -gt 0) { throw 'Canceled export committed nonempty output.' }
             } finally {
                 $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)
@@ -1874,8 +1933,15 @@ try {
             $focused = Ui @('get-focused', '--json') | ConvertFrom-Json
             if (-not $focused.hasFocus -or $focused.element.automationId -ne 'FilterBox') { throw 'An operation error announcement stole keyboard focus.' }
             $errors = @($observer.Events | Where-Object { $_.Text.Contains("Couldn't complete the operation") })
-            if ($errors.Count -ne 1 -or $errors[0].Processing -ne 0) { throw 'The error did not produce one important UIA notification.' }
+            if ($errors.Count -ne 1 -or $errors[0].Processing -ne 1) { throw 'The error did not produce one important UIA notification.' }
             Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'status-notification-error.png')) | Out-Null
+            Open-Menu 'Recent notifications'
+            Wait-Ui { param($items) $items.automationId -contains 'NotificationHistoryList' }
+            if (-not (Read-Ui | Where-Object { $_.name -eq "Couldn't complete the operation" })) {
+                throw 'Application-owned history lost the active error.'
+            }
+            Ui @('invoke', 'DismissAllNotifications', '--action', 'invoke') | Out-Null
+            Wait-Ui { param($items) $items.automationId -notcontains 'NotificationHistoryList' }
             Go-ToKey $address
         } finally {
             $observer.Dispose()
@@ -3935,10 +4001,10 @@ try {
                 Start-Sleep -Milliseconds 500
             }
             if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 820, 900, 0x16)) { throw 'Could not narrow Journal.' }
-            Wait-Ui { param($items) $items.automationId -contains 'InspectDetails' -and $items.automationId -contains 'ToolNotice' -and $items.automationId -contains 'ApplicationNotice' }
+            Wait-Ui { param($items) $items.automationId -contains 'InspectDetails' -and $items.automationId -contains 'Count' }
             $items = Read-Ui
             $rows = @($items | Where-Object type -eq 'ListItem')
-            $items | Where-Object { $_.automationId -in 'Results','Count','ToolNotice','ApplicationNotice' -or $_.type -eq 'ListItem' } |
+            $items | Where-Object { $_.automationId -in 'Results','Count','ApplicationNotifications' -or $_.type -eq 'ListItem' } |
                 Select-Object type,automationId,name,x,y,width,height | ConvertTo-Json |
                 Set-Content (Join-Path $ArtifactDirectory 'compact-journal.json')
             if ($rows.Count -lt 3) { throw "The collapsed 820x900 Journal shows only $($rows.Count) rows at 150% text scale." }
@@ -3946,16 +4012,11 @@ try {
             foreach ($id in @('JournalRevert','InspectDetails')) {
                 if (@($items | Where-Object automationId -eq $id).Count -ne 1) { throw "The narrow Journal lost reachable action '$id'." }
             }
-            $applicationNotice = @($items | Where-Object automationId -eq 'ApplicationNotice')[0]
-            $toolNotice = @($items | Where-Object automationId -eq 'ToolNotice')[0]
-            $count = @($items | Where-Object automationId -eq 'Count')[0]
-            $applicationTitle = @(Elements $applicationNotice.children | Where-Object { $_.type -eq 'Text' -and $_.automationId -eq 'Title' })
-            $toolTitle = @(Elements $toolNotice.children | Where-Object { $_.type -eq 'Text' -and $_.automationId -eq 'Title' })
-            if ($applicationTitle.Count -ne 1 -or $applicationTitle[0].name -cne 'Edit reverted' -or
-                $toolTitle.Count -ne 1 -or $toolTitle[0].name -cne 'Script copied' -or
-                $applicationNotice.y + $applicationNotice.height -ge $rows[0].y -or $toolNotice.y -le $count.y) {
-                throw 'The two notices are not simultaneously visible outside the Journal list area.'
+            if ($items.automationId -contains 'ApplicationNotice') {
+                throw 'Operation feedback still inserts an application status row above the Journal.'
             }
+            $journalList = @($items | Where-Object automationId -eq 'Results')[0]
+            if ($journalList.height -lt 200) { throw 'The narrow Journal lost its usable list area.' }
             Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'journal-narrow-150.png')) | Out-Null
             $selectedRow = @($rows | Where-Object name -ceq $original.name)
             if ($selectedRow.Count -ne 1) { throw 'The selected edit is missing from the narrow Journal list.' }
@@ -4474,6 +4535,30 @@ try {
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'virtualized-search-last-row.png')) | Out-Null
     }
 
+    Test-Ui 'Investigation status survives switching and docking then clears on close' {
+        Browser
+        Fill 'Search registry' 'notification lifetime'
+        Start-SearchInMainTab
+        Wait-Ui { param($items) $items.name -contains 'Find: notification lifetime' -and @($items | Where-Object { $_.type -eq 'Button' -and $_.name -eq 'Run search' -and $_.isEnabled }).Count -eq 1 }
+        $settingsLock = [IO.File]::Open($settingsFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+        try {
+            Press 'Save search'; Fill 'Search name' 'Blocked notification fixture'; Primary
+            Wait-Ui { param($items) $items.name -contains 'Could not save search' }
+        } finally { $settingsLock.Dispose() }
+        Browser
+        if ((Read-Ui).name -notcontains 'Could not save search') { throw 'Switching tabs dismissed the investigation status.' }
+        Ui @('invoke', (Pick 'TabItem' 'Find: notification lifetime').selector, '--action', 'select') | Out-Null
+        Press 'Show in panel'
+        Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' }
+        if ((Read-Ui).name -notcontains 'Could not save search') { throw 'Docking dismissed the investigation status.' }
+        Press 'Open panel tab in main tab'
+        Wait-Ui { param($items) $items.name -contains 'Find: notification lifetime' -and $items.automationId -contains 'ShowInPanelButton' }
+        if ((Read-Ui).name -notcontains 'Could not save search') { throw 'Undocking dismissed the investigation status.' }
+        Open-Menu 'Close tab'
+        Wait-Ui { param($items) $items.name -notcontains 'Could not save search' }
+        Browser
+    }
+
     Test-Ui 'Find-all keeps matches while opening a result and saves its query' {
         Browser
         Press 'Advanced search'
@@ -4900,8 +4985,8 @@ try {
                 Wait-Ui { param($items) $items.name -contains 'Finish the current operation before closing.' } -All
                 File-Picker 'Cancel'
                 Ui @('wait-for', 'RegFileImport', '-p', 'IsEnabled', '--value', 'True', '-t', '10000') | Out-Null
-                $notice = @(Read-Ui | Where-Object automationId -eq 'RegFileNotice')[0]
-                $dismissNotice = @(Elements $notice.children | Where-Object automationId -eq 'CloseButton')[0]
+                $notice = @(Read-Ui | Where-Object { $_.automationId -like 'Notification_*' -and $_.name -like "*Can't close yet*" })[0]
+                $dismissNotice = @(Elements $notice.children | Where-Object { $_.automationId -like 'DismissNotification_*' })[0]
                 Ui @('invoke', $dismissNotice.selector, '--action', 'invoke') | Out-Null
                 Wait-Ui { param($items) $items.name -notcontains 'Finish the current operation before closing.' }
                 Ui @('send-keys', 'alt+f', '--via', 'send-input', '--target', $initialEditor.selector) | Out-Null
@@ -5740,7 +5825,7 @@ try {
         try { $parent.DeleteSubKeyTree($childName, $false) } finally { $parent.Dispose() }
         Open-Menu 'Workspaces' -Group 'Tools'; Select-Row 'Phase7 preview workspace' | Out-Null
         Press 'Open workspace'; Confirm-WorkspacePreview -Replace -Start
-        Wait-Ui { param($items) $items.name -contains 'Workspace partly opened' -and @($items | Where-Object name -like "*Tab:*${childName}*").Count -gt 0 }
+        Wait-Ui { param($items) $items.name -contains "Some workspace items couldn't be opened" -and @($items | Where-Object name -like "*Tab:*${childName}*").Count -gt 0 }
         if (@(Read-Ui -All | Where-Object type -eq 'TabItem').Count -le $count -or (Read-Ui).automationId -notcontains 'RunningWatches') { throw 'Partial Replace removed usable tabs or failed to add its staged successes.' }
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'workspace-partial-preserved.png')) | Out-Null
         Browser; Press 'Notes for this key'
@@ -6097,7 +6182,7 @@ try {
             $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
             $sheet = @($windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.className -eq '#32770' -and $_.title -like '*Permissions*' })[0]
             if ($sheet) { break }
-            $notice = @(Read-Ui | Where-Object name -eq "Couldn't complete the operation")
+            $notice = @(Read-Ui | Where-Object name -eq "Couldn't open permissions")
             if ($notice.Count) { throw 'Windows could not open the permissions sheet. See the app log.' }
             Start-Sleep -Milliseconds 100
         } while ($timer.Elapsed.TotalSeconds -lt 15)

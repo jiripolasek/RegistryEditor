@@ -3,12 +3,14 @@
 // ------------------------------------------------------------
 
 using System.ComponentModel;
+using JPSoftworks.Notifications;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Journal;
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Core.Watching;
 using JPSoftworks.Regedit.Dialogs;
 using JPSoftworks.Regedit.Infrastructure;
+using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.Persistence;
 using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels;
@@ -29,14 +31,17 @@ using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.System;
 using Windows.UI.Core;
+using Windows.UI.ViewManagement;
 
 namespace JPSoftworks.Regedit.Views.Shell;
 
 public sealed partial class MainWindow : Window
 {
     private readonly Dictionary<WindowTab, FrameworkElement> _views = [];
+    private readonly OperationNotification _exportNotification;
 
     private string? _startupError;
+    private NotificationHandle? _preferenceNotice;
 
     public AppSettings Settings { get; }
 
@@ -101,11 +106,16 @@ public sealed partial class MainWindow : Window
         viewModel.WatchFailed += session =>
         {
             this.ShowApplicationNotice(
-                "Watch stopped unexpectedly", session.Target + "\n" + session.Error!.Message, InfoBarSeverity.Error);
-            this.ApplicationNotice.ActionButton = new Button
-            {
-                Content = "Open watch", Command = viewModel.RevealWatchCommand, CommandParameter = session
-            };
+                "Watch stopped unexpectedly", session.Target + "\n" + session.Error!.Message, NoticeKind.Error,
+                (NotificationAction[])
+                [
+                    new NotificationAction(
+                        "Open watch", _ =>
+                        {
+                            viewModel.RevealWatchCommand.Execute(session);
+                            return Task.CompletedTask;
+                        })
+                ]);
         };
         var dialogs = new RegistryDialogs(this);
         journal.ConfirmRevert = entry => dialogs.ConfirmAsync(
@@ -115,15 +125,27 @@ public sealed partial class MainWindow : Window
             "Check and revert");
         journal.RefreshBrowser
             = () => viewModel.ContextBrowser?.RefreshCommand.ExecuteAsync(null) ?? Task.CompletedTask;
-        journal.Notice += (title, message, kind) => this.ShowApplicationNotice(title, message, (InfoBarSeverity)kind);
+        journal.Notice += (title, message, kind) => this.ShowApplicationNotice(title, message, kind);
         var branches = new RegistryBranchCommands(registry) { Dialogs = dialogs };
-        branches.Notice += (title, message, kind) => this.ShowApplicationNotice(title, message, (InfoBarSeverity)kind);
+        branches.Notice += this.ShowBranchNotice;
+        this._exportNotification = new OperationNotification(
+            this.Notifications, "application-branch:export", this.CancelApplicationExport);
+        branches.OperationStarted += this._exportNotification.Start;
+        branches.ExportNotice += this._exportNotification.ShowResult;
+        branches.ExportCompleted += this._exportNotification.AddOpenFolderAction;
         branches.Failed += ex => logger.LogFailure(LogLevel.Warning, "Application registry export", ex);
         this.RegistryMenu = new ApplicationRegistryViewModel(
             viewModel, registry, journal, dialogs, branches, logger, journal.Journal.AdministratorOnly);
-        this.RegistryMenu.Notice += (title, message, kind) =>
-            this.ShowApplicationNotice(title, message, (InfoBarSeverity)kind);
+        this.RegistryMenu.Notice += (title, message, kind) => this.ShowApplicationNotice(title, message, kind);
         this.RegistryMenu.OpenFilePreviewAsync = this.OpenRegistryFileAsync;
+        this.RegistryMenu.ExportAllCommand.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(this.RegistryMenu.ExportAllCommand.IsRunning) &&
+                !this.RegistryMenu.ExportAllCommand.IsRunning)
+            {
+                this._exportNotification.Complete();
+            }
+        };
         this._startupError = startupError;
         if (this.Settings.LoadError is not null)
         {
@@ -131,6 +153,12 @@ public sealed partial class MainWindow : Window
         }
 
         this.InitializeComponent();
+        this.NotificationOverlay.Attach(this.Notifications);
+        this.NotificationOverlay.ShadowReceiver = this.Shell;
+        this.NotificationOverlay.ActionFailed += error =>
+            this.Logger.LogFailure(LogLevel.Warning, "Notification action", error);
+        this.Activated += (_, args) => this.NotificationOverlay.IsWindowActive
+            = args.WindowActivationState != WindowActivationState.Deactivated;
         this.ColumnLayouts = new ColumnLayoutPersistence(
             this.DispatcherQueue, preferences.ColumnLayout, preferences.SaveColumnLayout);
         this.ApplyListDensity();
@@ -146,8 +174,10 @@ public sealed partial class MainWindow : Window
         this.Dialogs = new WindowDialogPresenter(
             this.Shell, this.ViewModel,
             () => this.ShowApplicationNotice(
-                "Dialog unavailable", "Finish or cancel the current dialog or window close, then try again.",
-                InfoBarSeverity.Warning));
+                viewModel.IsDialogOpen ? "Finish the open dialog first" : "The window is closing",
+                viewModel.IsDialogOpen
+                    ? "Close the open dialog, then try again."
+                    : "A new dialog can't be opened while the window is closing.", NoticeKind.Warning));
         this.Shell.AddHandler(
             UIElement.PointerReleasedEvent, new PointerEventHandler(this.Shell_PointerReleased), true);
         this.Shell.AddHandler(UIElement.DragOverEvent, new DragEventHandler(this.RegistryFile_DragOver), true);
@@ -204,7 +234,7 @@ public sealed partial class MainWindow : Window
             }
             else
             {
-                this.ShowApplicationNotice("Settings could not be saved", ex.Message, InfoBarSeverity.Error);
+                this.ShowApplicationNotice("Settings could not be saved", ex.Message, NoticeKind.Error);
             }
         };
         this.ViewModel.PropertyChanged += this.ShellStateChanged;
@@ -220,6 +250,12 @@ public sealed partial class MainWindow : Window
         this.ShowBottomContent();
         this.Closed += (_, _) =>
         {
+            this.IsClosed = true;
+            foreach (var browser in this._views.Values.OfType<BrowserPage>())
+            {
+                browser.CancelWork();
+            }
+
             this.ColumnLayouts.Flush();
             if (this.Shell.XamlRoot is { } root)
             {
@@ -233,8 +269,15 @@ public sealed partial class MainWindow : Window
             this.JournalHistory.RevertCommand.Cancel();
             this.ViewModel.WindowClosed();
             this.RegistryMenu.ExportAllCommand.Cancel();
+            this._exportNotification.Dispose();
+            this.NotificationOverlay.Dispose();
+            this.Notifications.Dispose();
         };
     }
+
+    internal NotificationSession Notifications { get; } = new(TimeSpan.FromSeconds(new UISettings().MessageDuration));
+
+    internal bool IsClosed { get; private set; }
 
     internal void CancelApplicationExport()
     {
@@ -262,10 +305,32 @@ public sealed partial class MainWindow : Window
         return count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void ShowApplicationNotice(string title, string message, InfoBarSeverity severity)
+    private void ShowApplicationNotice(
+        string title,
+        string message,
+        NoticeKind kind,
+        IReadOnlyList<NotificationAction>? actions = null)
     {
-        this.ApplicationNotice.ActionButton = null;
-        StatusNotice.Show(this.ApplicationNotice, title, message, severity);
+        if (!this.IsClosed)
+        {
+            StatusNotifications.Show(this.Notifications, title, message, kind, actions);
+        }
+    }
+
+    private void ShowBranchNotice(string title, string message, NoticeKind kind)
+    {
+        if (this.IsClosed)
+        {
+            return;
+        }
+
+        StatusNotifications.Show(this.Notifications, title, message, kind, key: "application-branch");
+    }
+
+    private void NotificationHistory_Click(object sender, RoutedEventArgs args)
+    {
+        this.DispatcherQueue.TryEnqueue(() =>
+            this.NotificationOverlay.ShowHistory(this.ApplicationMenuButton ?? (FrameworkElement)this.Shell));
     }
 
     private async void Shell_Loaded(object sender, RoutedEventArgs args)
@@ -406,7 +471,7 @@ public sealed partial class MainWindow : Window
             SettingsTab => new SettingsPage(this.Preferences),
             ToolTab tool => (FrameworkElement)this.CreateTool(tool.Tool),
             InvestigationViewModel investigation => new InvestigationPage(
-                investigation, this.Dialogs, this.Settings.ListRowPadding, this.ColumnLayouts),
+                investigation, this.Dialogs, this.Notifications, this.Settings.ListRowPadding, this.ColumnLayouts),
             _ => throw new InvalidOperationException("Unknown tab type.")
         };
         if (view is InvestigationPage page)
@@ -434,9 +499,19 @@ public sealed partial class MainWindow : Window
 
     private void ReleaseView(WindowTab tab)
     {
-        if (this._views.Remove(tab, out var view) && view is BrowserPage browser)
+        if (!this._views.Remove(tab, out var view))
         {
-            browser.CancelWork();
+            return;
+        }
+
+        switch (view)
+        {
+            case BrowserPage browser:
+                browser.CancelWork();
+                break;
+            case InvestigationPage investigation:
+                investigation.DismissNotification();
+                break;
         }
     }
 

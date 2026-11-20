@@ -1,4 +1,4 @@
-﻿<Page
+<Page
     x:Class="JPSoftworks.Regedit.Views.Pages.InvestigationPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -188,11 +188,5 @@
                 Visibility="Collapsed" />
             <local:ToolPaneSplitter x:Name="DetailsSplitter" Visibility="Collapsed" />
         </Grid>
-        <InfoBar
-            x:Name="Notice"
-            Grid.Row="3"
-            Margin="0,12,0,0"
-            IsOpen="False"
-            Visibility="{x:Bind Notice.IsOpen, Mode=OneWay}" />
     </Grid>
 </Page>

@@ -6,6 +6,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.Input;
+using JPSoftworks.Notifications;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Export;
 using JPSoftworks.Regedit.Core.Journal;
@@ -17,6 +18,7 @@ using JPSoftworks.Regedit.Infrastructure;
 using JPSoftworks.Regedit.Infrastructure.Collections;
 using JPSoftworks.Regedit.Infrastructure.Input;
 using JPSoftworks.Regedit.Models.Tools;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using JPSoftworks.Regedit.ViewModels.Tools;
 using JPSoftworks.Regedit.Views.Shell;
@@ -36,6 +38,7 @@ namespace JPSoftworks.Regedit.Views.Tools;
 public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 {
     private readonly MainWindow _window;
+    private readonly string _watchErrorKey = "watch-error-" + Guid.NewGuid().ToString("N");
     private readonly bool _compact;
     private bool _loaded, _refreshing, _busy;
     private bool _focusOnLoad, _focusSelection;
@@ -45,6 +48,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
     private readonly List<ToolCommand> _commands = [];
     private readonly List<(ToolCommand Command, Func<bool> Enabled)> _conditionalCommands = [];
     private readonly List<RelayCommand> _runCommands = [];
+    private NotificationHandle? _watchErrorNotice;
     private ToolCommand? _inspectCommand, _revertCommand;
     private ToolCommand? _filterCommand;
     private ScrollViewer? _watchScroll;
@@ -117,7 +121,12 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
         this.ResultActions = new ToolResultActionsViewModel(ClipboardText.Set);
         this.ResultActions.Notice += (title, message, kind) =>
-            StatusNotice.Show(this.Notice, title, message, (InfoBarSeverity)kind);
+        {
+            if (!window.IsClosed)
+            {
+                StatusNotifications.Show(window.Notifications, title, message, kind);
+            }
+        };
         this.ResultActions.ActionFailed += (operation, error) =>
             window.Logger.LogFailure(LogLevel.Warning, operation, error);
 
@@ -547,7 +556,11 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 this._window.Logger.LogFailure(LogLevel.Warning, operation, ex);
             }
 
-            StatusNotice.Show(this.Notice, "Could not complete the action", ex.Message, InfoBarSeverity.Error);
+            if (!this._window.IsClosed)
+            {
+                StatusNotifications.Show(
+                    this._window.Notifications, "Could not complete the action", ex.Message, NoticeKind.Error);
+            }
         }
         finally
         {
@@ -644,6 +657,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             this._refreshing = false;
             watches.Activate();
             this.SelectWatch(watches.Selected);
+            this.UpdateWatchError();
         }
 
         this.Context_Changed(null, EventArgs.Empty);
@@ -919,6 +933,18 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         }
     }
 
+    private void UpdateWatchError()
+    {
+        if (this._window.IsClosed)
+        {
+            return;
+        }
+
+        this._watchErrorNotice = StatusNotifications.UpdateError(
+            this._window.Notifications, this._watchErrorNotice, "Could not complete the watch action",
+            this.WatchSurface?.Error, this._watchErrorKey);
+    }
+
     private void WatchSurface_Changed(object? sender, PropertyChangedEventArgs args)
     {
         if (!this._loaded || this._refreshing || this.WatchSurface is not { } watches)
@@ -939,9 +965,9 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             this.FollowLatestObservation();
         }
 
-        if (args.PropertyName == nameof(WatchSurfaceViewModel.Error) && watches.Error is { } error)
+        if (args.PropertyName == nameof(WatchSurfaceViewModel.Error))
         {
-            StatusNotice.Show(this.Notice, "Could not complete the watch action", error, InfoBarSeverity.Error);
+            this.UpdateWatchError();
         }
 
         this.RefreshCommands();

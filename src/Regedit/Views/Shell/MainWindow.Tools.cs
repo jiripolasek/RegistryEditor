@@ -6,6 +6,7 @@ using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Dialogs;
 using JPSoftworks.Regedit.Infrastructure;
 using JPSoftworks.Regedit.Models.Tools;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels.Shell;
 using JPSoftworks.Regedit.Views.Pages;
 using JPSoftworks.Regedit.Views.Tools;
@@ -104,7 +105,7 @@ public sealed partial class MainWindow
 
         var view = new FavoritesView(
             this.Favorites, this.Dialogs, compact, this.ViewModel.NavigateFromToolsAsync,
-            this.ViewModel.OpenInBackground, this.ShowToolInPanel, this.Logger, this.ColumnLayouts);
+            this.ViewModel.OpenInBackground, this.ShowToolInPanel, this.Logger, this.Notifications, this.ColumnLayouts);
         view.MenuButton.Click += this.ApplicationMenu_Click;
         view.ApplyListSpacing(this.Settings.ListRowPadding);
         return view;
@@ -401,14 +402,14 @@ public sealed partial class MainWindow
         try
         {
             this.ViewModel.SaveLayout();
-            this.ToolNotice.IsOpen = false;
+            this._preferenceNotice?.Dismiss();
         }
         catch (Exception ex)
         {
             this.Logger.LogFailure(LogLevel.Warning, "Save tool preferences", ex);
-            this.ToolNotice.Title = "Could not save preferences";
-            this.ToolNotice.Message = ex.Message;
-            this.ToolNotice.IsOpen = true;
+            this._preferenceNotice = StatusNotifications.Show(
+                this.Notifications, "Could not save preferences", ex.Message, NoticeKind.Error,
+                key: "tool-preferences");
         }
     }
 
@@ -444,7 +445,7 @@ public sealed partial class MainWindow
             if (this.Dialogs.IsOpen)
             {
                 this.ShowApplicationNotice(
-                    "Close canceled", "Finish or cancel the open dialog, then close again.", InfoBarSeverity.Warning);
+                    "Can't close yet", "Close the open dialog, then try again.", NoticeKind.Warning);
                 return;
             }
 
@@ -460,10 +461,7 @@ public sealed partial class MainWindow
                 this.Logger.LogFailure(LogLevel.Warning, "Close window", ex);
             }
 
-            this.ToolNotice.Title = "Close canceled";
-            this.ToolNotice.Message = ex.Message;
-            this.ToolNotice.IsOpen = true;
-            this.ViewModel.IsPaneOpen = true;
+            this.ShowApplicationNotice("Couldn't close the window", ex.Message, NoticeKind.Error);
         }
     }
 }

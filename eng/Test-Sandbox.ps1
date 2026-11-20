@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 param(
-    [ValidateSet('Fast', 'Edits', 'Registry', 'Ui', 'NativeUi', 'NoteClose', 'Launch', 'TreeActions')]
+    [ValidateSet('Fast', 'Edits', 'Registry', 'Ui', 'NativeUi', 'NoteClose', 'Launch', 'TreeActions', 'Notifications', 'NativeNotifications')]
     [string] $Suite = 'Edits',
     [string] $TestFilter,
     [string[]] $ManagedSuite = @(),
@@ -41,7 +41,7 @@ $lock = [IO.File]::Open((Join-Path $work 'run.lock'), 'OpenOrCreate', 'ReadWrite
 try {
     $run = [guid]::NewGuid().ToString('N')
     $output = New-Item -ItemType Directory -Path (Join-Path $resultsDir $run)
-    $isUi = $Suite -in 'Ui', 'NativeUi', 'NoteClose', 'Launch', 'TreeActions'
+    $isUi = $Suite -in 'Ui', 'NativeUi', 'NoteClose', 'Launch', 'TreeActions', 'Notifications', 'NativeNotifications'
     if ($isUi -and ($ManagedSuite.Count -gt 0 -or $ListManagedSuites)) {
         throw 'ManagedSuite and ListManagedSuites apply only to Fast, Edits and Registry.'
     }
@@ -49,8 +49,11 @@ try {
     $scripts = @("$root/tests/UI/Invoke-SandboxChecks.ps1")
     if ($isUi) {
         $null = [regex]::new($TestFilter)
-        $uiScript = if ($Suite -in 'Ui', 'NativeUi') { 'Investigations' } else { $Suite }
+        $uiScript = if ($Suite -in 'Ui', 'NativeUi') { 'Investigations' } elseif ($Suite -in 'Notifications', 'NativeNotifications') { 'Notifications' } else { $Suite }
         $scripts += "$root/tests/UI/$uiScript.Ui.Tests.ps1", "$root/tests/UI/UiTestWindow.ps1", "$root/tests/UI/UiTestProfile.ps1"
+        if ($Suite -in 'Notifications', 'NativeNotifications') {
+            $scripts += "$root/tests/UI/Notifications.Sandbox.Tests.ps1"
+        }
         if ($Suite -in 'Ui', 'NativeUi' -and 'Window chrome retains menu tab and layout behavior' -match $TestFilter) {
             $scripts += "$root/tests/UI/Layout.Ui.Tests.ps1", "$root/tests/UI/Shell.Ui.Tests.ps1"
         }
@@ -61,7 +64,13 @@ try {
         if ($parseErrors.Count) { throw "$scriptPath $($parseErrors[0])" }
     }
     if (-not $NoBuild) {
-        if ($Suite -eq 'NativeUi') {
+        if ($Suite -eq 'NativeNotifications') {
+            dotnet publish "$root/src/Regedit/Regedit.csproj" -c Release -r win-x64 -p:Platform=x64 -p:PublishAot=true -p:RegeditUiTests=true -o "$inputDir/builds/notifications-native" -m:1 -nr:false
+        }
+        elseif ($Suite -eq 'Notifications') {
+            dotnet build "$root/src/Regedit/Regedit.csproj" -c Debug -p:Platform=x64 -p:RegeditUiTests=true -p:SelfContained=true -p:IntermediateOutputPath=obj\NotificationsSandbox\ "-p:OutDir=$inputDir\builds\notifications\" -m:1 -nr:false
+        }
+        elseif ($Suite -eq 'NativeUi') {
             dotnet publish "$root/src/Regedit/Regedit.csproj" -c Release -r win-x64 -p:Platform=x64 -p:PublishAot=true -o "$inputDir/builds/ui-aot" -m:1 -nr:false
         }
         elseif ($isUi) {
@@ -72,7 +81,7 @@ try {
         }
         if ($LASTEXITCODE -ne 0) { throw 'The build failed.' }
     }
-    $executable = if ($Suite -eq 'NativeUi') { 'builds/ui-aot/regedit2.exe' } elseif ($isUi) { 'builds/ui/regedit2.exe' } else { 'builds/registry/Regedit.Tests.exe' }
+    $executable = if ($Suite -eq 'NativeNotifications') { 'builds/notifications-native/regedit2.exe' } elseif ($Suite -eq 'Notifications') { 'builds/notifications/regedit2.exe' } elseif ($Suite -eq 'NativeUi') { 'builds/ui-aot/regedit2.exe' } elseif ($isUi) { 'builds/ui/regedit2.exe' } else { 'builds/registry/Regedit.Tests.exe' }
     $executablePath = Join-Path $inputDir $executable
     if (-not (Test-Path -LiteralPath $executablePath)) { throw 'Run once without -NoBuild to build this suite.' }
     if ($isUi) {
@@ -80,6 +89,11 @@ try {
         if ($Suite -eq 'NativeUi') { Assert-ShippingUiBuild $executablePath } else { Assert-UiTestBuild $executablePath }
     }
     Copy-Item -LiteralPath $scripts -Destination $inputDir
+    if ($Suite -in 'Notifications', 'NativeNotifications') {
+        $source = Join-Path $inputDir 'notification-source/src/Regedit/Notifications/WinUI'
+        New-Item -ItemType Directory -Path $source -Force | Out-Null
+        Copy-Item -LiteralPath "$root/src/Regedit/Notifications/WinUI/Themes" -Destination $source -Recurse -Force
+    }
     if ($isUi) {
         $winapp = Get-Item -LiteralPath (Get-Command winapp.exe).Source
         if ($winapp.Length -eq 0) {
@@ -98,15 +112,20 @@ try {
     $id = $guests[0].Id
     $cache = Join-Path $work 'session.json'
     $session = if (Test-Path -LiteralPath $cache) { Get-Content -LiteralPath $cache -Raw | ConvertFrom-Json }
-    if ($session.Id -ne $id) {
+    $shellDir = $PSHOME
+    $mapped = $false
+    if ($session.Id -eq $id -and $session.Input -eq $inputDir -and $session.Output -eq $resultsDir -and $session.Shell -eq $shellDir -and $session.Base -match ('^' + [regex]::Escape('C:\Regedit-') + '[0-9a-f]{32}$')) {
+        $probeCommand = "cmd.exe /d /c `"if exist $($session.Base)-input\Invoke-SandboxChecks.ps1 (if exist $($session.Base)-results (exit 0) else (exit 1)) else (exit 1)`""
+        $probe = Invoke-Wsb @('exec', '--id', $id, '--run-as', 'ExistingLogin', '--command', $probeCommand)
+        $mapped = $probe.ExitCode -eq 0
+    }
+    if (-not $mapped) {
         $base = 'C:\Regedit-' + [guid]::NewGuid().ToString('N')
         $null = Connect-SandboxDesktop $id
-        $shellDir = Join-Path $env:ProgramFiles 'PowerShell/7'
-        if (-not (Test-Path -LiteralPath "$shellDir/pwsh.exe")) { $shellDir = $PSHOME }
         $null = Invoke-Wsb @('share', '--id', $id, '-f', $inputDir, '-s', "$base-input")
         $null = Invoke-Wsb @('share', '--id', $id, '-f', $shellDir, '-s', "$base-shell")
         $null = Invoke-Wsb @('share', '--id', $id, '-f', $resultsDir, '-s', "$base-results", '--allow-write')
-        $session = @{ Id = $id; Base = $base }
+        $session = @{ Id = $id; Base = $base; Input = $inputDir; Output = $resultsDir; Shell = $shellDir }
         $session | ConvertTo-Json | Set-Content -LiteralPath $cache
     }
     $base = $session.Base

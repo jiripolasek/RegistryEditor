@@ -3,6 +3,7 @@
 // ------------------------------------------------------------
 
 using System.ComponentModel;
+using JPSoftworks.Notifications;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using JPSoftworks.Regedit.Controls.Shared;
@@ -28,6 +29,10 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private readonly Dictionary<FavoriteItemId, TreeViewNode> _nodes = [];
 
+    private readonly INotificationService _notifications;
+    private readonly string _errorKey = "favorites-" + Guid.NewGuid().ToString("N");
+    private NotificationHandle? _errorNotice;
+
     private ToolCommand? _previewCommand;
     private FavoriteRow? _renderedRoot;
     private bool _syncing, _loaded, _focusPending, _focusSelection;
@@ -52,8 +57,10 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         Action<RegistryLocation> openBackground,
         Action<IToolSurface> showInPanel,
         ILogger logger,
+        INotificationService notifications,
         ColumnLayoutPersistence? layouts = null)
     {
+        this._notifications = notifications;
         this.ViewModel = new FavoritesViewModel(store, compact, new FavoriteDialogs(dialogs), navigate, openBackground);
         this.ViewModel.ActionFailed += (operation, error) => logger.LogFailure(LogLevel.Warning, operation, error);
         this.InitializeComponent();
@@ -186,10 +193,21 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private void ModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(FavoritesViewModel.ShowDetails))
+        if (args.PropertyName == nameof(FavoritesViewModel.Error))
+        {
+            this.ShowError();
+        }
+        else if (args.PropertyName == nameof(FavoritesViewModel.ShowDetails))
         {
             this.UpdateDetails();
         }
+    }
+
+    private void ShowError()
+    {
+        this._errorNotice = StatusNotifications.UpdateError(
+            this._notifications, this._errorNotice, "Could not complete the action", this.ViewModel.Error,
+            this._errorKey);
     }
 
     private static bool TryExecute(ICommand? command)
@@ -215,6 +233,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         this.ViewModel.SelectionChanged += this.ModelSelectionChanged;
         this.ViewModel.PropertyChanged += this.ModelPropertyChanged;
         this.ViewModel.Activate();
+        this.ShowError();
         if (this._focusPending)
         {
             this.RequestFocus(this._focusSelection);

@@ -4,6 +4,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using JPSoftworks.Notifications;
 using JPSoftworks.Regedit.Controls.Browser;
 using JPSoftworks.Regedit.Controls.Omnibox;
 using JPSoftworks.Regedit.Controls.Shared;
@@ -16,6 +17,7 @@ using JPSoftworks.Regedit.Infrastructure.Input;
 using JPSoftworks.Regedit.Models.Registry;
 using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.Persistence;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using JPSoftworks.Regedit.ViewModels.Tools;
@@ -36,8 +38,14 @@ public sealed partial class BrowserPage : Page
     private readonly MainWindow _window;
     private bool _initialized;
     private readonly RegistryDialogs _dialogs;
+    private readonly string _notificationKey = "browser-" + Guid.NewGuid().ToString("N");
+    private readonly OperationNotification _exportNotification;
+    private readonly OperationNotification _snapshotNotification;
     private RegistryLocation? _treeContextLocation;
     private bool _keepRenameRejectionNotice;
+    private bool _closed;
+    private NotificationHandle? _notification;
+    private Notification? _notificationContent;
 
     public BrowserViewModel ViewModel { get; }
 
@@ -73,7 +81,7 @@ public sealed partial class BrowserPage : Page
             (MenuFlyout)this.Resources["RegistryListMenu"]);
         this.EntryList.RenameRejected += error =>
         {
-            this.ShowError(error);
+            this.ShowError(error, "Couldn't rename the item");
             this._keepRenameRejectionNotice = true;
         };
         this.TreePane.OpenInBackground += this._window.ViewModel.OpenInBackground;
@@ -91,6 +99,27 @@ public sealed partial class BrowserPage : Page
         };
         viewModel.Branches.Dialogs = this._dialogs;
         viewModel.Branches.Notice += this.ShowNotice;
+        this._exportNotification = new OperationNotification(
+            window.Notifications, this._notificationKey + ":export", viewModel.Branches.ExportCommand.Cancel);
+        viewModel.Branches.OperationStarted += this._exportNotification.Start;
+        viewModel.Branches.ExportNotice += this._exportNotification.ShowResult;
+        viewModel.Branches.ExportCompleted += this._exportNotification.AddOpenFolderAction;
+        viewModel.Branches.HiveSaved += file =>
+        {
+            if (!this._closed && this._notificationContent is not null)
+            {
+                this._notificationContent = StatusNotifications.WithOpenFolderAction(this._notificationContent, file);
+                this._notification?.Update(this._notificationContent);
+            }
+        };
+        viewModel.Branches.ExportCommand.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.Branches.ExportCommand.IsRunning) &&
+                !viewModel.Branches.ExportCommand.IsRunning)
+            {
+                this._exportNotification.Complete();
+            }
+        };
         viewModel.Branches.Failed
             += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Registry branch operation", ex);
         viewModel.Snapshots.SaveFileRequested += () => this._dialogs.PickSaveAsync(
@@ -99,21 +128,26 @@ public sealed partial class BrowserPage : Page
         viewModel.Snapshots.RemoteConfirmationRequested += root => this.ConfirmAsync(
             "Compare remote snapshot?",
             $"Connect to {root.Machine} using your Windows credentials and read {root.Path}?", "Connect and compare");
-        viewModel.Snapshots.ComparisonRequested += comparison => this.GuardAsync(async () =>
-        {
-            var content = new SnapshotComparisonView(
-                new SnapshotComparisonViewModel(
-                    comparison,
-                    () => this._dialogs.PickSaveAsync("Registry differences", ".reg", "Registry differences"),
-                    ClipboardText.Set));
-            await content.ShowAsync(this._window.Root, this._window.Dialogs);
-        });
-        viewModel.Snapshots.Notice += this.ShowNotice;
+        viewModel.Snapshots.ComparisonRequested += comparison => this.GuardAsync(
+            "Couldn't open the comparison", "Opening the comparison was canceled", async () =>
+            {
+                var content = new SnapshotComparisonView(
+                    new SnapshotComparisonViewModel(
+                        comparison,
+                        () => this._dialogs.PickSaveAsync("Registry differences", ".reg", "Registry differences"),
+                        ClipboardText.Set));
+                await content.ShowAsync(this._window.Root, this._window.Dialogs);
+            });
+        this._snapshotNotification = new OperationNotification(
+            window.Notifications, this._notificationKey + ":snapshot",
+            () => viewModel.Snapshots.CancelCommand.Execute(null));
+        viewModel.Snapshots.Notice += this._snapshotNotification.ShowResult;
+        viewModel.Snapshots.OperationStarted += this._snapshotNotification.Start;
         viewModel.Snapshots.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(viewModel.Snapshots.IsBusy))
+            if (args.PropertyName == nameof(viewModel.Snapshots.IsBusy) && !viewModel.Snapshots.IsBusy)
             {
-                this.UpdateCancelButton();
+                this._snapshotNotification.Complete();
             }
         };
         viewModel.PropertyChanged += (_, args) =>
@@ -131,15 +165,22 @@ public sealed partial class BrowserPage : Page
         viewModel.ElevationRequested += window.RegistryMenu.ElevateLocationAsync;
         viewModel.EditPromptRequested += this.ShowEditPromptAsync;
         viewModel.ConfirmHistoryChange = (title, message) => this.ConfirmAsync(title, message, "Check and apply");
-        viewModel.HistoryJournalRequested += id => this.GuardAsync(() => this._window.ShowHistoryJournalAsync(id));
+        viewModel.HistoryJournalRequested += id => this.GuardAsync(
+            "Couldn't open the Journal", "Opening the Journal was canceled",
+            () => this._window.ShowHistoryJournalAsync(id));
         viewModel.HistoryNotice += (title, message, needsReview) =>
         {
-            this.ShowMessage(title, message, needsReview ? InfoBarSeverity.Warning : InfoBarSeverity.Success);
-            this.Notification.ActionButton = new Button
-            {
-                Content = needsReview ? "Show in Journal" : "Go to change",
-                Command = needsReview ? viewModel.ShowHistoryJournalCommand : viewModel.GoToHistoryChangeCommand
-            };
+            this.ShowMessage(
+                title, message, needsReview ? NoticeKind.Warning : NoticeKind.Success, (NotificationAction[])
+                [
+                    new NotificationAction(
+                        needsReview ? "Show in Journal" : "Go to change", _ =>
+                        {
+                            (needsReview ? viewModel.ShowHistoryJournalCommand : viewModel.GoToHistoryChangeCommand)
+                                .Execute(null);
+                            return Task.CompletedTask;
+                        })
+                ]);
         };
         viewModel.CopyTextRequested += this.CopyText;
         viewModel.EditFailed += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Registry edit", ex);
@@ -151,7 +192,7 @@ public sealed partial class BrowserPage : Page
         this.TreePane.LoadFailed += ex =>
         {
             this._window.Logger.LogFailure(LogLevel.Warning, "Load registry tree", ex);
-            this.ShowError(ex.Message);
+            this.ShowError(ex.Message, "Couldn't load the registry tree");
         };
         this.EntryList.FilterTyped += character =>
         {
@@ -355,16 +396,16 @@ public sealed partial class BrowserPage : Page
 
         if (this.Settings.LoadError is { } error)
         {
-            this.ShowError(error);
+            this.ShowError(error, "Couldn't load settings");
         }
     }
 
     private void ViewModel_Navigated(object? sender, EventArgs args)
     {
         // The click that dismisses a rejected rename can also navigate away from its key.
-        if (!this._keepRenameRejectionNotice)
+        if (!this._keepRenameRejectionNotice && this._notificationContent?.Actions.Count is not > 0)
         {
-            this.Notification.IsOpen = false;
+            this._notification?.Dismiss();
         }
 
         this.UpdateAddressBar();
@@ -424,8 +465,9 @@ public sealed partial class BrowserPage : Page
 
     private async void Address_NavigationRequested(object? sender, OmniboxNavigationRequestedEventArgs args)
     {
-        await this.GuardAsync(() =>
-            this.ViewModel.NavigateAsync(RegistryLocation.Parse(args.Address, this.ViewModel.Location.View)));
+        await this.GuardAsync(
+            "Couldn't open the registry key", "Navigation canceled",
+            () => this.ViewModel.NavigateAsync(RegistryLocation.Parse(args.Address, this.ViewModel.Location.View)));
     }
 
 
@@ -559,29 +601,38 @@ public sealed partial class BrowserPage : Page
         item.Text = target?.Hive == RegistryHive.CurrentUser ? "Go to HKCU" : "Go to HKLM";
     }
 
-    private void ShowError(string message)
+    private void ShowError(string message, string title = "Couldn't complete the operation")
     {
-        this.ShowMessage("Couldn't complete the operation", message, InfoBarSeverity.Error);
+        this.ShowMessage(title, message, NoticeKind.Error);
     }
 
     private void ShowNotice(string title, string message, NoticeKind kind)
     {
-        this.ShowMessage(title, message, (InfoBarSeverity)kind);
+        this.ShowMessage(title, message, kind);
     }
 
-    private void UpdateCancelButton()
+    private void ShowMessage(
+        string title,
+        string message,
+        NoticeKind severity = NoticeKind.Information,
+        IReadOnlyList<NotificationAction>? actions = null)
     {
-        var command = this.ViewModel.Snapshots.IsBusy ? this.ViewModel.Snapshots.CancelCommand : null;
-        this.Notification.ActionButton = command is null ? null : new Button { Content = "Cancel", Command = command };
-    }
+        if (this._closed)
+        {
+            return;
+        }
 
-    private void ShowMessage(string title, string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
-    {
         this._keepRenameRejectionNotice = false;
-        StatusNotice.Show(this.Notification, title, message, severity);
+        this._notificationContent = StatusNotifications.Create(
+            title, message, severity, actions, this._notificationKey);
+        this._notification = this._window.Notifications.Show(this._notificationContent);
     }
 
-    private async Task GuardAsync(Func<Task> action, [CallerMemberName] string operation = "")
+    private async Task GuardAsync(
+        string failureTitle,
+        string canceledTitle,
+        Func<Task> action,
+        [CallerMemberName] string operation = "")
     {
         try
         {
@@ -589,12 +640,12 @@ public sealed partial class BrowserPage : Page
         }
         catch (OperationCanceledException)
         {
-            this.ShowMessage("Canceled", "The operation was canceled.");
+            this.ShowMessage(canceledTitle, "The operation was canceled.");
         }
         catch (Exception ex)
         {
             this._window.Logger.LogFailure(LogLevel.Warning, operation, ex);
-            this.ShowError(ex.Message);
+            this.ShowError(ex.Message, failureTitle);
         }
         finally
         {
@@ -604,7 +655,11 @@ public sealed partial class BrowserPage : Page
 
     internal void CancelWork()
     {
+        this._closed = true;
         this.ViewModel.InspectorRequested -= this.ShowValueInspectorAsync;
+        this._notification?.Dismiss();
+        this._exportNotification.Dispose();
+        this._snapshotNotification.Dispose();
         this.ToolbarShortcuts.SetCommands(null);
         this.TreePane.Cancel();
     }
@@ -719,7 +774,7 @@ public sealed partial class BrowserPage : Page
         }
         catch (Exception ex)
         {
-            this.ShowError(ex.Message);
+            this.ShowError(ex.Message, "Couldn't copy to the clipboard");
         }
     }
 
@@ -786,16 +841,18 @@ public sealed partial class BrowserPage : Page
 
     private async void EntryFavorite_Click(object sender, RoutedEventArgs args)
     {
-        await this.GuardAsync(() =>
-            this.ViewModel.SelectedEntry?.Key is { } location
+        await this.GuardAsync(
+            "Couldn't update favorites", "Favorite update canceled",
+            () => this.ViewModel.SelectedEntry?.Key is { } location
                 ? this.ViewModel.ToggleFavoriteCommand.ExecuteAsync(location)
                 : Task.CompletedTask);
     }
 
     private async void TreeFavorite_Click(object sender, RoutedEventArgs args)
     {
-        await this.GuardAsync(() =>
-            this._treeContextLocation is { } location
+        await this.GuardAsync(
+            "Couldn't update favorites", "Favorite update canceled",
+            () => this._treeContextLocation is { } location
                 ? this.ViewModel.ToggleFavoriteCommand.ExecuteAsync(location)
                 : Task.CompletedTask);
     }

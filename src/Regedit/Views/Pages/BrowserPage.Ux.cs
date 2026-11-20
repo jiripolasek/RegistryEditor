@@ -61,8 +61,9 @@ public sealed partial class BrowserPage
                     = $"{entry.Location.Address} · {(entry.Location.View == RegistryView.Registry32 ? "32-bit" : "64-bit")}",
                 Icon = new FontIcon { Glyph = RegistryTreePane.TreeGlyph(entry.Location) }
             };
-            item.Click += async (_, _) =>
-                await this.GuardAsync(() => this.ViewModel.NavigateHistoryAsync(entry.Index, entry.Location));
+            item.Click += async (_, _) => await this.GuardAsync(
+                "Couldn't open the registry key", "Navigation canceled",
+                () => this.ViewModel.NavigateHistoryAsync(entry.Index, entry.Location));
             menu.Items.Add(item);
         }
     }
@@ -146,7 +147,8 @@ public sealed partial class BrowserPage
         }
         else if (back && IsInside(FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject, this.TreePane))
         {
-            await this.GuardAsync(this.TreePane.NavigateParentAsync);
+            await this.GuardAsync(
+                "Couldn't open the parent key", "Navigation canceled", this.TreePane.NavigateParentAsync);
         }
         else if (args.Key == VirtualKey.Up)
         {

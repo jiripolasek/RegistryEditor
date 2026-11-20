@@ -4,6 +4,9 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using JPSoftworks.Notifications;
+using JPSoftworks.Regedit.Services;
+using JPSoftworks.Regedit.Models.Tools;
 using System.Windows.Input;
 using JPSoftworks.Regedit.Controls.Lists;
 using JPSoftworks.Regedit.Core.Import;
@@ -28,6 +31,9 @@ public sealed partial class RegistryFilePreview : UserControl
     private readonly Dictionary<string, TreeViewNode> _nodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<TreeViewNode, string> _paths = [];
     private readonly ObservableCollection<object> _selectedValues = [];
+
+    private readonly NotificationSession _notifications = new(
+        TimeSpan.FromSeconds(new Windows.UI.ViewManagement.UISettings().MessageDuration));
     private RegistryFont? _editorFont;
     private bool _loadingSource, _synchronizingSource;
     private Control? _previousFocus;
@@ -42,6 +48,8 @@ public sealed partial class RegistryFilePreview : UserControl
     public RegistryFilePreview()
     {
         this.InitializeComponent();
+        this.NotificationOverlay.Attach(this._notifications);
+        this.NotificationOverlay.ActionFailed += error => this.ViewModel.ReportFailure(error);
         this.LayoutModes.SelectionChanged += this.Layout_SelectionChanged;
         this.SourceEditor.Editor.Modified += this.Source_Modified;
         this.SourceEditor.Editor.UpdateUI += this.Source_UpdateUI;
@@ -106,10 +114,13 @@ public sealed partial class RegistryFilePreview : UserControl
         };
     }
 
+    internal JPSoftworks.Notifications.WinUI.NotificationHost NotificationHost => this.NotificationOverlay;
+
     internal void Initialize(RegistryFilePreviewViewModel model, RegistryFont font)
     {
         this.ViewModel = model;
         model.PropertyChanged += this.Model_Changed;
+        model.Notice += this.ShowNotice;
         model.SourceLoaded += this.LoadEditorSource;
         model.Saved += this.SetEditorSavePoint;
         model.EditHistoryRequested += this.EditHistory;
@@ -127,6 +138,9 @@ public sealed partial class RegistryFilePreview : UserControl
     internal void Detach()
     {
         this.ViewModel.PropertyChanged -= this.Model_Changed;
+        this.ViewModel.Notice -= this.ShowNotice;
+        this.NotificationOverlay.Dispose();
+        this._notifications.Dispose();
         this.ViewModel.SourceLoaded -= this.LoadEditorSource;
         this.ViewModel.Saved -= this.SetEditorSavePoint;
         this.ViewModel.EditHistoryRequested -= this.EditHistory;
@@ -183,10 +197,12 @@ public sealed partial class RegistryFilePreview : UserControl
             case nameof(RegistryFilePreviewViewModel.Diagnostics):
                 this.UpdateDiagnosticMarkers();
                 break;
-            case nameof(RegistryFilePreviewViewModel.NoticeKind):
-                this.Notice.Severity = (InfoBarSeverity)this.ViewModel.NoticeKind;
-                break;
         }
+    }
+
+    private void ShowNotice(string title, string message, NoticeKind kind)
+    {
+        StatusNotifications.Show(this._notifications, title, message, kind, key: "file-operation");
     }
 
     private void RestoreOperationFocus()

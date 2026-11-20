@@ -147,7 +147,7 @@ internal sealed partial class WorkspacesViewModel : InvestigationViewModel
                       ? "\nSaved searches are ready to run; saved watches were not started."
                       : string.Empty);
             this.Report(
-                result.Errors.Length == 0 ? "Workspace opened" : "Workspace partly opened",
+                result.Errors.Length == 0 ? "Workspace opened" : "Some workspace items couldn't be opened",
                 summary + (result.Errors.Length == 0 ? string.Empty : "\n\n" + string.Join("\n", result.Errors)),
                 result.Errors.Length == 0 ? NoticeKind.Success : NoticeKind.Warning);
         }

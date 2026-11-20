@@ -122,7 +122,7 @@ try {
         Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'AddressInput') | Out-Null
         Wait-State {
             param($elements)
-            $elements.automationId -contains 'Notification' -and
+            @($elements | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0 -and
                 @($elements | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' -and $_.value -eq $missing }).Count -eq 1
         }
         Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input', '--target', 'AddressInput') | Out-Null
@@ -136,7 +136,7 @@ try {
         Wait-State { param($elements) @($elements | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' -and $_.value -eq 'HKEY_CURRENT_USER\Software' }).Count -eq 1 }
         Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'AddressInput') | Out-Null
         Expect-Location 'HKEY_CURRENT_USER\Software'
-        if ((Read-Ui).automationId -contains 'Notification') { throw 'Successful navigation did not clear the old error.' }
+        if (@((Read-Ui) | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0) { throw 'Successful navigation did not clear the old error.' }
     }
     Test-Omnibox 'Escape prevents delayed suggestions from reopening the editor' {
         Invoke-Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
