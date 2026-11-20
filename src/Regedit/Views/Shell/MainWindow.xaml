@@ -211,7 +211,7 @@
                             Height="16"
                             VerticalAlignment="Center"
                             AutomationProperties.Name="Modern Registry Editor"
-                            Source="ms-appx:///Assets/Square44x44Logo.scale-200.png"
+                            Source="ms-appx:///Assets/TitleBarIcon.png"
                             ToolTipService.ToolTip="Modern Registry Editor" />
                     </Border>
                     <FontIcon

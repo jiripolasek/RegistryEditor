@@ -16,7 +16,7 @@
             AutomationProperties.AutomationId="RegFileTitleBar"
             Subtitle="Registry file preview">
             <TitleBar.IconSource>
-                <BitmapIconSource ShowAsMonochrome="False" UriSource="ms-appx:///Assets/Square44x44Logo.scale-200.png" />
+                <BitmapIconSource ShowAsMonochrome="False" UriSource="ms-appx:///Assets/TitleBarIcon.png" />
             </TitleBar.IconSource>
         </TitleBar>
         <files:RegistryFilePreview x:Name="Preview" Grid.Row="1" />

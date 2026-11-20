@@ -2253,7 +2253,7 @@ try {
     foreach ($iconButton in 'Left', 'Right') {
         Test-Ui "A single $iconButton click on the application icon opens the native window menu" {
             $assets = Join-Path (Split-Path -Parent $Executable) 'Assets'
-            foreach ($file in 'AppIcon.ico', 'Square44x44Logo.scale-200.png') {
+            foreach ($file in 'AppIcon.ico', 'TitleBarIcon.png') {
                 if (-not [IO.File]::Exists((Join-Path $assets $file))) { throw "Missing title-bar asset $file." }
             }
             Browser
