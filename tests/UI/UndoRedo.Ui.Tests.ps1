@@ -65,11 +65,16 @@ function Alpha([string] $Expected) {
     if ($value -ne $Expected) { throw "Expected Alpha=$Expected, got $value." }
 }
 
-function Open-Alpha {
+function Get-AlphaRow {
     $row = @(Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Alpha, REG_SZ,*' })
     if ($row.Count -ne 1) { throw 'Expected exactly one Alpha registry row.' }
-    Ui @('invoke', $row[0].selector, '--action', 'select') | Out-Null
-    Keys 'enter' $row[0].selector
+    $row[0]
+}
+
+function Open-Alpha {
+    $row = Get-AlphaRow
+    Ui @('invoke', $row.selector, '--action', 'select') | Out-Null
+    Keys 'enter' $row.selector
     Ui @('wait-for', 'ValueDataEditor', '-t', '6000') | Out-Null
 }
 
@@ -101,6 +106,11 @@ try {
         Keys 'ctrl+z'
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'ValueDataEditor' -and $_.value -eq 'original' }).Count -eq 1 }
         Alpha 'original'
+        Ui @('set-value', 'ValueDataEditor', 'intermediate') | Out-Null
+        Ui @('invoke', 'PrimaryButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'UndoButton' -and $_.isEnabled }).Count -eq 1 }
+        Alpha 'intermediate'
+        Open-Alpha
         Ui @('set-value', 'ValueDataEditor', 'changed') | Out-Null
         Ui @('invoke', 'PrimaryButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'UndoButton' -and $_.isEnabled -and $_.name -eq 'Undo' }).Count -eq 1 }
@@ -119,13 +129,26 @@ try {
         Ui @('wait-for', 'PrimaryButton', '--gone', '-t', '6000') | Out-Null
     }
 
-    Test-Ui 'Ctrl+Z and Ctrl+Y apply the labeled registry action' {
-        Keys 'ctrl+z' 'Registry keys and values'
-        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RedoButton' -and $_.isEnabled -and $_.name -eq 'Redo' }).Count -eq 1 }
-        Alpha 'original'
-        Keys 'ctrl+y' 'Registry keys and values'
-        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'UndoButton' -and $_.isEnabled -and $_.name -eq 'Undo' }).Count -eq 1 }
-        Alpha 'changed'
+    Test-Ui 'Consecutive Undo and Redo shortcuts keep focus on the value row' {
+        Ui @('focus', (Get-AlphaRow).selector) | Out-Null
+        foreach ($step in @(
+            @{ Keys = 'ctrl+z'; Value = 'intermediate'; ReadyButton = 'RedoButton' }
+            @{ Keys = 'ctrl+z'; Value = 'original'; ReadyButton = 'RedoButton' }
+            @{ Keys = 'ctrl+y'; Value = 'intermediate'; ReadyButton = 'UndoButton' }
+            @{ Keys = 'ctrl+y'; Value = 'changed'; ReadyButton = 'UndoButton' }
+        )) {
+            Keys $step.Keys
+            Wait-Ui {
+                param($items)
+                ($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq "Alpha, REG_SZ, $($step.Value)" }) -and
+                    ($items | Where-Object { $_.automationId -eq $step.ReadyButton -and $_.isEnabled })
+            }
+            Alpha $step.Value
+            $focused = Ui @('get-focused')
+            if (!$focused.hasFocus -or $focused.element.name -ne "Alpha, REG_SZ, $($step.Value)") {
+                throw "$($step.Keys) moved focus away from the value row."
+            }
+        }
     }
 
     Test-Ui 'Undoing the filter to empty keeps text focus and never undoes the registry' {
@@ -164,7 +187,7 @@ try {
         }
         Ui @('invoke', 'UndoButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RedoButton' -and $_.isEnabled }).Count -eq 1 }
-        Alpha 'original'
+        Alpha 'intermediate'
         Ui @('invoke', 'RedoButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'UndoButton' -and $_.isEnabled }).Count -eq 1 }
         Alpha 'changed'
