@@ -25,6 +25,8 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
 
     internal event Action<string, string, NoticeKind>? Notice;
 
+    internal event Action<string, string>? OperationStarted;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(
         nameof(CaptureCommand), nameof(CompareFileCommand), nameof(CompareLastCommand), nameof(CancelCommand))]
@@ -54,44 +56,53 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
     {
         return !this.CanCapture(location)
             ? Task.CompletedTask
-            : this.RunAsync(async token =>
-            {
-                using var connection = RemoteRegistryCredentials.Retain((string?[])[location!.Machine]);
-                if (this.SaveFileRequested is null || await this.SaveFileRequested() is not { } file)
+            : this.RunAsync(
+                "Couldn't capture the snapshot", "Snapshot capture canceled", async token =>
                 {
-                    return;
-                }
+                    using var connection = RemoteRegistryCredentials.Retain((string?[])[location!.Machine]);
+                    if (this.SaveFileRequested is null || await this.SaveFileRequested() is not { } file)
+                    {
+                        return;
+                    }
 
-                this.ReportReading("Capturing branch…");
-                var snapshot = await Task.Run(() => RegistryBranchSnapshot.Capture(registry, location!, token), token);
-                await Task.Run(() => snapshot.SaveAsync(file, token), token);
-                token.ThrowIfCancellationRequested();
-                this.LastSnapshot = snapshot;
-                this.Notice?.Invoke(
-                    "Snapshot saved",
-                    $"{snapshot.Keys.Length:N0} keys · {snapshot.Keys.Sum(key => key.Values.Length):N0} values\n{file}",
-                    NoticeKind.Success);
-            });
+                    token.ThrowIfCancellationRequested();
+                    this.ReportReading("Capturing branch…");
+                    var snapshot = await Task.Run(
+                        () => RegistryBranchSnapshot.Capture(registry, location!, token), token);
+                    await Task.Run(() => snapshot.SaveAsync(file, token), token);
+                    token.ThrowIfCancellationRequested();
+                    this.LastSnapshot = snapshot;
+                    this.Notice?.Invoke(
+                        "Snapshot saved",
+                        $"{snapshot.Keys.Length:N0} keys · {snapshot.Keys.Sum(key => key.Values.Length):N0} values\n{file}",
+                        NoticeKind.Success);
+                });
     }
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task CompareFileAsync()
     {
-        return this.RunAsync(async token =>
-        {
-            if (this.OpenFileRequested is not null && await this.OpenFileRequested() is { } file)
+        return this.RunAsync(
+            "Couldn't compare the snapshot", "Snapshot comparison canceled", async token =>
             {
-                var snapshot = await Task.Run(() => RegistryBranchSnapshot.LoadAsync(file, token), token);
-                await this.CompareAsync(snapshot, token);
-            }
-        });
+                if (this.OpenFileRequested is not null && await this.OpenFileRequested() is { } file)
+                {
+                    token.ThrowIfCancellationRequested();
+                    this.OperationStarted?.Invoke(
+                        "Loading snapshot…", "Reading the saved snapshot. No registry data is changed.");
+                    var snapshot = await Task.Run(() => RegistryBranchSnapshot.LoadAsync(file, token), token);
+                    await this.CompareAsync(snapshot, token);
+                }
+            });
     }
 
     [RelayCommand(CanExecute = nameof(CanCompareLast))]
     private Task CompareLastAsync()
     {
         return this.LastSnapshot is { } before
-            ? this.RunAsync(token => this.CompareAsync(before, token))
+            ? this.RunAsync(
+                "Couldn't compare the snapshot", "Snapshot comparison canceled",
+                token => this.CompareAsync(before, token))
             : Task.CompletedTask;
     }
 
@@ -135,13 +146,12 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
 
     private void ReportReading(string title)
     {
-        this.Notice?.Invoke(
+        this.OperationStarted?.Invoke(
             title,
-            "Reading keys, types, and raw values. No registry data is changed. Inaccessible branches stop the capture.",
-            NoticeKind.Information);
+            "Reading keys, types, and raw values. No registry data is changed. Inaccessible branches stop the capture.");
     }
 
-    private async Task RunAsync(Func<CancellationToken, Task> operation)
+    private async Task RunAsync(string failureTitle, string canceledTitle, Func<CancellationToken, Task> operation)
     {
         if (!this.IsIdle)
         {
@@ -159,14 +169,14 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
         {
             if (!this._closed)
             {
-                this.Notice?.Invoke("Canceled", "The operation was canceled.", NoticeKind.Information);
+                this.Notice?.Invoke(canceledTitle, "The operation was canceled.", NoticeKind.Information);
             }
         }
         catch (Exception ex)
         {
             if (!this._closed)
             {
-                this.Notice?.Invoke("Snapshot failed", ex.Message, NoticeKind.Error);
+                this.Notice?.Invoke(failureTitle, ex.Message, NoticeKind.Error);
             }
         }
         finally

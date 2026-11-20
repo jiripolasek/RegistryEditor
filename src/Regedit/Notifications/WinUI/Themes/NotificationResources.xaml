@@ -1,0 +1,102 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:JPSoftworks.Notifications.WinUI">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="NotificationOverflowFadeColor">Transparent</Color>
+            <StaticResource x:Key="NotificationBackgroundBrush" ResourceKey="SolidBackgroundFillColorTertiaryBrush" />
+            <StaticResource x:Key="NotificationAcrylicBackgroundBrush" ResourceKey="AcrylicInAppFillColorDefaultBrush" />
+            <StaticResource x:Key="NotificationBorderBrush" ResourceKey="SurfaceStrokeColorFlyoutBrush" />
+            <StaticResource x:Key="NotificationForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+            <StaticResource x:Key="NotificationSecondaryForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="NotificationNeutralIconBrush" ResourceKey="SystemFillColorNeutralBrush" />
+            <StaticResource x:Key="NotificationCustomIconBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="NotificationSuccessIconBrush" ResourceKey="SystemFillColorSuccessBrush" />
+            <StaticResource x:Key="NotificationWarningIconBrush" ResourceKey="SystemFillColorCautionBrush" />
+            <StaticResource x:Key="NotificationErrorIconBrush" ResourceKey="SystemFillColorCriticalBrush" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="NotificationOverflowFadeColor">Transparent</Color>
+            <StaticResource x:Key="NotificationBackgroundBrush" ResourceKey="SolidBackgroundFillColorTertiaryBrush" />
+            <StaticResource x:Key="NotificationAcrylicBackgroundBrush" ResourceKey="AcrylicInAppFillColorDefaultBrush" />
+            <StaticResource x:Key="NotificationBorderBrush" ResourceKey="SurfaceStrokeColorFlyoutBrush" />
+            <StaticResource x:Key="NotificationForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+            <StaticResource x:Key="NotificationSecondaryForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="NotificationNeutralIconBrush" ResourceKey="SystemFillColorNeutralBrush" />
+            <StaticResource x:Key="NotificationCustomIconBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="NotificationSuccessIconBrush" ResourceKey="SystemFillColorSuccessBrush" />
+            <StaticResource x:Key="NotificationWarningIconBrush" ResourceKey="SystemFillColorCautionBrush" />
+            <StaticResource x:Key="NotificationErrorIconBrush" ResourceKey="SystemFillColorCriticalBrush" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <Color x:Key="NotificationOverflowFadeColor">White</Color>
+            <StaticResource x:Key="NotificationBackgroundBrush" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="NotificationAcrylicBackgroundBrush" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="NotificationBorderBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationForegroundBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationSecondaryForegroundBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationNeutralIconBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationCustomIconBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationSuccessIconBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationWarningIconBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="NotificationErrorIconBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+    <x:String x:Key="NotificationInformationGlyph">&#xE946;</x:String>
+    <x:String x:Key="NotificationSuccessGlyph">&#xE930;</x:String>
+    <x:String x:Key="NotificationWarningGlyph">&#xE7BA;</x:String>
+    <x:String x:Key="NotificationErrorGlyph">&#xEA39;</x:String>
+    <x:String x:Key="NotificationStackUpGlyph">&#xE70E;</x:String>
+    <x:String x:Key="NotificationStackDownGlyph">&#xE70D;</x:String>
+    <Style x:Key="NotificationActionPanelStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Thickness x:Key="NotificationPadding">16</Thickness>
+    <Thickness x:Key="NotificationCompactPadding">12,8</Thickness>
+    <Thickness x:Key="NotificationHostPadding">16</Thickness>
+    <x:Double x:Key="NotificationDetailSpacing">8</x:Double>
+    <x:Double x:Key="NotificationCompactDetailSpacing">4</x:Double>
+    <x:Double x:Key="NotificationActionSpacing">12</x:Double>
+    <x:Double x:Key="NotificationCardSpacing">16</x:Double>
+    <x:Double x:Key="NotificationCompactCardSpacing">8</x:Double>
+    <x:Double x:Key="NotificationMaxCardWidth">400</x:Double>
+    <StaticResource x:Key="NotificationCornerRadius" ResourceKey="ControlCornerRadius" />
+    <StaticResource x:Key="NotificationRoundedCornerRadius" ResourceKey="OverlayCornerRadius" />
+    <Style
+        x:Key="NotificationActionLinkStyle"
+        BasedOn="{StaticResource DefaultHyperlinkButtonStyle}"
+        TargetType="HyperlinkButton">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinHeight" Value="24" />
+    </Style>
+    <Style
+        x:Key="NotificationDefaultActionLinkStyle"
+        BasedOn="{StaticResource NotificationActionLinkStyle}"
+        TargetType="HyperlinkButton">
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style
+        x:Key="NotificationActionButtonStyle"
+        BasedOn="{StaticResource DefaultButtonStyle}"
+        TargetType="Button">
+        <Setter Property="Padding" Value="12,4" />
+    </Style>
+    <Style
+        x:Key="NotificationDefaultActionButtonStyle"
+        BasedOn="{StaticResource AccentButtonStyle}"
+        TargetType="Button">
+        <Setter Property="Padding" Value="12,4" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style
+        x:Key="NotificationDismissButtonStyle"
+        BasedOn="{StaticResource DefaultButtonStyle}"
+        TargetType="Button">
+        <Setter Property="MinWidth" Value="24" />
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+</ResourceDictionary>

@@ -52,7 +52,7 @@ function Assert-Panel([bool] $Visible) {
 }
 
 function Assert-NoNotice {
-    if (@(Read-Ui | Where-Object { $_.automationId -eq 'Notification' }).Count -gt 0) {
+    if (@(Read-Ui | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0) {
         throw 'Routine F3 navigation opened the browser InfoBar.'
     }
 }

@@ -59,6 +59,14 @@ public partial class App : Application
     {
         try
         {
+#if DEBUG || REGEDIT_UI_TESTS
+            if (Environment.GetCommandLineArgs().Contains("--notification-prototype", StringComparer.Ordinal))
+            {
+                this.OpenNotificationPrototype();
+                return;
+            }
+#endif
+
             RegistryLocation? location = null;
             string? startupError = null;
             try

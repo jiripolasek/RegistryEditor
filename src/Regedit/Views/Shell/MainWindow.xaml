@@ -1,8 +1,9 @@
-<Window
+﻿<Window
     x:Class="JPSoftworks.Regedit.Views.Shell.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:JPSoftworks.Regedit.Models.Tools"
+    xmlns:notifications="using:JPSoftworks.Notifications.WinUI"
     xmlns:shared="using:JPSoftworks.Regedit.Controls.Shared"
     xmlns:vm="using:JPSoftworks.Regedit.ViewModels.Shell"
     Title="Registry Editor">
@@ -68,6 +69,11 @@
                     </MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    AutomationProperties.AutomationId="RecentNotifications"
+                    Click="NotificationHistory_Click"
+                    Icon="Message"
+                    Text="Recent notifications" />
                 <MenuFlyoutItem
                     Command="{x:Bind ViewModel.OpenSettingsCommand}"
                     Icon="Setting"
@@ -393,13 +399,6 @@
                             Grid.Row="1"
                             HorizontalContentAlignment="Stretch"
                             VerticalContentAlignment="Stretch" />
-                        <InfoBar
-                            x:Name="ToolNotice"
-                            Grid.Row="2"
-                            Margin="0,8,0,0"
-                            IsOpen="False"
-                            Severity="Error"
-                            Visibility="{x:Bind ToolNotice.IsOpen, Mode=OneWay}" />
                     </Grid>
                 </Grid>
             </SplitView.Pane>
@@ -590,10 +589,10 @@
                     VerticalContentAlignment="Stretch" />
             </Border>
         </Grid>
-        <InfoBar
-            x:Name="ApplicationNotice"
+        <notifications:NotificationHost
+            x:Name="NotificationOverlay"
             Grid.Row="1"
-            AutomationProperties.AutomationId="ApplicationNotice"
-            IsOpen="False" />
+            Grid.RowSpan="3"
+            AutomationProperties.AutomationId="ApplicationNotifications" />
     </Grid>
 </Window>

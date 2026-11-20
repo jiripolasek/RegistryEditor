@@ -4,6 +4,7 @@
 
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Infrastructure;
+using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.Views.Files;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
@@ -98,7 +99,7 @@ public sealed partial class MainWindow
             this.Logger.LogFailure(LogLevel.Warning, "Open dropped registry file", ex);
             if (openPreview)
             {
-                this.ShowApplicationNotice("Couldn't open registry file", ex.Message, InfoBarSeverity.Error);
+                this.ShowApplicationNotice("Couldn't open registry file", ex.Message, NoticeKind.Error);
             }
         }
         finally

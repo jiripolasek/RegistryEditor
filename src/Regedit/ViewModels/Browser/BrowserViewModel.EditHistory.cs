@@ -226,8 +226,9 @@ public sealed partial class BrowserViewModel
             this.RegistryChanged?.Invoke(this, EventArgs.Empty);
             if (await this.RefreshHistoryViewsAsync(recorded) && !this._closed)
             {
-                this.Status = verb + " completed: " + edit.Label;
-                this.HistoryNotice?.Invoke(verb + " completed", edit.Label + "\n" + HistoryTarget(edit), false);
+                var title = redo ? "Change redone" : "Change undone";
+                this.Status = title + ": " + edit.Label;
+                this.HistoryNotice?.Invoke(title, edit.Label + "\n" + HistoryTarget(edit), false);
             }
         }
         finally
@@ -249,7 +250,9 @@ public sealed partial class BrowserViewModel
         catch (Exception ex)
         {
             this.EditFailed?.Invoke(ex);
-            this.HistoryNotice?.Invoke("Registry changed; refresh failed", ex.Message, true);
+            this.HistoryNotice?.Invoke(
+                "Couldn't refresh the view",
+                "The registry has changed. Review the Journal to confirm the result.\n" + ex.Message, true);
             return false;
         }
     }

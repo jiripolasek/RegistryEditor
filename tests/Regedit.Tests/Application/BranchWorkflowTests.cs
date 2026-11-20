@@ -2,6 +2,12 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using JPSoftworks.Notifications;
+using JPSoftworks.Regedit.Services;
+// ------------------------------------------------------------
+// Copyright (c) Jiri Polasek. All rights reserved.
+// ------------------------------------------------------------
+
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Core.Snapshots;
 using JPSoftworks.Regedit.Dialogs;
@@ -115,6 +121,19 @@ internal static class BranchWorkflowTests
             var foreign = before with { Root = remote, Computer = "fixture" };
             await foreign.SaveAsync(file);
             var snapshots = new BrowserSnapshotsViewModel(registry);
+            using var progressSession = new NotificationSession();
+            using var snapshotNotification = new OperationNotification(progressSession, "snapshot", snapshots.Cancel);
+            snapshots.OperationStarted += snapshotNotification.Start;
+            snapshots.Notice += snapshotNotification.ShowResult;
+            snapshots.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(snapshots.IsBusy) && !snapshots.IsBusy)
+                {
+                    snapshotNotification.Complete();
+                }
+            };
+            var snapshotStarts = new List<string>();
+            snapshots.OperationStarted += (title, _) => snapshotStarts.Add(title);
             snapshots.OpenFileRequested += () => Task.FromResult<string?>(file);
             var confirmations = 0;
             snapshots.RemoteConfirmationRequested += target =>
@@ -136,20 +155,27 @@ internal static class BranchWorkflowTests
             };
             await snapshots.CompareFileCommand.ExecuteAsync(null);
             check(
+                snapshotStarts is ["Loading snapshot…"],
+                "Snapshot file loading posts progress before reading and before remote confirmation");
+            check(
                 confirmations == 1 && failure is null && snapshots.LastComparison is null && !snapshots.IsBusy,
                 "Canceling the remote snapshot confirmation skips the registry read and clears busy state");
+            check(
+                progressSession.GetActive().Length == 0,
+                "Declining remote comparison dismisses loading progress instead of restoring stale started text");
 
             var held = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
             snapshots.SaveFileRequested += () => held.Task;
             var capture = snapshots.CaptureCommand.ExecuteAsync(local);
             check(
-                snapshots.IsBusy && !snapshots.CompareFileCommand.CanExecute(null),
-                "A pending capture owns this tab's snapshot commands");
+                snapshots.IsBusy && !snapshots.CompareFileCommand.CanExecute(null) && snapshotStarts.Count == 1,
+                "A pending snapshot picker owns commands without posting progress or changing the previous notice");
             snapshots.Close();
             held.SetResult(file);
             await capture;
             check(
-                snapshots.LastSnapshot is null && (await RegistryBranchSnapshot.LoadAsync(file)).Root == remote,
+                snapshots.LastSnapshot is null && snapshotStarts.Count == 1 &&
+                (await RegistryBranchSnapshot.LoadAsync(file)).Root == remote,
                 "Closing the browser while the snapshot picker is open preserves the existing file");
 
             var prompts = new BranchDialogs();
@@ -171,6 +197,10 @@ internal static class BranchWorkflowTests
                 prompts.PermissionsTarget == local && refreshes is [null],
                 "Closing permissions refreshes the tree without navigating the browser to the dialog target");
 
+            var exportStarts = new List<string>();
+            commands.OperationStarted += (title, _) => exportStarts.Add(title);
+            var completedExports = new List<string>();
+            commands.ExportCompleted += completedExports.Add;
             await commands.SaveHiveCommand.ExecuteAsync(local);
             await commands.LoadHiveCommand.ExecuteAsync(RegistryLocation.Parse("HKU"));
             await commands.UnloadHiveCommand.ExecuteAsync(RegistryLocation.Parse(@"HKU\RegeditTestMount"));
@@ -180,6 +210,24 @@ internal static class BranchWorkflowTests
                 prompts.Calls.SequenceEqual(new[] { "save:.hiv", "open:*", "confirm", "save:.reg", "range" }) &&
                 prompts.Preview is null,
                 "Canceling pickers, hive confirmation and print range stops before side effects");
+            check(
+                completedExports.Count == 0 && exportStarts.Count == 0,
+                "Canceled export pickers post neither progress nor an output folder");
+            var exportNotices = new List<string>();
+            var pageNotices = new List<string>();
+            commands.ExportNotice += (title, _, _) => exportNotices.Add(title);
+            commands.Notice += (title, _, _) => pageNotices.Add(title);
+            using (var canceledExport = new CancellationTokenSource())
+            {
+                canceledExport.Cancel();
+                prompts.SavePath = exported;
+                await commands.ExportLocationAsync(local, false, canceledExport.Token);
+                check(
+                    exportNotices is ["Export canceled"] && pageNotices.Count == 0 && exportStarts.Count == 0,
+                    "An export canceled after its picker routes the result to the export channel without touching page feedback");
+                prompts.SavePath = null;
+            }
+
             if (useRegistry)
             {
                 using var root = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, local.View);
@@ -195,6 +243,13 @@ internal static class BranchWorkflowTests
                     prompts.SavePath = exported;
                     await commands.ExportCommand.ExecuteAsync(local.Child("Child"));
                     var branch = await File.ReadAllTextAsync(exported);
+                    check(exportStarts is ["Exporting…"], "Confirmed exports post their own operation progress");
+                    check(
+                        exportNotices is ["Export canceled", "Export complete"] && pageNotices.Count == 0,
+                        "Successful exports publish their terminal result only to the export channel");
+                    check(
+                        completedExports.SequenceEqual(new[] { exported }),
+                        "A completed export publishes its exact output path for the notification action");
                     check(
                         branch.Contains("OnlyInChild") && !branch.Contains("OnlyHere"),
                         "Registry export reads exactly the requested child branch");

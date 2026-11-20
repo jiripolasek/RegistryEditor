@@ -101,6 +101,9 @@ void AddAsync(string name, Func<Task> run)
     suites.Add(new TestSuite(name, run));
 }
 
+AddAsync("notifications", () => JPSoftworks.Regedit.Tests.Notifications.NotificationSessionTests.RunAsync(Check));
+AddAsync("status-notifications", () => JPSoftworks.Regedit.Tests.Notifications.StatusNotificationTests.RunAsync(Check));
+
 AddAsync("ux-mvp", () => UxMvpTests.RunAsync(Check));
 Add("logging", () => LoggingTests.Run(Check));
 AddAsync("app-services", () => AppServicesTests.RunAsync(Check));

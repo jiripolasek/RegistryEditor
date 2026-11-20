@@ -268,7 +268,7 @@ try {
         Open-Menu 'Close application'
         Wait-Ui { param($items) $items.name -contains 'Unsaved notes' }
         Press 'Discard notes'
-        Wait-Ui { param($items) $items.name -contains 'Close canceled' }
+        Wait-Ui { param($items) $items.name -contains "Can't close yet" }
         Expect-Draft
         if ((Pick 'TabItem' 'Software').isOffscreen) { throw 'The registry tab was lost after the failed session save.' }
         Open-Menu 'Close application'
@@ -280,7 +280,7 @@ try {
         Ui @('invoke', 'FavoriteButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) $items.name -contains 'Add favorite' }
         $appProcess.CloseMainWindow() | Out-Null
-        Wait-Ui { param($items) $items.name -contains 'Add favorite' -and $items.name -contains 'Close canceled' }
+        Wait-Ui { param($items) $items.name -contains 'Add favorite' -and $items.name -contains "Can't close yet" }
         if ($appProcess.HasExited) { throw 'A clean window closed behind its open dialog.' }
         Press 'Cancel'
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq $savedText }).Count -eq 1 }
@@ -293,7 +293,7 @@ try {
         Ui @('invoke', 'FavoriteButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) $items.name -contains 'Add favorite' }
         $appProcess.CloseMainWindow() | Out-Null
-        Wait-Ui { param($items) $items.name -contains 'Add favorite' -and $items.name -contains 'Close canceled' }
+        Wait-Ui { param($items) $items.name -contains 'Add favorite' -and $items.name -contains "Can't close yet" }
         Press 'Cancel'
         Expect-Draft
         Open-Menu 'Close application'

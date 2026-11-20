@@ -276,7 +276,8 @@ internal static class UndoRedoTests
 
             var refresh = NewTab();
             var refreshNotice = string.Empty;
-            refresh.HistoryNotice += (title, _, _) => refreshNotice = title;
+            var refreshMessage = string.Empty;
+            refresh.HistoryNotice += (title, message, _) => (refreshNotice, refreshMessage) = (title, message);
             await refresh.NavigateAsync(root, false);
             await CreateValue(refresh, "RefreshFailure", "01");
             Func<BrowserViewModel, IReadOnlyList<JournalEntry>, Task> failRefresh = (source, _) => source == refresh
@@ -287,7 +288,8 @@ internal static class UndoRedoTests
             history.Changed -= failRefresh;
             check(
                 raw.ReadValue(root, "RefreshFailure") is null && refresh.RedoCommand.CanExecute(null) &&
-                refreshNotice.Contains("refresh failed"),
+                refreshNotice == "Couldn't refresh the view" &&
+                refreshMessage.StartsWith("The registry has changed.", StringComparison.Ordinal),
                 "A refresh failure reports the successful mutation and preserves Redo");
 
             var capturedA = new List<JournalEntry>();

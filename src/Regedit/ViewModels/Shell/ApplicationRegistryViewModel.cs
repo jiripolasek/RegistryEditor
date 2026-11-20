@@ -54,30 +54,31 @@ internal sealed partial class ApplicationRegistryViewModel(
 
         var browser = window.ContextBrowser;
         var location = browser?.Location ?? new RegistryLocation();
-        await this.GuardAsync(async () =>
-        {
-            if (location.Machine is not null)
+        await this.GuardAsync(
+            "Couldn't open the registry file", "Import canceled", async () =>
             {
-                throw new InvalidOperationException(
-                    "Registry files are imported on this computer. Switch to a local registry tab first.");
-            }
+                if (location.Machine is not null)
+                {
+                    throw new InvalidOperationException(
+                        "Registry files are imported on this computer. Switch to a local registry tab first.");
+                }
 
-            file ??= await dialogs.PickOpenAsync(".reg");
-            if (file is null)
-            {
-                return;
-            }
+                file ??= await dialogs.PickOpenAsync(".reg");
+                if (file is null)
+                {
+                    return;
+                }
 
-            if (!string.Equals(Path.GetExtension(file), ".reg", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("Choose a .reg file to preview registry changes.");
-            }
+                if (!string.Equals(Path.GetExtension(file), ".reg", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Choose a .reg file to preview registry changes.");
+                }
 
-            if (this.OpenFilePreviewAsync is { } open)
-            {
-                await open(file, location.View);
-            }
-        });
+                if (this.OpenFilePreviewAsync is { } open)
+                {
+                    await open(file, location.View);
+                }
+            });
     }
 
     internal RegistryFilePreviewViewModel CreateFilePreview(RegistryView view, IRegistryFileDialogs fileDialogs)
@@ -152,33 +153,34 @@ internal sealed partial class ApplicationRegistryViewModel(
     private async Task ConnectAsync()
     {
         var view = window.ContextLocation?.View ?? RegistryView.Registry64;
-        await this.GuardAsync(async () =>
-        {
-            RegistryLocation? target = null;
-            IDisposable? connection = null;
-            try
+        await this.GuardAsync(
+            "Couldn't connect to the remote registry", "Connection canceled", async () =>
             {
-                if (await dialogs.RequestComputerNameAsync(async computer =>
-                    {
-                        target = RemoteRoot(computer, view);
-                        var pending = RemoteRegistryCredentials.Retain(target.Machine!);
-                        connection?.Dispose();
-                        connection = pending;
-                        await Task.Run(() => ProbeRemote(
-                            target, location =>
-                            {
-                                using var key = registry.Open(location);
-                            }));
-                    }) && !window.IsClosing && !window.CanCloseWindow)
+                RegistryLocation? target = null;
+                IDisposable? connection = null;
+                try
                 {
-                    window.OpenBrowser(target!.GetComputer());
+                    if (await dialogs.RequestComputerNameAsync(async computer =>
+                        {
+                            target = RemoteRoot(computer, view);
+                            var pending = RemoteRegistryCredentials.Retain(target.Machine!);
+                            connection?.Dispose();
+                            connection = pending;
+                            await Task.Run(() => ProbeRemote(
+                                target, location =>
+                                {
+                                    using var key = registry.Open(location);
+                                }));
+                        }) && !window.IsClosing && !window.CanCloseWindow)
+                    {
+                        window.OpenBrowser(target!.GetComputer());
+                    }
                 }
-            }
-            finally
-            {
-                connection?.Dispose();
-            }
-        });
+                finally
+                {
+                    connection?.Dispose();
+                }
+            });
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenStandardAccess))]
@@ -190,11 +192,12 @@ internal sealed partial class ApplicationRegistryViewModel(
         }
 
         var location = window.ContextLocation ?? new RegistryLocation();
-        return this.GuardAsync(() =>
-        {
-            this._startStandardAccess(Environment.ProcessPath!, location);
-            return Task.CompletedTask;
-        });
+        return this.GuardAsync(
+            "Couldn't open a standard access window", "Window launch canceled", () =>
+            {
+                this._startStandardAccess(Environment.ProcessPath!, location);
+                return Task.CompletedTask;
+            });
     }
 
     [RelayCommand(CanExecute = nameof(CanElevate))]
@@ -210,14 +213,19 @@ internal sealed partial class ApplicationRegistryViewModel(
             return Task.CompletedTask;
         }
 
-        return this.GuardAsync(() =>
-        {
-            this._startProcess(RegistryLaunch.CreateElevationStartInfo(Environment.ProcessPath!, location));
-            return Task.CompletedTask;
-        });
+        return this.GuardAsync(
+            "Couldn't open an administrator window", "Elevation canceled", () =>
+            {
+                this._startProcess(RegistryLaunch.CreateElevationStartInfo(Environment.ProcessPath!, location));
+                return Task.CompletedTask;
+            });
     }
 
-    private async Task GuardAsync(Func<Task> action, [CallerMemberName] string operation = "")
+    private async Task GuardAsync(
+        string failureTitle,
+        string canceledTitle,
+        Func<Task> action,
+        [CallerMemberName] string operation = "")
     {
         try
         {
@@ -225,16 +233,16 @@ internal sealed partial class ApplicationRegistryViewModel(
         }
         catch (OperationCanceledException)
         {
-            this.Notice?.Invoke("Canceled", "The operation was canceled.", NoticeKind.Information);
+            this.Notice?.Invoke(canceledTitle, "The operation was canceled.", NoticeKind.Information);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            this.Notice?.Invoke("Canceled", "The operation was canceled.", NoticeKind.Information);
+            this.Notice?.Invoke(canceledTitle, "The operation was canceled.", NoticeKind.Information);
         }
         catch (Exception ex)
         {
             logger.LogFailure(LogLevel.Warning, operation, ex);
-            this.Notice?.Invoke("Couldn't complete the operation", ex.Message, NoticeKind.Error);
+            this.Notice?.Invoke(failureTitle, ex.Message, NoticeKind.Error);
         }
         finally
         {

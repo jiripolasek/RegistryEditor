@@ -101,7 +101,7 @@ internal sealed partial class JournalViewModel
         catch (Exception ex)
         {
             this._logger.LogFailure(LogLevel.Warning, "Change journal archive state", ex);
-            this.Notice?.Invoke("Could not change archive state", ex.Message, NoticeKind.Error);
+            this.Notice?.Invoke("Couldn't update the archive", ex.Message, NoticeKind.Error);
         }
     }
 

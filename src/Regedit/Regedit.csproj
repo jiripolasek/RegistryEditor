@@ -15,6 +15,11 @@
     <CopyOutputSymbolsToPublishDirectory Condition="'$(Configuration)' == 'Release'">false</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(Configuration)' != 'Debug' and '$(RegeditUiTests)' != 'true'">
+    <Compile Remove="Notifications\Prototype\**\*.cs" />
+    <Page Remove="Notifications\Prototype\**\*.xaml" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- UI libraries reference the metapackage; suppress its unused component assets. -->
     <PackageReference Include="Microsoft.WindowsAppSDK" ExcludeAssets="all" PrivateAssets="all" />

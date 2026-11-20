@@ -20,7 +20,15 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
 
     internal event Action<string, string, NoticeKind>? Notice;
 
+    internal event Action<string, string, NoticeKind>? ExportNotice;
+
+    internal event Action<string, string>? OperationStarted;
+
     internal event Action<Exception>? Failed;
+
+    internal event Action<string>? ExportCompleted;
+
+    internal event Action<string>? HiveSaved;
 
     internal event Action? RegistryActivityCompleted;
 
@@ -55,7 +63,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
     internal Task ExportLocationAsync(RegistryLocation? location, bool all, CancellationToken token)
     {
         return this.WithDialogsAsync(
-            location, async (target, dialogs) =>
+            location, "Couldn't export the registry", "Export canceled", async (target, dialogs) =>
             {
                 var roots = target.GetScopeRoots(all);
                 if (await dialogs.PickSaveAsync(all ? "Registry export" : target.Name, ".reg", "Registry file") is not
@@ -65,31 +73,33 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
                 }
 
                 token.ThrowIfCancellationRequested();
-                this.Notice?.Invoke(
-                    "Exporting…", "The destination is replaced only after export finishes. Press Esc to cancel.",
-                    NoticeKind.Information);
+                this.OperationStarted?.Invoke(
+                    "Exporting…",
+                    "The destination file won't be replaced until the export finishes. Press Esc to cancel.");
                 var skipped = await Task.Run(
                     () => RegistryExport.ExportAsync(registry, roots, file, token, all), token);
-                this.Notice?.Invoke(
-                    skipped == 0 ? "Export complete" : "Exported accessible keys",
+                this.ExportNotice?.Invoke(
+                    skipped == 0 ? "Export complete" : "Export finished with warnings",
                     file + (skipped == 0
                         ? string.Empty
                         : $" · {skipped} inaccessible branches were skipped and noted in the file."),
                     skipped == 0 ? NoticeKind.Success : NoticeKind.Warning);
-            });
+                this.ExportCompleted?.Invoke(file);
+            }, isExport: true);
     }
 
     [RelayCommand(CanExecute = nameof(IsKey))]
     private Task SaveHiveAsync(RegistryLocation? location)
     {
         return this.WithDialogsAsync(
-            location, async (target, dialogs) =>
+            location, "Couldn't save the hive", "Hive save canceled", async (target, dialogs) =>
             {
                 if (IsKey(target) && await dialogs.PickSaveAsync(target.Name, ".hiv", "Registry hive") is { } file &&
                     !this._closed)
                 {
                     await RegistryService.SaveHiveAsync(target, file);
                     this.Notice?.Invoke("Hive saved", file, NoticeKind.Success);
+                    this.HiveSaved?.Invoke(file);
                 }
             });
     }
@@ -98,7 +108,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
     private Task LoadHiveAsync(RegistryLocation? location)
     {
         return this.WithDialogsAsync(
-            location, async (parent, dialogs) =>
+            location, "Couldn't load the hive", "Hive loading canceled", async (parent, dialogs) =>
             {
                 if (!CanLoad(parent) || await dialogs.PickOpenAsync("*") is not { } file)
                 {
@@ -148,7 +158,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
     private Task UnloadHiveAsync(RegistryLocation? location)
     {
         return this.WithDialogsAsync(
-            location, async (target, dialogs) =>
+            location, "Couldn't unload the hive", "Hive unloading canceled", async (target, dialogs) =>
             {
                 if (!CanUnload(target) || !await dialogs.ConfirmAsync(
                         "Unload hive?",
@@ -187,7 +197,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
     private Task PermissionsAsync(RegistryLocation? location)
     {
         return this.WithDialogsAsync(
-            location, (target, dialogs) =>
+            location, "Couldn't open permissions", "Permissions dialog canceled", (target, dialogs) =>
             {
                 if (IsKey(target))
                 {
@@ -203,7 +213,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
     private Task PrintAsync(RegistryLocation? location, CancellationToken token)
     {
         return this.WithDialogsAsync(
-            location, async (target, dialogs) =>
+            location, "Couldn't print the registry report", "Printing canceled", async (target, dialogs) =>
             {
                 if (await dialogs.ChoosePrintRangeAsync(target) is not { } range)
                 {
@@ -220,7 +230,10 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
 
     private async Task WithDialogsAsync(
         RegistryLocation? location,
-        Func<RegistryLocation, IRegistryBranchDialogs, Task> action)
+        string failureTitle,
+        string canceledTitle,
+        Func<RegistryLocation, IRegistryBranchDialogs, Task> action,
+        bool isExport = false)
     {
         if (this._closed || location is null || this.Dialogs is not { } dialogs)
         {
@@ -236,7 +249,8 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
         {
             if (!this._closed)
             {
-                this.Notice?.Invoke("Canceled", "The operation was canceled.", NoticeKind.Information);
+                (isExport ? this.ExportNotice : this.Notice)?.Invoke(
+                    canceledTitle, "The operation was canceled.", NoticeKind.Information);
             }
         }
         catch (Exception ex)
@@ -244,7 +258,7 @@ internal sealed partial class RegistryBranchCommands(RegistryService registry)
             this.Failed?.Invoke(ex);
             if (!this._closed)
             {
-                this.Notice?.Invoke("Couldn't complete the operation", ex.Message, NoticeKind.Error);
+                (isExport ? this.ExportNotice : this.Notice)?.Invoke(failureTitle, ex.Message, NoticeKind.Error);
             }
         }
         finally

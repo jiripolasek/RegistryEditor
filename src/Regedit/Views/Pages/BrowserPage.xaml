@@ -1166,13 +1166,6 @@
                             </Button>
                         </Grid>
                     </Grid>
-                    <InfoBar
-                        x:Name="Notification"
-                        Grid.Row="1"
-                        Margin="12,0"
-                        IsClosable="True"
-                        IsOpen="False"
-                        Severity="Error" />
                     <Grid
                         x:Name="ValueWorkspace"
                         Grid.Row="2"

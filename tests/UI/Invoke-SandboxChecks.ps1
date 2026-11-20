@@ -27,7 +27,7 @@ if ($ActivateForSid) {
     $app = Get-Process -Id $point.Pid -ErrorAction Stop
     $owner = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $app.Id) | Invoke-CimMethod -MethodName GetOwnerSid
     $request = Get-Content -LiteralPath "$output\request.json" -Raw | ConvertFrom-Json
-    $build = if ($request.Suite -eq 'NativeUi') { 'ui-aot' } else { 'ui' }
+    $build = if ($request.Suite -eq 'NativeNotifications') { 'notifications-native' } elseif ($request.Suite -eq 'Notifications') { 'notifications' } elseif ($request.Suite -eq 'NativeUi') { 'ui-aot' } else { 'ui' }
     $expectedPath = Join-Path $cacheRoot "$build\regedit2.exe"
     if ($owner.Sid -ne $ActivateForSid -or $app.Path -ne $expectedPath -or
         [long]$app.MainWindowHandle -ne $point.Hwnd) { throw 'Unexpected isolated test window.' }
@@ -40,7 +40,7 @@ if ($ActivateForSid) {
 }
 
 # Running from the shared folder leaves host build products locked by the guest.
-function Copy-TestBuild([ValidateSet('registry', 'ui', 'ui-aot')][string] $Build) {
+function Copy-TestBuild([ValidateSet('registry', 'ui', 'ui-aot', 'notifications', 'notifications-native')][string] $Build) {
     $destination = [IO.Path]::GetFullPath((Join-Path $cacheRoot $Build))
     if ([IO.Path]::GetDirectoryName($destination) -ne $cacheRoot) { throw 'Invalid guest build cache directory.' }
     & robocopy.exe "$Base-input\builds\$Build" $destination /MIR /R:0 /W:0 /NFL /NDL /NJH /NJS /NP | Out-Null
@@ -69,10 +69,10 @@ try {
         & $testExe @options *> $log
         exit $LASTEXITCODE
     }
-    if ($request.Suite -notin 'Ui', 'NativeUi', 'NoteClose', 'Launch', 'TreeActions') { throw "Unknown guest suite '$($request.Suite)'." }
+    if ($request.Suite -notin 'Ui', 'NativeUi', 'NoteClose', 'Launch', 'TreeActions', 'Notifications', 'NativeNotifications') { throw "Unknown guest suite '$($request.Suite)'." }
 
     $pidFile = Join-Path $output 'ui-worker.pid'
-    $build = if ($request.Suite -eq 'NativeUi') { 'ui-aot' } else { 'ui' }
+    $build = if ($request.Suite -eq 'NativeNotifications') { 'notifications-native' } elseif ($request.Suite -eq 'Notifications') { 'notifications' } elseif ($request.Suite -eq 'NativeUi') { 'ui-aot' } else { 'ui' }
     $cli = Join-Path $cacheRoot 'winapp'
     if ($UiWorker) {
         [IO.File]::WriteAllText("$pidFile.tmp", [string]$PID)
@@ -99,6 +99,12 @@ try {
             Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) ("RegeditUiTests-" + $Run.ToString('N'))
         } else {
             Join-Path $env:TEMP ("RegeditProfile-" + $Run.ToString('N'))
+        }
+        if ($request.Suite -in 'Notifications', 'NativeNotifications') {
+            & "$Base-input\Notifications.Sandbox.Tests.ps1" -Executable $executable -ProfileRoot $profile -SourceRoot "$Base-input\notification-source" -ArtifactDirectory $output -WinApp "$cli\winapp.exe" -SandboxRun $Run -TestFilter $request.Filter -ExpectNative:($request.Suite -eq 'NativeNotifications') *> $log
+            $code = $LASTEXITCODE
+            if ($ExpectedAppSid) { [IO.File]::WriteAllText("$output\shipping.exit", [string]$code) }
+            exit $code
         }
         if ($request.Suite -eq 'Launch') {
             & "$Base-input\Launch.Ui.Tests.ps1" -Executable $executable -TestDataDirectory $profile -ResultsFile "$output\results.json" *> $log
@@ -147,16 +153,23 @@ try {
     $null = Copy-TestBuild $build
     & robocopy.exe "$Base-input\winapp" $cli /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw 'Could not cache WinApp CLI on the guest disk.' }
+    $shellExecutable = "$Base-shell\pwsh.exe"
+    if ($request.Suite -in 'Notifications', 'NativeNotifications') {
+        $shellCache = Join-Path $cacheRoot 'notification-shell'
+        & robocopy.exe "$Base-shell" $shellCache /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw 'Could not cache the notification test shell.' }
+        $shellExecutable = Join-Path $shellCache 'pwsh.exe'
+    }
     $arguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $PSCommandPath -Base $Base -Run $Run -UiWorker"
     $isDebugPrint = $request.Suite -eq 'Ui' -and $isPrintPreview
-    if ($request.Suite -eq 'NativeUi' -or $isDebugPrint) {
-        # A signed-in standard profile gives WinUI print preview its own desktop identity.
+    if ($request.Suite -in 'NativeUi', 'Notifications', 'NativeNotifications' -or $isDebugPrint) {
+        # A disposable standard profile gives UI tests their own desktop identity.
         $account = 'RegeditUi' + $Run.ToString('N').Substring(0, 10)
         $password = ConvertTo-SecureString (([guid]::NewGuid().ToString('N')) + 'aA!7') -AsPlainText -Force
         $shippingUser = New-LocalUser -Name $account -Password $password -Description 'Disposable Regedit UI test'
         $arguments = "$arguments -ExpectedAppSid $($shippingUser.SID.Value)"
         $credential = [pscredential]::new("$env:COMPUTERNAME\$account", $password)
-        $worker = Start-Process -FilePath "$Base-shell\pwsh.exe" -ArgumentList $arguments -WorkingDirectory $env:WINDIR -Credential $credential -LoadUserProfile -WindowStyle Hidden -PassThru
+        $worker = Start-Process -FilePath $shellExecutable -ArgumentList $arguments -WorkingDirectory $env:WINDIR -Credential $credential -LoadUserProfile -WindowStyle Hidden -PassThru -RedirectStandardOutput "$output\worker.stdout" -RedirectStandardError "$output\worker.stderr"
         $activation = Join-Path $output 'activate.json'
         while (-not $worker.WaitForExit(200)) {
             if (-not [IO.File]::Exists($activation)) { continue }

@@ -331,7 +331,7 @@ internal static class CodeBehindMoveTests
             canceledOpen.SetCanceled();
             await opening;
             check(
-                notices is [{ Kind: NoticeKind.Information, Title: "Canceled" }],
+                notices is [{ Kind: NoticeKind.Information, Title: "Import canceled" }],
                 "Canceled preview opening is observed and reported as cancellation");
             notices.Clear();
             dialogs.OpenFile = null;

@@ -17,7 +17,6 @@ namespace JPSoftworks.Regedit.Views.Files;
 internal sealed partial class RegistryFileWindow : SecondaryWindow
 {
     internal RegistryFilePreviewViewModel ViewModel { get; }
-
     internal RegistryFileWindow(
         AppWindow owner,
         ElementTheme theme,
@@ -28,9 +27,11 @@ internal sealed partial class RegistryFileWindow : SecondaryWindow
         this.InitializeComponent();
         this.ViewModel = createViewModel(new RegistryFileDialogs(this.Handle, this.Preview));
         this.InitializeWindow(
-            this.WindowTitleBar, owner, theme, settings.Backdrop, scale, new SizeInt32(1200, 780), new SizeInt32(720, 520),
-            this.ViewModel.ReportFailure);
+            this.WindowTitleBar, owner, theme, settings.Backdrop, scale, new SizeInt32(1200, 780),
+            new SizeInt32(720, 520), error => this.ViewModel.ReportFailure(error));
         this.Preview.Initialize(this.ViewModel, settings.EditorFont);
+        this.Activated += (_, args) => this.Preview.NotificationHost.IsWindowActive
+            = args.WindowActivationState != WindowActivationState.Deactivated;
         this.ViewModel.PropertyChanged += this.Model_Changed;
         this.ViewModel.CloseRequested += this.RequestClose;
         this.ViewModel.ActivationRequested += this.Activate;

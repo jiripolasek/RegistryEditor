@@ -93,18 +93,6 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanInteract), nameof(CanPreview), nameof(CanNavigateDiagnostics))]
     public partial bool IsClosePending { get; private set; }
 
-    [ObservableProperty]
-    public partial string NoticeTitle { get; private set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string NoticeMessage { get; private set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial NoticeKind NoticeKind { get; private set; }
-
-    [ObservableProperty]
-    public partial bool IsNoticeOpen { get; set; }
-
     public string Text
     {
         get => this._buffer?.Text ?? string.Empty;
@@ -209,13 +197,14 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
 
     internal Task OpenAsync(string file)
     {
-        return this.RunAsync(async () =>
-        {
-            if (await this.ConfirmChangesAsync())
+        return this.RunAsync(
+            "Couldn't open the registry file", async () =>
             {
-                await this.LoadAsync(file);
-            }
-        });
+                if (await this.ConfirmChangesAsync())
+                {
+                    await this.LoadAsync(file);
+                }
+            });
     }
 
     private async Task LoadAsync(string file)
@@ -276,7 +265,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         {
             if (revision == this._revision && !this.IsClosed)
             {
-                this.ReportFailure(ex);
+                this.ReportFailure(ex, "Couldn't read the registry file");
             }
         }
         finally
@@ -411,7 +400,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         this.RefreshCommands();
     }
 
-    private async Task RunAsync(Func<Task> action)
+    private async Task RunAsync(string failureTitle, Func<Task> action)
     {
         if (!this.CanInteract)
         {
@@ -425,7 +414,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            this.ReportFailure(ex);
+            this.ReportFailure(ex, failureTitle);
         }
         finally
         {
@@ -490,15 +479,16 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         }
 
         var approved = false;
-        await this.RunAsync(async () =>
-        {
-            if (await this.ConfirmChangesAsync())
+        await this.RunAsync(
+            "Couldn't close the file", async () =>
             {
-                this._approvedCloseRevision = this._revision;
-                this.IsClosePending = true;
-                approved = true;
-            }
-        });
+                if (await this.ConfirmChangesAsync())
+                {
+                    this._approvedCloseRevision = this._revision;
+                    this.IsClosePending = true;
+                    approved = true;
+                }
+            });
         return approved;
     }
 
@@ -552,7 +542,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         {
             this.CancelPendingClose();
             this.ShowNotice(
-                "Close canceled", "The registry file changed while closing. Review your changes and close again.",
+                "Can't close yet", "The registry file changed while closing. Review your changes and close again.",
                 NoticeKind.Warning);
             return false;
         }
@@ -563,7 +553,7 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
 
     private void ShowCloseBlocked()
     {
-        this.ShowNotice("Close canceled", "Finish the current operation before closing.", NoticeKind.Information);
+        this.ShowNotice("Can't close yet", "Finish the current operation before closing.", NoticeKind.Information);
         this.ActivationRequested?.Invoke();
     }
 
@@ -576,76 +566,79 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanInteract))]
     private Task OpenAsync()
     {
-        return this.RunAsync(async () =>
-        {
-            if (await this.ConfirmChangesAsync() && await this._dialogs.PickOpenAsync() is { } file)
+        return this.RunAsync(
+            "Couldn't open the registry file", async () =>
             {
-                await this.LoadAsync(file);
-            }
-        });
+                if (await this.ConfirmChangesAsync() && await this._dialogs.PickOpenAsync() is { } file)
+                {
+                    await this.LoadAsync(file);
+                }
+            });
     }
 
     [RelayCommand(CanExecute = nameof(HasFile))]
     private Task ReloadAsync()
     {
-        return this.RunAsync(async () =>
-        {
-            if (this._buffer is not null && await this.ConfirmChangesAsync())
+        return this.RunAsync(
+            "Couldn't reload the registry file", async () =>
             {
-                await this.LoadAsync(this._buffer.FilePath);
-            }
-        });
+                if (this._buffer is not null && await this.ConfirmChangesAsync())
+                {
+                    await this.LoadAsync(this._buffer.FilePath);
+                }
+            });
     }
 
     [RelayCommand(CanExecute = nameof(HasFile))]
     private Task SaveAsync()
     {
-        return this.RunAsync(async () => await this.SaveFileAsync(false));
+        return this.RunAsync("Couldn't save the registry file", async () => await this.SaveFileAsync(false));
     }
 
     [RelayCommand(CanExecute = nameof(HasFile))]
     private Task SaveAsAsync()
     {
-        return this.RunAsync(async () => await this.SaveFileAsync(true));
+        return this.RunAsync("Couldn't save the registry file", async () => await this.SaveFileAsync(true));
     }
 
     [RelayCommand(CanExecute = nameof(CanImport))]
     private Task ImportAsync()
     {
-        return this.RunAsync(async () =>
-        {
-            if (this._buffer is null)
+        return this.RunAsync(
+            "Couldn't import the registry file", async () =>
             {
-                return;
-            }
-
-            var bytes = this._buffer.ImportBytes(out var metadata);
-            var view = this.TargetRegistryView;
-            var source = this.FilePath;
-            if (!await this._dialogs.ConfirmImportAsync(Path.GetFileName(source), view))
-            {
-                return;
-            }
-
-            var folder = Directory.CreateTempSubdirectory("Regedit.Import.");
-            try
-            {
-                var snapshot = Path.Combine(folder.FullName, "preview.reg");
-                await File.WriteAllBytesAsync(snapshot, bytes);
-                await this._import(snapshot, source, view);
-                var message = Path.GetFileName(source);
-                if (metadata.FollowUp != RegistryFileFollowUp.None)
+                if (this._buffer is null)
                 {
-                    message += "\n\nFile recommends: " + metadata.FollowUpText + ".";
+                    return;
                 }
 
-                this.ShowNotice("Import complete", message, NoticeKind.Success);
-            }
-            finally
-            {
-                folder.Delete(true);
-            }
-        });
+                var bytes = this._buffer.ImportBytes(out var metadata);
+                var view = this.TargetRegistryView;
+                var source = this.FilePath;
+                if (!await this._dialogs.ConfirmImportAsync(Path.GetFileName(source), view))
+                {
+                    return;
+                }
+
+                var folder = Directory.CreateTempSubdirectory("Regedit.Import.");
+                try
+                {
+                    var snapshot = Path.Combine(folder.FullName, "preview.reg");
+                    await File.WriteAllBytesAsync(snapshot, bytes);
+                    await this._import(snapshot, source, view);
+                    var message = Path.GetFileName(source);
+                    if (metadata.FollowUp != RegistryFileFollowUp.None)
+                    {
+                        message += "\n\nFile recommends: " + metadata.FollowUpText + ".";
+                    }
+
+                    this.ShowNotice("Import complete", message, NoticeKind.Success);
+                }
+                finally
+                {
+                    folder.Delete(true);
+                }
+            });
     }
 
     [RelayCommand(CanExecute = nameof(CanInteract))]
@@ -745,18 +738,17 @@ internal sealed partial class RegistryFilePreviewViewModel : ObservableObject
         }
     }
 
-    internal void ReportFailure(Exception ex)
+    internal void ReportFailure(Exception ex, string title = "Couldn't update the file preview")
     {
         this._logger.LogFailure(LogLevel.Warning, "Registry file preview", ex);
-        this.ShowNotice("Registry file operation failed", ex.Message, NoticeKind.Error);
+        this.ShowNotice(title, ex.Message, NoticeKind.Error);
     }
+
+    internal event Action<string, string, NoticeKind>? Notice;
 
     private void ShowNotice(string title, string message, NoticeKind kind)
     {
-        this.NoticeTitle = title;
-        this.NoticeMessage = message;
-        this.NoticeKind = kind;
-        this.IsNoticeOpen = true;
+        this.Notice?.Invoke(title, message, kind);
         this.OnPropertyChanged(nameof(this.DiagnosticLine));
         this.GoToErrorCommand.NotifyCanExecuteChanged();
     }
