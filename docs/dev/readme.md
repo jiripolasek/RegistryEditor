@@ -12,6 +12,21 @@ dotnet run --project tests/Regedit.Tests
 
 Open `JPSoftworks.Regedit.slnx` in Visual Studio for the full solution.
 
+Format C# and XAML with Roslyn, ReSharper cleanup (including Apply file layout), and XAML Styler:
+
+```powershell
+.\eng\Format.ps1
+.\eng\Format-Modified.ps1
+```
+
+`Format-Modified.ps1` selects new untracked files, tracked working-tree changes and staged added, copied, modified or renamed files. New files respect Git ignore rules; deleted files and files under bin, obj, artifacts or TestResults are excluded. It formats working copies without updating the index; stage the resulting formatting afterward. ReSharper still analyzes the solution, but only selected files are rewritten.
+
+Run formatter-selection regressions without installing the formatters:
+
+```powershell
+.\eng\tests\Format.Tests.ps1
+```
+
 GitHub Actions builds the solution in Release for x64 and runs the default unit test suite on pull requests and pushes to `master`. The suite uses a console runner (`dotnet run --project tests/Regedit.Tests`), not `dotnet test`. UI tests and opt-in registry/native integration tests are excluded from CI.
 
 Build self-contained Native AOT releases for x64 and ARM64 with the MSVC Desktop development with C++ tools installed:
