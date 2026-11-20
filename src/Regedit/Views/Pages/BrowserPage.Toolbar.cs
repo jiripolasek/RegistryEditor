@@ -32,13 +32,14 @@ public sealed partial class BrowserPage
         this.ForwardButton.Visibility = this.Settings.ShowForwardButton ? Visibility.Visible : Visibility.Collapsed;
         this.UpButton.Visibility = this.Settings.ShowUpButton ? Visibility.Visible : Visibility.Collapsed;
         this.RefreshButton.Visibility = this.Settings.ShowRefreshButton ? Visibility.Visible : Visibility.Collapsed;
-        this.NavigationButtons.Visibility = this.Settings.ShowBackButton || this.Settings.ShowForwardButton ||
-                                            this.Settings.ShowUpButton || this.Settings.ShowRefreshButton
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        this.ToolbarShortcuts.Visibility = this.Settings.ToolbarButtons == ToolbarButtons.None
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+        this.NavigationButtons.Visibility
+            = this.Settings.ShowBackButton
+              || this.Settings.ShowForwardButton
+              || this.Settings.ShowUpButton
+              || this.Settings.ShowRefreshButton
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        this.ToolbarShortcuts.Visibility = this.Settings.ToolbarButtons == ToolbarButtons.None ? Visibility.Collapsed : Visibility.Visible;
         this.ToolbarShortcuts.MaxWidth = Math.Clamp(this.LayoutRoot.ActualWidth - 700, 40, 360);
         const double buttonWidth = 36;
         var count = this._window.ToolbarCommands.Count(item => item.Command.IsVisible);
@@ -68,16 +69,17 @@ public sealed partial class BrowserPage
             AllowFocusOnInteraction = false
         };
         // The pin handles pointer input separately from the menu item.
-        pin.AddHandler(UIElement.PointerEnteredEvent, new PointerEventHandler((_, _) =>
-            VisualStateManager.GoToState(item, "PointerOver", false)), true);
-        pin.AddHandler(UIElement.PointerExitedEvent, new PointerEventHandler((_, args) =>
-        {
-            var point = args.GetCurrentPoint(item).Position;
-            if (point.X < 0 || point.X >= item.ActualWidth || point.Y < 0 || point.Y >= item.ActualHeight)
+        pin.AddHandler(
+            PointerEnteredEvent, new PointerEventHandler((_, _) => VisualStateManager.GoToState(item, "PointerOver", false)), true);
+        pin.AddHandler(
+            PointerExitedEvent, new PointerEventHandler((_, args) =>
             {
-                VisualStateManager.GoToState(item, "Normal", false);
-            }
-        }), true);
+                var point = args.GetCurrentPoint(item).Position;
+                if (point.X < 0 || point.X >= item.ActualWidth || point.Y < 0 || point.Y >= item.ActualHeight)
+                {
+                    VisualStateManager.GoToState(item, "Normal", false);
+                }
+            }), true);
         AutomationProperties.SetAutomationId(pin, $"ToolsMenuPin{button}");
         AutomationProperties.SetAutomationId(item, $"ToolsMenu{button}");
         item.Template = (ControlTemplate)this.Resources["PinnableToolsMenuItemTemplate"];
@@ -106,9 +108,7 @@ public sealed partial class BrowserPage
     {
         foreach (var (command, pin) in this._toolsMenuPins)
         {
-            var label = command.IsVisible
-                ? $"Unpin {command.Label} from toolbar"
-                : $"Pin {command.Label} to toolbar";
+            var label = command.IsVisible ? $"Unpin {command.Label} from toolbar" : $"Pin {command.Label} to toolbar";
             ((FontIcon)pin.Content).Glyph = command.IsVisible ? "\uE77A" : "\uE718";
             AutomationProperties.SetName(pin, label);
             ToolTipService.SetToolTip(pin, label);

@@ -21,15 +21,35 @@ public sealed record JournalEntry(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     JournalOperation? Kind = null)
 {
-    public JournalOperation OperationKind => this.Kind ?? (this.Activity is not null ? JournalOperation.Activity :
-        this.Reverts.HasValue ? JournalOperation.Revert : JournalOperations.FromLegacy(this.Operation));
+    public JournalOperation OperationKind => this.Kind
+                                             ?? (this.Activity is not null ? JournalOperation.Activity :
+                                                 this.Reverts.HasValue ? JournalOperation.Revert :
+                                                 JournalOperations.FromLegacy(this.Operation));
+
+    public string Summary => $"{this.Time.ToLocalTime():G} · {this.Operation}";
+
+    public string Path => this.Before.FirstOrDefault()?.Scope.Location.Address ?? this.ActivityLocation?.Address ?? string.Empty;
+
+    public string Status => this.After is null ? "Incomplete; inspect the registry before continuing" :
+        this.Error is not null ? "Failed or partially applied: " + this.Error :
+        this.Activity is not null ? "Recorded activity; automatic revert unavailable" : "Completed";
+
+    [JsonIgnore]
+    public bool HasChanges => this.After is { } after
+                              && (this.OperationKind == JournalOperation.RenameKey
+                                  || this.Before.Zip(after).Any(pair => !RegistryJournal.Same(pair.First, pair.Second)));
+
+    [JsonIgnore]
+    public IReadOnlyList<RegistryDifference> Differences => this.After is null
+        ? []
+        : this.Before.Zip(this.After).SelectMany(pair => new RegistryComparison(pair.First.Snapshot, pair.Second.Snapshot).Differences)
+            .ToArray();
 
     public string? RevertUnavailableReason(IReadOnlySet<Guid> reverted)
     {
         if (this.Activity is not null || this.OperationKind == JournalOperation.Activity)
         {
-            return
-                "This external Windows operation is recorded as activity. Its prior data is not available for automatic revert.";
+            return "This external Windows operation is recorded as activity. Its prior data is not available for automatic revert.";
         }
 
         if (this.After is null || this.Error is not null)
@@ -51,8 +71,11 @@ public sealed record JournalEntry(
         for (var i = history.Count - 1; i >= 0; i--)
         {
             var item = history[i];
-            if (item.Reverts is { } original && item.OperationKind == JournalOperation.Revert &&
-                item.After is not null && item.Error is null && !reverted.Contains(item.Id))
+            if (item.Reverts is { } original
+                && item.OperationKind == JournalOperation.Revert
+                && item.After is not null
+                && item.Error is null
+                && !reverted.Contains(item.Id))
             {
                 reverted.Add(original);
             }
@@ -60,25 +83,4 @@ public sealed record JournalEntry(
 
         return reverted;
     }
-
-    public string Summary => $"{this.Time.ToLocalTime():G} · {this.Operation}";
-
-    public string Path => this.Before.FirstOrDefault()?.Scope.Location.Address ??
-                          this.ActivityLocation?.Address ?? string.Empty;
-
-    public string Status => this.After is null ? "Incomplete; inspect the registry before continuing" :
-        this.Error is not null ? "Failed or partially applied: " + this.Error :
-        this.Activity is not null ? "Recorded activity; automatic revert unavailable" : "Completed";
-
-    [JsonIgnore]
-    public bool HasChanges => this.After is { } after && (this.OperationKind == JournalOperation.RenameKey ||
-                                                          this.Before.Zip(after).Any(pair =>
-                                                              !RegistryJournal.Same(pair.First, pair.Second)));
-
-    [JsonIgnore]
-    public IReadOnlyList<RegistryDifference> Differences => this.After is null
-        ? []
-        : this.Before.Zip(this.After)
-            .SelectMany(pair => new RegistryComparison(pair.First.Snapshot, pair.Second.Snapshot).Differences)
-            .ToArray();
 }

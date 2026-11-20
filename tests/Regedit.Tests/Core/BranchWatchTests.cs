@@ -17,8 +17,7 @@ internal static class BranchWatchTests
         var root = RegistryLocation.Parse(@"HKCU\Software\Regedit.BranchWatchTests");
         var missingErrors = new Exception[]
         {
-            new FileNotFoundException("Enumerated child disappeared"),
-            new IOException("Opened child was deleted", 1018),
+            new FileNotFoundException("Enumerated child disappeared"), new IOException("Opened child was deleted", 1018),
             new IOException("Opened child was deleted", unchecked((int)0x800703FA)), new Win32Exception(1018)
         };
         foreach (var missing in missingErrors)
@@ -38,8 +37,8 @@ internal static class BranchWatchTests
             var observed = RegistryBranchSnapshot.Capture(Read, root, skipMissingDescendants: true);
             observed.Validate();
             check(
-                observed.Keys.Select(key => key.Path).SequenceEqual([string.Empty, "Sibling"]) &&
-                observed.Keys[1].Values.Single().Data[0] == 7,
+                observed.Keys.Select(key => key.Path).SequenceEqual([string.Empty, "Sibling"])
+                && observed.Keys[1].Values.Single().Data[0] == 7,
                 $"Watch capture skips vanished child and retains sibling: {missing.GetType().Name}");
             Reject(
                 () => RegistryBranchSnapshot.Capture(Read, root), missing, check,
@@ -48,25 +47,24 @@ internal static class BranchWatchTests
                 () => RegistryBranchSnapshot.Capture(Read, root, allowMissingRoot: true), missing, check,
                 "Journal capture policy remains strict for disappearing descendants");
             Reject(
-                () => RegistryBranchSnapshot.Capture(_ => throw missing, root, skipMissingDescendants: true), missing,
-                check, "Missing watch baseline root still fails");
+                () => RegistryBranchSnapshot.Capture(_ => throw missing, root, skipMissingDescendants: true), missing, check,
+                "Missing watch baseline root still fails");
             if (missing is not FileNotFoundException)
             {
                 Reject(
-                    () => RegistryBranchSnapshot.Capture(_ => throw missing, root, allowMissingRoot: true), missing,
-                    check, "Journal capture propagates deletion during a root read");
+                    () => RegistryBranchSnapshot.Capture(_ => throw missing, root, allowMissingRoot: true), missing, check,
+                    "Journal capture propagates deletion during a root read");
             }
 
-            var removed = RegistryBranchSnapshot.Capture(
-                _ => throw missing, root, allowMissingRoot: true, skipMissingDescendants: true);
+            var removed = RegistryBranchSnapshot.Capture(_ => throw missing, root, allowMissingRoot: true, skipMissingDescendants: true);
             check(removed.Keys.Length == 0, "Missing watch refresh root produces final empty observation");
         }
 
         foreach (var failure in new Exception[]
                  {
                      new UnauthorizedAccessException(), new SecurityException(), new Win32Exception(5),
-                     new IOException("Access denied", unchecked((int)0x80070005)),
-                     new IOException("Unrelated I/O failure"), new OperationCanceledException()
+                     new IOException("Access denied", unchecked((int)0x80070005)), new IOException("Unrelated I/O failure"),
+                     new OperationCanceledException()
                  })
         {
             foreach (var failAtRoot in new[] { false, true })
@@ -77,8 +75,7 @@ internal static class BranchWatchTests
                 }
 
                 Reject(
-                    () => RegistryBranchSnapshot.Capture(
-                        Read, root, allowMissingRoot: true, skipMissingDescendants: true), failure, check,
+                    () => RegistryBranchSnapshot.Capture(Read, root, allowMissingRoot: true, skipMissingDescendants: true), failure, check,
                     "Watch capture propagates access, cancellation, and unrelated failures unchanged");
             }
         }
@@ -159,9 +156,7 @@ internal static class BranchWatchTests
                 }
                 catch (Win32Exception error)
                 {
-                    check(
-                        error.NativeErrorCode == 1018,
-                        "Native deleted-handle value query reports ERROR_KEY_DELETED as Win32Exception");
+                    check(error.NativeErrorCode == 1018, "Native deleted-handle value query reports ERROR_KEY_DELETED as Win32Exception");
                 }
             }
 
@@ -191,20 +186,18 @@ internal static class BranchWatchTests
                 var watch = RegistryWatcher.RunAsync(
                     registry, root, comparison =>
                     {
-                        if (comparison.Differences.Any(change =>
-                                change.After?.Name == "value" && change.After.Data[0] == 1))
+                        if (comparison.Differences.Any(change => change.After?.Name == "value" && change.After.Data[0] == 1))
                         {
                             first.TrySetResult();
                         }
 
-                        if (comparison.Differences.Any(change =>
-                                change.After?.Name == "value" && change.After.Data[0] == 2))
+                        if (comparison.Differences.Any(change => change.After?.Name == "value" && change.After.Data[0] == 2))
                         {
                             second.TrySetResult();
                         }
 
-                        if (comparison.After.Keys.Length == 0 &&
-                            comparison.Differences.Any(change => change.Kind == RegistryChangeKind.KeyRemoved))
+                        if (comparison.After.Keys.Length == 0
+                            && comparison.Differences.Any(change => change.Kind == RegistryChangeKind.KeyRemoved))
                         {
                             deleted.TrySetResult();
                         }
@@ -219,8 +212,7 @@ internal static class BranchWatchTests
                         Interlocked.Exchange(ref remove, 1);
                     }
 
-                    registry.Write(
-                        root.Child("Sibling"), new RegistryValue("value", RegistryValueType.Binary, [1]), null);
+                    registry.Write(root.Child("Sibling"), new RegistryValue("value", RegistryValueType.Binary, [1]), null);
                     await first.Task.WaitAsync(cancellation.Token);
                     check(
                         removedDuringRead == 1 && !watch.IsCompleted,
@@ -289,16 +281,13 @@ internal static class BranchWatchTests
         var registry = new RegistryService();
         foreach (var duringBaseline in new[] { true, false })
         {
-            var root = RegistryLocation.Parse(
-                @"HKCU\Software\Regedit.WatchIdentityTests." + Guid.NewGuid().ToString("N"));
+            var root = RegistryLocation.Parse(@"HKCU\Software\Regedit.WatchIdentityTests." + Guid.NewGuid().ToString("N"));
             registry.CreateKey(root.Parent!, root.Name);
             registry.Write(root, new RegistryValue("value", RegistryValueType.Binary, [1]), null);
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var first = new TaskCompletionSource<RegistryComparison>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
-            var final = new TaskCompletionSource<RegistryComparison>(
-                TaskCreationOptions.RunContinuationsAsynchronously);
+            var first = new TaskCompletionSource<RegistryComparison>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var final = new TaskCompletionSource<RegistryComparison>(TaskCreationOptions.RunContinuationsAsynchronously);
             var replace = duringBaseline ? 1 : 0;
             var deliveries = 0;
 
@@ -346,8 +335,9 @@ internal static class BranchWatchTests
                         new RegistryValue("value", RegistryValueType.Binary, [2]));
                     var removed = await final.Task.WaitAsync(cancellation.Token);
                     check(
-                        removed.Before.Keys[0].Values.Single().Data[0] == 2 && removed.After.Keys.Length == 0 &&
-                        removed.Differences.All(change => change.After is null),
+                        removed.Before.Keys[0].Values.Single().Data[0] == 2
+                        && removed.After.Keys.Length == 0
+                        && removed.Differences.All(change => change.After is null),
                         "Replacement during branch capture yields final old-key removals instead of replacement contents");
                 }
 

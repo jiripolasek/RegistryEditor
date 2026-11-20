@@ -24,11 +24,7 @@ public sealed record RegistryFileValue(string Name, RegistryValue? Value, int Li
     public string Operation => this.Value is null ? "Delete value" : "Set value";
 }
 
-public sealed record RegistryFileSection(
-    string Path,
-    bool IsDeletion,
-    int Line,
-    IReadOnlyList<RegistryFileValue> Values);
+public sealed record RegistryFileSection(string Path, bool IsDeletion, int Line, IReadOnlyList<RegistryFileValue> Values);
 
 /// <summary>Ordered file instructions, independent of the live registry and the editor control.</summary>
 public sealed record RegistryFileDocument(
@@ -117,8 +113,7 @@ public sealed record RegistryFileDocument(
                     }
 
                     var hive = path.Split('\\', 2)[0];
-                    var canonicalHive = LocalHives.FirstOrDefault(name => name.Equals(
-                        hive, StringComparison.OrdinalIgnoreCase));
+                    var canonicalHive = LocalHives.FirstOrDefault(name => name.Equals(hive, StringComparison.OrdinalIgnoreCase));
                     if (canonicalHive is null || path.Contains('\0') || path.EndsWith('\\'))
                     {
                         throw new FormatException("Expected a full local registry key path.");
@@ -196,8 +191,8 @@ public sealed record RegistryFileDocument(
                 else if (remaining.StartsWith("dword:", StringComparison.OrdinalIgnoreCase))
                 {
                     var numberText = StripComment(remaining[6..]);
-                    if (numberText.Length is < 1 or > 8 || !uint.TryParse(
-                            numberText, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var number))
+                    if (numberText.Length is < 1 or > 8
+                        || !uint.TryParse(numberText, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var number))
                     {
                         throw new FormatException("Expected up to eight hexadecimal DWORD digits.");
                     }
@@ -213,10 +208,9 @@ public sealed record RegistryFileDocument(
                     uint type = (uint)RegistryValueType.Binary;
                     if (typeText != "hex" && !typeText.Equals("hex", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (!typeText.StartsWith("hex(", StringComparison.OrdinalIgnoreCase) ||
-                            !typeText.EndsWith(')') || !uint.TryParse(
-                                typeText[4..^1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture,
-                                out type))
+                        if (!typeText.StartsWith("hex(", StringComparison.OrdinalIgnoreCase)
+                            || !typeText.EndsWith(')')
+                            || !uint.TryParse(typeText[4..^1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out type))
                         {
                             throw new FormatException("Invalid hexadecimal value type.");
                         }
@@ -233,8 +227,8 @@ public sealed record RegistryFileDocument(
                     for (var i = 0; i < parts.Length; i++)
                     {
                         var part = parts[i].Trim();
-                        if (part.Length is < 1 or > 2 || !byte.TryParse(
-                                part, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out bytes[i]))
+                        if (part.Length is < 1 or > 2
+                            || !byte.TryParse(part, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out bytes[i]))
                         {
                             throw new FormatException("Expected comma-separated hexadecimal bytes.");
                         }
@@ -269,8 +263,7 @@ public sealed record RegistryFileDocument(
         return new(sections, errors, legacy) { Metadata = metadata, KeyChanges = SummarizeKeys(sections) };
     }
 
-    private static IReadOnlyDictionary<string, RegistryFileKeyChange> SummarizeKeys(
-        IReadOnlyList<RegistryFileSection> sections)
+    private static IReadOnlyDictionary<string, RegistryFileKeyChange> SummarizeKeys(IReadOnlyList<RegistryFileSection> sections)
     {
         Dictionary<string, int> opened = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, int> deleted = new(StringComparer.OrdinalIgnoreCase);

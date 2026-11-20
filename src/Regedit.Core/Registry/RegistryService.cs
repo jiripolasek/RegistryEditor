@@ -45,16 +45,14 @@ public sealed class RegistryService
     {
         var minimumAfterBytes = this.Journal?.CheckIncomingValue(value) ?? 0;
         this.Mutate(
-            expected is null ? JournalOperation.CreateValue : JournalOperation.EditValue,
-            [new JournalScope(location, [value.Name])], () => this.WriteCore(location, value, expected),
-            cancellationToken, minimumAfterBytes);
+            expected is null ? JournalOperation.CreateValue : JournalOperation.EditValue, [new JournalScope(location, [value.Name])],
+            () => this.WriteCore(location, value, expected), cancellationToken, minimumAfterBytes);
     }
 
     public void CreateKey(RegistryLocation parent, string name, CancellationToken cancellationToken = default)
     {
         this.Mutate(
-            JournalOperation.CreateKey, [new JournalScope(parent.Child(name))], () => this.CreateKeyCore(parent, name),
-            cancellationToken);
+            JournalOperation.CreateKey, [new JournalScope(parent.Child(name))], () => this.CreateKeyCore(parent, name), cancellationToken);
     }
 
     public void RenameKey(RegistryLocation location, string name, CancellationToken cancellationToken = default)
@@ -62,16 +60,11 @@ public sealed class RegistryService
         this.Mutate(
             JournalOperation.RenameKey, [
                 new JournalScope(location),
-                new JournalScope(
-                    (location.Parent ?? throw new InvalidOperationException("Cannot rename a root hive.")).Child(name))
+                new JournalScope((location.Parent ?? throw new InvalidOperationException("Cannot rename a root hive.")).Child(name))
             ], () => this.RenameKeyCore(location, name), cancellationToken);
     }
 
-    public void RenameValue(
-        RegistryLocation location,
-        RegistryValue expected,
-        string name,
-        CancellationToken cancellationToken = default)
+    public void RenameValue(RegistryLocation location, RegistryValue expected, string name, CancellationToken cancellationToken = default)
     {
         this.Mutate(
             JournalOperation.RenameValue, [new JournalScope(location, [expected.Name, name])],
@@ -85,30 +78,21 @@ public sealed class RegistryService
             throw new InvalidOperationException("Root hives cannot be deleted.");
         }
 
+        this.Mutate(JournalOperation.DeleteKey, [new JournalScope(location)], () => this.DeleteKeyCore(location), cancellationToken);
+    }
+
+    public void DeleteValue(RegistryLocation location, RegistryValue expected, CancellationToken cancellationToken = default)
+    {
         this.Mutate(
-            JournalOperation.DeleteKey, [new JournalScope(location)], () => this.DeleteKeyCore(location),
+            JournalOperation.DeleteValue, [new JournalScope(location, [expected.Name])], () => this.DeleteValueCore(location, expected),
             cancellationToken);
     }
 
-    public void DeleteValue(
-        RegistryLocation location,
-        RegistryValue expected,
-        CancellationToken cancellationToken = default)
+    public void CopyKey(RegistryLocation source, RegistryLocation destination, string name, CancellationToken cancellationToken = default)
     {
         this.Mutate(
-            JournalOperation.DeleteValue, [new JournalScope(location, [expected.Name])],
-            () => this.DeleteValueCore(location, expected), cancellationToken);
-    }
-
-    public void CopyKey(
-        RegistryLocation source,
-        RegistryLocation destination,
-        string name,
-        CancellationToken cancellationToken = default)
-    {
-        this.Mutate(
-            JournalOperation.CopyKey, [new JournalScope(destination.Child(name))],
-            () => this.CopyKeyCore(source, destination, name), cancellationToken);
+            JournalOperation.CopyKey, [new JournalScope(destination.Child(name))], () => this.CopyKeyCore(source, destination, name),
+            cancellationToken);
     }
 
     public RegistryKey Open(RegistryLocation location, bool writable = false)
@@ -125,8 +109,8 @@ public sealed class RegistryService
 
                 using (root)
                 {
-                    return root.OpenSubKey(location.SubKey, writable) ??
-                           throw new FileNotFoundException($"The key no longer exists: {location.Address}");
+                    return root.OpenSubKey(location.SubKey, writable)
+                           ?? throw new FileNotFoundException($"The key no longer exists: {location.Address}");
                 }
             });
     }
@@ -158,28 +142,22 @@ public sealed class RegistryService
         const uint openLink = 8;
         using var hive = OpenRoot(location);
         // Handle on a predefined RegistryKey reopens the hive for writing, even for a read-only query.
-        using var root = hive.OpenSubKey(string.Empty, RegistryRights.QueryValues) ??
-                         throw new IOException("Could not open the registry hive for reading.");
+        using var root = hive.OpenSubKey(string.Empty, RegistryRights.QueryValues)
+                         ?? throw new IOException("Could not open the registry hive for reading.");
         var localChild = location.Machine is null && location.SubKey.Length != 0;
         var access = (uint)RegistryRights.QueryValues | (uint)location.View;
         // Opening the local link itself keeps its counts and timestamp independent of the target.
-        var error = RegistryNative.OpenKey(
-            root.Handle, location.SubKey, localChild ? openLink : 0, access, out var key);
+        var error = RegistryNative.OpenKey(root.Handle, location.SubKey, localChild ? openLink : 0, access, out var key);
         using (key)
         {
             Check(error);
             Check(QueryKeyInfo(key, out var lastWrite, out var subKeys, out var values));
             return new RegistryKeyDetails(
-                lastWrite, checked((int)subKeys), checked((int)values),
-                localChild && includeLink ? ReadLinkTarget(key) : null);
+                lastWrite, checked((int)subKeys), checked((int)values), localChild && includeLink ? ReadLinkTarget(key) : null);
         }
     }
 
-    private static int QueryKeyInfo(
-        SafeRegistryHandle key,
-        out DateTimeOffset? lastWriteUtc,
-        out uint subKeys,
-        out uint values)
+    private static int QueryKeyInfo(SafeRegistryHandle key, out DateTimeOffset? lastWriteUtc, out uint subKeys, out uint values)
     {
         var error = RegistryNative.QueryInfoKey(key, 0, 0, 0, out subKeys, 0, 0, out values, 0, 0, 0, out var fileTime);
         lastWriteUtc = error == 0 && fileTime > 0 && fileTime <= DateTimeOffset.MaxValue.ToFileTime()
@@ -252,9 +230,7 @@ public sealed class RegistryService
     internal RegistrySnapshot Read(RegistryLocation location, JournalCaptureBudget budget)
     {
         using var key = this.Open(location);
-        budget.Check(
-            (long)key.SubKeyCount * JournalCaptureBudget.KeyBytes +
-            (long)key.ValueCount * JournalCaptureBudget.ValueBytes);
+        budget.Check((long)key.SubKeyCount * JournalCaptureBudget.KeyBytes + (long)key.ValueCount * JournalCaptureBudget.ValueBytes);
         var names = ReadNames(key, location, true, budget);
         var valueNames = ReadNames(key, location, false, budget);
         var values = new List<RegistryValue>();
@@ -269,11 +245,7 @@ public sealed class RegistryService
         return new RegistrySnapshot(names, values.ToArray());
     }
 
-    private static string[] ReadNames(
-        RegistryKey key,
-        RegistryLocation location,
-        bool subKeys,
-        JournalCaptureBudget budget)
+    private static string[] ReadNames(RegistryKey key, RegistryLocation location, bool subKeys, JournalCaptureBudget budget)
     {
         var fixedBytes = subKeys
             ? JournalCaptureBudget.KeyBytes + JournalCaptureBudget.TextBytes(location.SubKey) + sizeof(char)
@@ -332,8 +304,6 @@ public sealed class RegistryService
         return value;
     }
 
-    internal delegate int QueryRegistryValue(byte[]? bytes, out uint type, ref uint size);
-
     internal static RegistryValue? ReadValue(
         RegistryKey key,
         string name,
@@ -385,13 +355,10 @@ public sealed class RegistryService
         var current = ReadValue(key, value.Name);
         if (expected is null ? current is not null : !expected.SameData(current))
         {
-            throw new IOException(
-                "This value was changed by another program or already exists. Refresh before editing it.");
+            throw new IOException("This value was changed by another program or already exists. Refresh before editing it.");
         }
 
-        Check(
-            RegistryNative.SetValue(
-                key.Handle, value.Name, 0, (uint)value.Type, value.Data, checked((uint)value.Data.Length)));
+        Check(RegistryNative.SetValue(key.Handle, value.Name, 0, (uint)value.Type, value.Data, checked((uint)value.Data.Length)));
     }
 
     private void CreateKeyCore(RegistryLocation parent, string name)
@@ -438,8 +405,7 @@ public sealed class RegistryService
         {
             return siblings().Any(name => name.Equals(destination, StringComparison.OrdinalIgnoreCase));
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException
-                                       or Win32Exception)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException or Win32Exception)
         {
             return false;
         }
@@ -469,9 +435,7 @@ public sealed class RegistryService
             throw new IOException("A value with this name already exists.");
         }
 
-        Check(
-            RegistryNative.SetValue(
-                key.Handle, name, 0, (uint)expected.Type, expected.Data, checked((uint)expected.Data.Length)));
+        Check(RegistryNative.SetValue(key.Handle, name, 0, (uint)expected.Type, expected.Data, checked((uint)expected.Data.Length)));
         // Keep both copies if removing the original fails, so a failed rename never loses the data.
         key.DeleteValue(expected.Name, true);
     }
@@ -497,16 +461,15 @@ public sealed class RegistryService
     private void CopyKeyCore(RegistryLocation source, RegistryLocation destination, string name)
     {
         var target = destination.Child(name);
-        if (!string.Equals(source.Machine, target.Machine, StringComparison.OrdinalIgnoreCase) ||
-            source.View != target.View)
+        if (!string.Equals(source.Machine, target.Machine, StringComparison.OrdinalIgnoreCase) || source.View != target.View)
         {
             throw new InvalidOperationException(
                 "Copy keys within the same computer connection and registry view. Use export and import to transfer data between them.");
         }
 
         var sourcePaths = RegistryKeyIdentity.Paths(source);
-        if (target.IsAtOrBelow(source) || RegistryKeyIdentity.Paths(target).Any(child =>
-                sourcePaths.Any(parent => RegistryKeyIdentity.AtOrBelow(child, parent))))
+        if (target.IsAtOrBelow(source)
+            || RegistryKeyIdentity.Paths(target).Any(child => sourcePaths.Any(parent => RegistryKeyIdentity.AtOrBelow(child, parent))))
         {
             throw new InvalidOperationException("A key cannot be copied into itself.");
         }
@@ -514,18 +477,13 @@ public sealed class RegistryService
         using var sourceKey = this.Open(source);
         this.CreateKeyCore(destination, name);
         using var targetParent = this.Open(destination, true);
-        using var targetKey = targetParent.OpenSubKey(
-                                  name, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.FullControl) ??
-                              throw new IOException("The destination key could not be opened.");
+        using var targetKey = targetParent.OpenSubKey(name, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.FullControl)
+                              ?? throw new IOException("The destination key could not be opened.");
         // A partial copy is kept on failure; removing it could also remove concurrent writes.
         Check(RegistryNative.CopyTree(sourceKey.Handle, null, targetKey.Handle));
     }
 
-    public SearchResult FindNext(
-        RegistryLocation root,
-        SearchOptions options,
-        SearchHit? after,
-        CancellationToken token)
+    public SearchResult FindNext(RegistryLocation root, SearchOptions options, SearchHit? after, CancellationToken token)
     {
         if (string.IsNullOrEmpty(options.Text) || !(options.Keys || options.Values || options.Data))
         {
@@ -546,8 +504,7 @@ public sealed class RegistryService
         }
 
         // Only ancestors of the cursor need their earlier children skipped during the sorted depth-first walk.
-        var cursorPath = after?.Location.SubKey[root.SubKey.Length..]
-            .Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        var cursorPath = after?.Location.SubKey[root.SubKey.Length..].Split('\\', StringSplitOptions.RemoveEmptyEntries);
         var stack = new Stack<(RegistryLocation Location, int CursorDepth)>();
         stack.Push((root, cursorPath is null ? -1 : 0));
         var skippedKeys = 0;
@@ -560,8 +517,7 @@ public sealed class RegistryService
             {
                 snapshot = this.Read(location);
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException
-                                           or Win32Exception)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException or Win32Exception)
             {
                 skippedKeys++;
                 continue;
@@ -578,14 +534,13 @@ public sealed class RegistryService
                 foreach (var value in snapshot.Values)
                 {
                     token.ThrowIfCancellationRequested();
-                    if ((atCursor && StringComparer.OrdinalIgnoreCase.Compare(value.Name, after?.ValueName) <= 0) ||
-                        (options.Types is { Length: > 0 } && !options.Types.Contains(value.Type)))
+                    if ((atCursor && StringComparer.OrdinalIgnoreCase.Compare(value.Name, after?.ValueName) <= 0)
+                        || (options.Types is { Length: > 0 } && !options.Types.Contains(value.Type)))
                     {
                         continue;
                     }
 
-                    if ((options.Values && Matches(value.Name)) ||
-                        (options.Data && Matches(RegistrySearch.ValueSearchText(value))))
+                    if ((options.Values && Matches(value.Name)) || (options.Data && Matches(RegistrySearch.ValueSearchText(value))))
                     {
                         return new SearchResult(new SearchHit(location, value.Name), skippedKeys);
                     }
@@ -595,9 +550,7 @@ public sealed class RegistryService
             for (var i = snapshot.SubKeys.Length - 1; i >= 0; i--)
             {
                 var child = snapshot.SubKeys[i];
-                var order = depth < 0 || atCursor
-                    ? 1
-                    : StringComparer.OrdinalIgnoreCase.Compare(child, cursorPath![depth]);
+                var order = depth < 0 || atCursor ? 1 : StringComparer.OrdinalIgnoreCase.Compare(child, cursorPath![depth]);
                 if (order < 0)
                 {
                     break;
@@ -614,18 +567,14 @@ public sealed class RegistryService
     {
         var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "reg.exe"))
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
         };
         foreach (var argument in arguments)
         {
             start.ArgumentList.Add(argument);
         }
 
-        using var process = Process.Start(start) ??
-                            throw new IOException("Could not start the Windows registry utility.");
+        using var process = Process.Start(start) ?? throw new IOException("Could not start the Windows registry utility.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
@@ -643,8 +592,7 @@ public sealed class RegistryService
         var temporary = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            await RunRegAsync(
-                "save", location.Address, temporary, location.View == RegistryView.Registry32 ? "/reg:32" : "/reg:64");
+            await RunRegAsync("save", location.Address, temporary, location.View == RegistryView.Registry32 ? "/reg:32" : "/reg:64");
             File.Move(temporary, file, true);
         }
         finally
@@ -671,4 +619,6 @@ public sealed class RegistryService
             throw new Win32Exception(error);
         }
     }
+
+    internal delegate int QueryRegistryValue(byte[]? bytes, out uint type, ref uint size);
 }

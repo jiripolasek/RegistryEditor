@@ -39,9 +39,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
             "save" => new SymbolIconSource { Symbol = Symbol.Save },
             "edit" => new FontIconSource
             {
-                Glyph = "\uE70F",
-                FontSize = 16,
-                FontFamily = (FontFamily)Application.Current.Resources["SymbolThemeFontFamily"]
+                Glyph = "\uE70F", FontSize = 16, FontFamily = (FontFamily)Application.Current.Resources["SymbolThemeFontFamily"]
             },
             _ => null
         };
@@ -57,16 +55,11 @@ internal sealed partial class NotificationPrototypeWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var heading = new StackPanel { Spacing = 8 };
+        heading.Children.Add(new TextBlock { Text = "Notifications", Style = (Style)Application.Current.Resources["TitleTextBlockStyle"] });
         heading.Children.Add(
             new TextBlock
             {
-                Text = "Notifications", Style = (Style)Application.Current.Resources["TitleTextBlockStyle"]
-            });
-        heading.Children.Add(
-            new TextBlock
-            {
-                Text
-                    = "Keep typing, selecting and scrolling while messages appear. Each window has its own notification session.",
+                Text = "Keep typing, selecting and scrolling while messages appear. Each window has its own notification session.",
                 TextWrapping = TextWrapping.Wrap
             });
         root.Children.Add(heading);
@@ -78,9 +71,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
         {
             var choice = new ComboBox
             {
-                Header = label,
-                MinWidth = id is "PrototypePosition" or "PrototypeArea" ? 144 : 112,
-                Margin = new Thickness(0, 0, 12, 8)
+                Header = label, MinWidth = id is "PrototypePosition" or "PrototypeArea" ? 144 : 112, Margin = new Thickness(0, 0, 12, 8)
             };
             AutomationProperties.SetAutomationId(choice, id);
             foreach (var item in choices)
@@ -106,12 +97,9 @@ internal sealed partial class NotificationPrototypeWindow : Window
         Choice(
             "Dismiss", "PrototypeDismiss", ["Close icon", "Dismiss link"],
             index => this.ApplyAppearance(this._appearance with { Dismiss = (NotificationDismissPresentation)index }));
+        Choice("Theme", "PrototypeTheme", ["System", "Light", "Dark"], index => this.Surface.RequestedTheme = (ElementTheme)index);
         Choice(
-            "Theme", "PrototypeTheme", ["System", "Light", "Dark"],
-            index => this.Surface.RequestedTheme = (ElementTheme)index);
-        Choice(
-            "Position", "PrototypePosition",
-            ["Bottom right", "Bottom center", "Bottom left", "Top right", "Top center", "Top left"],
+            "Position", "PrototypePosition", ["Bottom right", "Bottom center", "Bottom left", "Top right", "Top center", "Top left"],
             index => this._host.Position = (NotificationPosition)index);
         var commands = new VariableSizedWrapGrid { Orientation = Orientation.Horizontal, MaximumRowsOrColumns = 6 };
         Grid.SetRow(commands, 2);
@@ -141,10 +129,8 @@ internal sealed partial class NotificationPrototypeWindow : Window
         AddButton("Save icon", "PrototypeSaveIcon", () => this.ShowIconPreview());
         AddButton("Delayed info", "PrototypeInfo", () => _ = this.ShowInformationAsync());
         AddButton("Success", "PrototypeSuccess", () => this.Show("Changes saved", NotificationSeverity.Success));
-        AddButton(
-            "Warning", "PrototypeWarning", () => this.Show("Connection needs attention", NotificationSeverity.Warning));
-        AddButton(
-            "Error", "PrototypeError", () => this.Show("Could not complete the operation", NotificationSeverity.Error));
+        AddButton("Warning", "PrototypeWarning", () => this.Show("Connection needs attention", NotificationSeverity.Warning));
+        AddButton("Error", "PrototypeError", () => this.Show("Could not complete the operation", NotificationSeverity.Error));
         AddButton("Progress", "PrototypeProgress", () => _ = this.RunProgressAsync());
         AddButton(
             "Action", "PrototypeAction", () => this._session.Show(
@@ -172,8 +158,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
                     Actions = (NotificationAction[])
                     [
                         new NotificationAction(
-                            "Try action",
-                            _ => Task.FromException(new IOException("The sample destination is unavailable.")))
+                            "Try action", _ => Task.FromException(new IOException("The sample destination is unavailable.")))
                     ]
                 }));
         AddButton("Message burst", "PrototypeBurst", () => this.PublishBurst());
@@ -229,26 +214,18 @@ internal sealed partial class NotificationPrototypeWindow : Window
                     this._host.ShadowReceiver = list;
                 }
             });
-        var preview = new Button
-        {
-            Content = "Preview", Margin = new Thickness(0, 0, 12, 8), VerticalAlignment = VerticalAlignment.Bottom
-        };
+        var preview = new Button { Content = "Preview", Margin = new Thickness(0, 0, 12, 8), VerticalAlignment = VerticalAlignment.Bottom };
         AutomationProperties.SetAutomationId(preview, "PrototypePreview");
         preview.Click += (_, _) => this.ShowPreview();
         appearance.Children.Add(preview);
         var dismissAll = new Button
         {
-            Content = "Dismiss all",
-            Margin = new Thickness(0, 0, 12, 8),
-            VerticalAlignment = VerticalAlignment.Bottom
+            Content = "Dismiss all", Margin = new Thickness(0, 0, 12, 8), VerticalAlignment = VerticalAlignment.Bottom
         };
         AutomationProperties.SetAutomationId(dismissAll, "PrototypeDismissAll");
         dismissAll.Click += (_, _) => this._session.DismissAll();
         appearance.Children.Add(dismissAll);
-        var history = new Button
-        {
-            Content = "History", Margin = new Thickness(0, 0, 12, 8), VerticalAlignment = VerticalAlignment.Bottom
-        };
+        var history = new Button { Content = "History", Margin = new Thickness(0, 0, 12, 8), VerticalAlignment = VerticalAlignment.Bottom };
         AutomationProperties.SetAutomationId(history, "PrototypeHistory");
         history.Click += (_, _) => this._host.ShowHistory(history);
         appearance.Children.Add(history);
@@ -258,8 +235,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
             this.AppWindow.Resize(new SizeInt32((int)(1100 * scale), (int)(800 * scale)));
             this.ShowPreview();
         };
-        this.Activated += (_, args) =>
-            this._host.IsWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+        this.Activated += (_, args) => this._host.IsWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
         this.Closed += (_, _) =>
         {
             this._lifetime.Cancel();
@@ -386,9 +362,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
                 Message = "The workspace keeps its position. Repeating this message updates its existing card.",
                 Key = severity.ToString(),
                 Severity = severity,
-                Duration = severity is NotificationSeverity.Warning or NotificationSeverity.Error
-                    ? null
-                    : TimeSpan.FromSeconds(5)
+                Duration = severity is NotificationSeverity.Warning or NotificationSeverity.Error ? null : TimeSpan.FromSeconds(5)
             });
     }
 
@@ -400,8 +374,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
             await Task.Delay(600, token).ConfigureAwait(false);
             this.Show("Information", NotificationSeverity.Information);
         }
-        catch (Exception error) when (token.IsCancellationRequested &&
-                                      error is OperationCanceledException or ObjectDisposedException)
+        catch (Exception error) when (token.IsCancellationRequested && error is OperationCanceledException or ObjectDisposedException)
         {
         }
     }
@@ -411,8 +384,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
         // shortcut: a fixed sample burst exercises bounded storage; real operations should publish one summary.
         for (var i = 1; i <= 75; i++)
         {
-            this._session.Show(
-                new Notification { Title = $"Background message {i}", Message = "Available in notification history." });
+            this._session.Show(new Notification { Title = $"Background message {i}", Message = "Available in notification history." });
         }
     }
 
@@ -441,8 +413,7 @@ internal sealed partial class NotificationPrototypeWindow : Window
             for (var i = 1; i <= 10; i++)
             {
                 await Task.Delay(400, stop.Token).ConfigureAwait(false);
-                handle.Update(
-                    notification with { Message = $"{i} of 10 items", Progress = new NotificationProgress(i / 10d) });
+                handle.Update(notification with { Message = $"{i} of 10 items", Progress = new NotificationProgress(i / 10d) });
             }
 
             handle.Update(new Notification { Title = "Processing complete", Severity = NotificationSeverity.Success });

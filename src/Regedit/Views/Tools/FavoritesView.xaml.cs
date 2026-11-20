@@ -3,9 +3,9 @@
 // ------------------------------------------------------------
 
 using System.ComponentModel;
-using JPSoftworks.Notifications;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
+using JPSoftworks.Notifications;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Dialogs;
@@ -43,12 +43,6 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     internal FavoritesViewModel ViewModel { get; }
 
-    public ToolKind Tool => ToolKind.Favorites;
-
-    public Button MenuButton => this.PageHeader.MenuButton;
-
-    public IReadOnlyList<ToolCommand> PanelCommands { get; }
-
     internal FavoritesView(
         FavoritesStore store,
         WindowDialogPresenter dialogs,
@@ -71,8 +65,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         this.Results.PreviewKeyDown += this.Results_KeyDown;
         this.Results.SelectionChanged += this.Selection_Changed;
         this.Search.KeyDown += this.Search_KeyDown;
-        this.LocalControls.PresentationChanged
-            += (_, _) => this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
+        this.LocalControls.PresentationChanged += (_, _) => this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
         this.ResultColumns.ItemAutomationName = item => (item as FavoriteRow)?.AccessibleName;
         layouts?.Attach(this.ResultColumns, "Favorites");
         this._addCommand = new ToolCommand(this.ViewModel.AddLabel, Symbol.Add)
@@ -104,8 +97,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         this.PageHeader.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         if (compact)
         {
-            this.LocalControls.Visibility = this.Commands.Visibility
-                = this.FolderHeader.Visibility = Visibility.Collapsed;
+            this.LocalControls.Visibility = this.Commands.Visibility = this.FolderHeader.Visibility = Visibility.Collapsed;
             this.LocalControls.ShowSearchOnly();
             this.LocalControls.Margin = new Thickness(0, 0, 0, 8);
             this.FolderPanel.RowSpacing = 0;
@@ -123,8 +115,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         };
         this.Results.ItemContainerStyle = new Style(typeof(ListViewItem))
         {
-            BasedOn = this.Results.ItemContainerStyle,
-            Setters = { new Setter(ContextFlyoutProperty, this.ItemMenu) }
+            BasedOn = this.Results.ItemContainerStyle, Setters = { new Setter(ContextFlyoutProperty, this.ItemMenu) }
         };
 
         MiddleClick.Attach(
@@ -132,8 +123,8 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
             _ => this.ViewModel.Selected is [{ IsFolder: false } item] ? this.ViewModel.Store.Bookmark(item.Id) : null,
             favorite => this.ViewModel.OpenBackgroundCommand.Execute(new FavoriteItemId(favorite.Id, false)));
         MiddleClick.Attach(
-            this.Results, args => !this.ViewModel.IsBusy &&
-                                  MiddleClick.Container<ListViewItem>(this.Results, args)?.Content is FavoriteRow
+            this.Results, args => !this.ViewModel.IsBusy
+                                  && MiddleClick.Container<ListViewItem>(this.Results, args)?.Content is FavoriteRow
                                   {
                                       Key.IsFolder: false
                                   } row
@@ -141,12 +132,62 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
                 : null, row => this.ViewModel.OpenBackgroundCommand.Execute(row.Key));
         MiddleClick.Attach(
             this.FavoriteTree,
-            args => !this.ViewModel.IsBusy &&
-                    MiddleClick.Container<TreeViewItem>(this.FavoriteTree, args) is { } container &&
-                    this.FavoriteTree.NodeFromContainer(container)?.Content is FavoriteRow { Key.IsFolder: false } row
+            args => !this.ViewModel.IsBusy
+                    && MiddleClick.Container<TreeViewItem>(this.FavoriteTree, args) is { } container
+                    && this.FavoriteTree.NodeFromContainer(container)?.Content is FavoriteRow { Key.IsFolder: false } row
                 ? row
                 : null, row => this.ViewModel.OpenBackgroundCommand.Execute(row.Key));
         this.UpdateSurfaceLayout();
+    }
+
+    public ToolKind Tool => ToolKind.Favorites;
+
+    public Button MenuButton => this.PageHeader.MenuButton;
+
+    public IReadOnlyList<ToolCommand> PanelCommands { get; }
+
+    void IToolSurface.CopyContextFrom(IToolSurface source)
+    {
+        this.ViewModel.CopyFrom(((FavoritesView)source).ViewModel);
+        this.LocalControls.ShowColumns = ((FavoritesView)source).LocalControls.ShowColumns;
+    }
+
+    public void RequestFocus(bool preferSelection = false)
+    {
+        this._focusPending = true;
+        this._focusSelection = preferSelection;
+        if (!this._loaded)
+        {
+            return;
+        }
+
+        this.DispatcherQueue.TryEnqueue(
+            Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (!this._loaded || !this._focusPending)
+                {
+                    return;
+                }
+
+                this._focusPending = false;
+                if (this._focusSelection && this.ViewModel.Compact && this.FavoriteTree.SelectedNode is { } node)
+                {
+                    (this.FavoriteTree.ContainerFromNode(node) as Control ?? this.FavoriteTree).Focus(FocusState.Keyboard);
+                }
+                else if (this._focusSelection && this.Results.SelectedItem is { } row)
+                {
+                    this.Results.ScrollIntoView(row);
+                    this.Results.Focus(FocusState.Keyboard);
+                }
+                else if (this.ViewModel.Compact && this.LocalControls.Visibility == Visibility.Collapsed)
+                {
+                    this.FavoriteTree.Focus(FocusState.Keyboard);
+                }
+                else
+                {
+                    this.Search.Focus(FocusState.Keyboard);
+                }
+            });
     }
 
     internal void ApplyListSpacing(double spacing)
@@ -180,8 +221,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
                 this.ViewModel.SelectTree(treeRow.Key);
             }
 
-            this.MenuNewFolder.Visibility
-                = this.ViewModel.HasSelectedBookmark ? Visibility.Collapsed : Visibility.Visible;
+            this.MenuNewFolder.Visibility = this.ViewModel.HasSelectedBookmark ? Visibility.Collapsed : Visibility.Visible;
         }
     }
 
@@ -206,8 +246,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     private void ShowError()
     {
         this._errorNotice = StatusNotifications.UpdateError(
-            this._notifications, this._errorNotice, "Could not complete the action", this.ViewModel.Error,
-            this._errorKey);
+            this._notifications, this._errorNotice, "Could not complete the action", this.ViewModel.Error, this._errorKey);
     }
 
     private static bool TryExecute(ICommand? command)
@@ -249,12 +288,6 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         this.ViewModel.SelectionChanged -= this.ModelSelectionChanged;
     }
 
-    void IToolSurface.CopyContextFrom(IToolSurface source)
-    {
-        this.ViewModel.CopyFrom(((FavoritesView)source).ViewModel);
-        this.LocalControls.ShowColumns = ((FavoritesView)source).LocalControls.ShowColumns;
-    }
-
     private void ItemsChanged(object? sender, EventArgs args)
     {
         this._syncing = true;
@@ -288,21 +321,17 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         var searching = this.ViewModel.Query.Length > 0;
         var rows = this.ViewModel.Rows.Count;
         this.CollectionTitle.Text = searching ? "Search results" : this.ViewModel.FolderTitle;
-        this.RootFavorites.Visibility = this.ViewModel.FolderId is not null || searching
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        this.RootFavorites.Visibility = this.ViewModel.FolderId is not null || searching ? Visibility.Visible : Visibility.Collapsed;
         this.Empty.Visibility = rows == 0 ? Visibility.Visible : Visibility.Collapsed;
         this.TreeEmpty.Visibility = this.ViewModel.Root.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         this.EmptyTitle.Text = searching ? "No matches" : "No favorites yet";
         this.TreeEmptyTitle.Text = this.ViewModel.Compact ? this.EmptyTitle.Text : "No folders";
         this.TreeEmptyDescription.Text = !this.ViewModel.Compact ? "Create a folder to organize favorites." :
-            searching ? "Try another name or saved location." :
-            "Add the current key or create a folder to get started.";
+            searching ? "Try another name or saved location." : "Add the current key or create a folder to get started.";
         this.EmptyDescription.Text = searching
             ? "Try another name or registry path."
             : "Add a favorite or create a folder to organize saved locations.";
-        if (!searching && rows == 0 &&
-            (this.ViewModel.Store.Favorites.Count > 0 || this.ViewModel.Store.Folders.Count > 0))
+        if (!searching && rows == 0 && (this.ViewModel.Store.Favorites.Count > 0 || this.ViewModel.Store.Folders.Count > 0))
         {
             var hasChildren = this.ViewModel.Store.Folders.Any(folder => folder.ParentId == this.ViewModel.FolderId);
             this.EmptyTitle.Text = hasChildren ? "No favorites in this folder" : "This folder is empty";
@@ -319,8 +348,9 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         var node = new TreeViewNode
         {
             Content = row,
-            IsExpanded = row.Key.IsFolder && (this.ViewModel.Compact && this.ViewModel.Query.Length > 0 ||
-                                              this.ViewModel.ExpandedFolders.Contains(row.Key.Id))
+            IsExpanded = row.Key.IsFolder
+                         && (this.ViewModel.Compact && this.ViewModel.Query.Length > 0
+                             || this.ViewModel.ExpandedFolders.Contains(row.Key.Id))
         };
         this._nodes.Add(row.Key, node);
         foreach (var child in row.Children)
@@ -334,9 +364,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     private void SyncSelection()
     {
         var model = this.ViewModel;
-        var treeKey = model.TreeSelection && model.Selected is [var key]
-            ? key
-            : new FavoriteItemId(model.FolderId ?? string.Empty, true);
+        var treeKey = model.TreeSelection && model.Selected is [var key] ? key : new FavoriteItemId(model.FolderId ?? string.Empty, true);
         if (this._nodes.TryGetValue(treeKey, out var node))
         {
             // Do not change ancestor expansion from WinUI's own selection callback.
@@ -402,8 +430,8 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     private void UpdateDetails()
     {
         var model = this.ViewModel;
-        this.Count.Text = $"{model.Rows.Count:N0} {(model.Rows.Count == 1 ? "item" : "items")}" +
-                          (model.Selected.Count > 0 ? $" · {model.Selected.Count:N0} selected" : string.Empty);
+        this.Count.Text = $"{model.Rows.Count:N0} {(model.Rows.Count == 1 ? "item" : "items")}"
+                          + (model.Selected.Count > 0 ? $" · {model.Selected.Count:N0} selected" : string.Empty);
         this.Details.Visibility = model.ShowDetails ? Visibility.Visible : Visibility.Collapsed;
         if (this._previewCommand is { } preview)
         {
@@ -421,15 +449,12 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
             }
             else if (model.Selected is [var folder])
             {
-                this.Details.Show(
-                    model.Store.Folders.First(f => f.Id == folder.Id).Name, model.Store.FolderPath(folder.Id),
-                    string.Empty);
+                this.Details.Show(model.Store.Folders.First(f => f.Id == folder.Id).Name, model.Store.FolderPath(folder.Id), string.Empty);
             }
             else if (model.Selected.Count > 1)
             {
                 this.Details.Show(
-                    $"{model.Selected.Count:N0} items selected", string.Empty,
-                    "Use the collection actions to organize these items.");
+                    $"{model.Selected.Count:N0} items selected", string.Empty, "Use the collection actions to organize these items.");
             }
             else
             {
@@ -459,9 +484,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         this.Collection.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         var beside = !compact && width - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
         this.InspectorWidth.Width = this.ViewModel.ShowDetails && beside ? new GridLength(285) : new GridLength(0);
-        this.InspectorHeight.Height = this.ViewModel.ShowDetails && !beside
-            ? new GridLength(1, GridUnitType.Star)
-            : new GridLength(0);
+        this.InspectorHeight.Height = this.ViewModel.ShowDetails && !beside ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         Grid.SetColumn(this.Details, beside ? 2 : 0);
         Grid.SetRow(this.Details, beside ? 0 : 1);
         Grid.SetColumnSpan(this.Details, beside ? 1 : 3);
@@ -550,8 +573,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private void FavoriteTree_Expanding(TreeView sender, TreeViewExpandingEventArgs args)
     {
-        if (!this._syncing && (!this.ViewModel.Compact || this.ViewModel.Query.Length == 0) &&
-            args.Node.Content is FavoriteRow row)
+        if (!this._syncing && (!this.ViewModel.Compact || this.ViewModel.Query.Length == 0) && args.Node.Content is FavoriteRow row)
         {
             this.ViewModel.ExpandedFolders.Add(row.Key.Id);
         }
@@ -559,8 +581,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private void FavoriteTree_Collapsed(TreeView sender, TreeViewCollapsedEventArgs args)
     {
-        if (!this._syncing && (!this.ViewModel.Compact || this.ViewModel.Query.Length == 0) &&
-            args.Node.Content is FavoriteRow row)
+        if (!this._syncing && (!this.ViewModel.Compact || this.ViewModel.Query.Length == 0) && args.Node.Content is FavoriteRow row)
         {
             this.ViewModel.ExpandedFolders.Remove(row.Key.Id);
         }
@@ -615,44 +636,5 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         {
             args.Handled = true;
         }
-    }
-
-    public void RequestFocus(bool preferSelection = false)
-    {
-        this._focusPending = true;
-        this._focusSelection = preferSelection;
-        if (!this._loaded)
-        {
-            return;
-        }
-
-        this.DispatcherQueue.TryEnqueue(
-            Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-            {
-                if (!this._loaded || !this._focusPending)
-                {
-                    return;
-                }
-
-                this._focusPending = false;
-                if (this._focusSelection && this.ViewModel.Compact && this.FavoriteTree.SelectedNode is { } node)
-                {
-                    (this.FavoriteTree.ContainerFromNode(node) as Control ?? this.FavoriteTree).Focus(
-                        FocusState.Keyboard);
-                }
-                else if (this._focusSelection && this.Results.SelectedItem is { } row)
-                {
-                    this.Results.ScrollIntoView(row);
-                    this.Results.Focus(FocusState.Keyboard);
-                }
-                else if (this.ViewModel.Compact && this.LocalControls.Visibility == Visibility.Collapsed)
-                {
-                    this.FavoriteTree.Focus(FocusState.Keyboard);
-                }
-                else
-                {
-                    this.Search.Focus(FocusState.Keyboard);
-                }
-            });
     }
 }

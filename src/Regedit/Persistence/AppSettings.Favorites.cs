@@ -31,8 +31,7 @@ public sealed partial class AppSettings
     {
         var trail = new List<FavoriteFolder>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (id is not null && visited.Add(id) && this.FavoriteFolders.FirstOrDefault(folder => folder.Id == id) is
-                   { } folder)
+        while (id is not null && visited.Add(id) && this.FavoriteFolders.FirstOrDefault(folder => folder.Id == id) is { } folder)
         {
             trail.Add(folder);
             id = folder.ParentId;
@@ -44,23 +43,21 @@ public sealed partial class AppSettings
 
     public string FavoriteFolderPath(string? id)
     {
-        return string.Join(
-            " / ", new[] { "Favorites" }.Concat(this.FavoriteFolderTrail(id).Select(folder => folder.Name)));
+        return string.Join(" / ", new[] { "Favorites" }.Concat(this.FavoriteFolderTrail(id).Select(folder => folder.Name)));
     }
 
     public FavoriteFolder[] FavoriteFolderChoices(IReadOnlySet<string>? excluded = null)
     {
         return this.FavoriteFolders.Where(folder => excluded?.Contains(folder.Id) != true)
             .Select(folder => folder with { Name = this.FavoriteFolderPath(folder.Id) })
-            .OrderBy(folder => folder.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Prepend(new FavoriteFolder(string.Empty, "Favorites")).ToArray();
+            .OrderBy(folder => folder.Name, StringComparer.CurrentCultureIgnoreCase).Prepend(new FavoriteFolder(string.Empty, "Favorites"))
+            .ToArray();
     }
 
     public FavoriteFolder AddFavoriteFolder(string name, string? parentId)
     {
         this.RequireFavoriteFolder(parentId);
-        var folder = new FavoriteFolder(
-            Guid.NewGuid().ToString("N"), this.ValidateFolderName(name, parentId), parentId);
+        var folder = new FavoriteFolder(Guid.NewGuid().ToString("N"), this.ValidateFolderName(name, parentId), parentId);
         this.FavoriteFolders.Add(folder);
         return folder;
     }
@@ -94,10 +91,7 @@ public sealed partial class AppSettings
         return descendants;
     }
 
-    public void MoveFavoriteItems(
-        IReadOnlyCollection<Favorite> favorites,
-        IReadOnlyCollection<string> folderIds,
-        string? destination)
+    public void MoveFavoriteItems(IReadOnlyCollection<Favorite> favorites, IReadOnlyCollection<string> folderIds, string? destination)
     {
         this.RequireFavoriteFolder(destination);
         foreach (var favorite in favorites)
@@ -112,8 +106,7 @@ public sealed partial class AppSettings
         }
 
         var roots = this.FavoriteFolders.Where(folder =>
-                folderIds.Contains(folder.Id) && (folder.ParentId is null || !descendants.Contains(folder.ParentId)))
-            .ToArray();
+            folderIds.Contains(folder.Id) && (folder.ParentId is null || !descendants.Contains(folder.ParentId))).ToArray();
         var names = this.FavoriteFolders.Where(folder => folder.ParentId == destination && !roots.Contains(folder))
             .Select(folder => folder.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var folder in roots)
@@ -131,8 +124,7 @@ public sealed partial class AppSettings
 
         foreach (var favorite in favorites.Distinct<Favorite>(ReferenceEqualityComparer.Instance))
         {
-            if (favorite.FolderId == destination ||
-                favorite.FolderId is not null && descendants.Contains(favorite.FolderId))
+            if (favorite.FolderId == destination || favorite.FolderId is not null && descendants.Contains(favorite.FolderId))
             {
                 continue;
             }
@@ -154,8 +146,7 @@ public sealed partial class AppSettings
             .OrderByDescending(folder => this.FavoriteFolderTrail(folder.Id).Length).ToArray();
         for (var index = this.Favorites.Count - 1; index >= 0; index--)
         {
-            if (selected.Contains(this.Favorites[index]) ||
-                this.Favorites[index].FolderId is { } id && descendants.Contains(id))
+            if (selected.Contains(this.Favorites[index]) || this.Favorites[index].FolderId is { } id && descendants.Contains(id))
             {
                 this.Favorites.RemoveAt(index);
             }
@@ -185,8 +176,7 @@ public sealed partial class AppSettings
         var next = Array.IndexOf(siblings, folder) + offset;
         if (next >= 0 && next < siblings.Length)
         {
-            this.FavoriteFolders.Move(
-                this.FavoriteFolders.IndexOf(folder), this.FavoriteFolders.IndexOf(siblings[next]));
+            this.FavoriteFolders.Move(this.FavoriteFolders.IndexOf(folder), this.FavoriteFolders.IndexOf(siblings[next]));
         }
     }
 
@@ -207,8 +197,8 @@ public sealed partial class AppSettings
     {
         return id is null
             ? null
-            : this.FavoriteFolders.FirstOrDefault(folder => folder.Id == id) ??
-              throw new ArgumentException("This favorites folder no longer exists.");
+            : this.FavoriteFolders.FirstOrDefault(folder => folder.Id == id)
+              ?? throw new ArgumentException("This favorites folder no longer exists.");
     }
 
     private string ValidateFolderName(string name, string? parentId, string? currentId = null)
@@ -220,8 +210,7 @@ public sealed partial class AppSettings
 
         name = name.Trim();
         if (this.FavoriteFolders.Any(folder =>
-                folder.ParentId == parentId && folder.Id != currentId &&
-                folder.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                folder.ParentId == parentId && folder.Id != currentId && folder.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
         {
             throw new ArgumentException("A folder with this name already exists here.");
         }
@@ -247,8 +236,7 @@ public sealed partial class AppSettings
 
         foreach (var siblings in byId.Values.GroupBy(folder => folder.ParentId))
         {
-            if (siblings.Select(folder => folder.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
-                siblings.Count())
+            if (siblings.Select(folder => folder.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != siblings.Count())
             {
                 throw new ArgumentException("Favorites folders have duplicate names in the same folder.");
             }
@@ -279,8 +267,7 @@ public sealed partial class AppSettings
         var favoriteIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var favorite in favorites)
         {
-            if (favorite is null || string.IsNullOrWhiteSpace(favorite.Name) ||
-                string.IsNullOrWhiteSpace(favorite.Address))
+            if (favorite is null || string.IsNullOrWhiteSpace(favorite.Name) || string.IsNullOrWhiteSpace(favorite.Address))
             {
                 throw new ArgumentException("A saved favorite is missing its name or address.");
             }

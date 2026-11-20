@@ -17,10 +17,11 @@ internal static class RegistryFileTests
     internal static async Task RunAsync(Action<bool, string> check, bool native)
     {
         MetadataAndKeyChanges(check);
-        var source = Header + "[HKEY_CURRENT_USER\\Software\\Preview]\r\n" +
-                     "@=\"A \\\"quote\\\" and \\\\ path\"\r\n\"Number\"=dword:ffffffff\r\n" +
-                     "\"Bytes\"=hex:01,ab,\\\r\n  ff\r\n\"Expand\"=hex(2):25,00,00,00\r\n\"Remove\"=-\r\n" +
-                     "[-HKEY_CURRENT_USER\\Software\\Preview]\r\n[HKEY_CURRENT_USER\\Software\\Preview]\r\n\"Number\"=dword:1\r\n";
+        var source = Header
+                     + "[HKEY_CURRENT_USER\\Software\\Preview]\r\n"
+                     + "@=\"A \\\"quote\\\" and \\\\ path\"\r\n\"Number\"=dword:ffffffff\r\n"
+                     + "\"Bytes\"=hex:01,ab,\\\r\n  ff\r\n\"Expand\"=hex(2):25,00,00,00\r\n\"Remove\"=-\r\n"
+                     + "[-HKEY_CURRENT_USER\\Software\\Preview]\r\n[HKEY_CURRENT_USER\\Software\\Preview]\r\n\"Number\"=dword:1\r\n";
         var document = RegistryFileDocument.Parse(source);
         check(
             document.CanImport && document.Sections.Count == 3 && document.Sections[1].IsDeletion,
@@ -33,36 +34,26 @@ internal static class RegistryFileTests
             values[1].Value!.Data.SequenceEqual(new byte[] { 255, 255, 255, 255 }) && values[1].Line == 5,
             "Registry DWORD retains unsigned bytes and source line");
         check(
-            values[2].Value!.Data.SequenceEqual(new byte[] { 1, 171, 255 }) &&
-            values[3].Value!.Type == RegistryValueType.ExpandString,
+            values[2].Value!.Data.SequenceEqual(new byte[] { 1, 171, 255 }) && values[3].Value!.Type == RegistryValueType.ExpandString,
             "Registry hex continuations and typed byte payloads are preserved");
         check(values[4].Value is null && values[4].Operation == "Delete value", "Registry value deletion is explicit");
 
         foreach (var invalid in new[]
                  {
-                     "", "not a header\r\n[HKEY_CURRENT_USER]", Header + "\"Name\"=\"Outside a section\"",
-                     Header + "[HKCU\\Software]", Header + "[-HKEY_CURRENT_USER]",
-                     Header + "[HKEY_CURRENT_USER] trailing",
-                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=dword:123456789",
-                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=hex:01,zz",
-                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=hex:01,\\",
-                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=\"unterminated",
-                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=qword:1",
-                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=\"bad\\escape\"", Header + "; hidden\0content"
+                     "", "not a header\r\n[HKEY_CURRENT_USER]", Header + "\"Name\"=\"Outside a section\"", Header + "[HKCU\\Software]",
+                     Header + "[-HKEY_CURRENT_USER]", Header + "[HKEY_CURRENT_USER] trailing",
+                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=dword:123456789", Header + "[HKEY_CURRENT_USER]\r\n\"x\"=hex:01,zz",
+                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=hex:01,\\", Header + "[HKEY_CURRENT_USER]\r\n\"x\"=\"unterminated",
+                     Header + "[HKEY_CURRENT_USER]\r\n\"x\"=qword:1", Header + "[HKEY_CURRENT_USER]\r\n\"x\"=\"bad\\escape\"",
+                     Header + "; hidden\0content"
                  })
         {
-            check(
-                !RegistryFileDocument.Parse(invalid).CanImport, "Registry file refuses invalid or unsupported source");
+            check(!RegistryFileDocument.Parse(invalid).CanImport, "Registry file refuses invalid or unsupported source");
         }
 
-        foreach (var hive in new[]
-                 {
-                     "HKEY_CLASSES_ROOT", "HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE", "HKEY_USERS",
-                     "HKEY_CURRENT_CONFIG"
-                 })
+        foreach (var hive in new[] { "HKEY_CLASSES_ROOT", "HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE", "HKEY_USERS", "HKEY_CURRENT_CONFIG" })
         {
-            var mixed = RegistryFileDocument.Parse(
-                Header + "[" + hive.ToLowerInvariant() + "\\Software\\MixedCaseKey]\r\n@=\"value\"");
+            var mixed = RegistryFileDocument.Parse(Header + "[" + hive.ToLowerInvariant() + "\\Software\\MixedCaseKey]\r\n@=\"value\"");
             check(
                 mixed.CanImport && mixed.Sections[0].Path == hive + "\\Software\\MixedCaseKey",
                 "Registry file accepts hive casing and canonicalizes only the hive name");
@@ -90,8 +81,8 @@ internal static class RegistryFileTests
         {
             foreach (var encoding in new Encoding[]
                      {
-                         new UnicodeEncoding(false, true, true), new UnicodeEncoding(true, true, true),
-                         new UTF8Encoding(true, true), Encoding.ASCII
+                         new UnicodeEncoding(false, true, true), new UnicodeEncoding(true, true, true), new UTF8Encoding(true, true),
+                         Encoding.ASCII
                      })
             {
                 var file = Path.Combine(folder.FullName, "roundtrip.reg");
@@ -99,18 +90,15 @@ internal static class RegistryFileTests
                 var bytes = encoding.GetPreamble().Concat(encoding.GetBytes(text)).ToArray();
                 await File.WriteAllBytesAsync(file, bytes);
                 var buffer = await RegistryFileBuffer.OpenAsync(file);
-                check(
-                    buffer.Text == text && !buffer.IsDirty,
-                    "Registry file opens without changing source or line endings");
+                check(buffer.Text == text && !buffer.IsDirty, "Registry file opens without changing source or line endings");
                 await buffer.SaveAsync(file);
-                check(
-                    (await File.ReadAllBytesAsync(file)).SequenceEqual(bytes),
-                    "Unchanged save preserves every original file byte");
+                check((await File.ReadAllBytesAsync(file)).SequenceEqual(bytes), "Unchanged save preserves every original file byte");
                 buffer.Text += "; unsaved edit\n";
                 var snapshot = buffer.ImportBytes();
                 check(
-                    buffer.IsDirty && Encoding.Unicode.GetString(snapshot.AsSpan(2)).EndsWith("; unsaved edit\n") &&
-                    (await File.ReadAllBytesAsync(file)).SequenceEqual(bytes),
+                    buffer.IsDirty
+                    && Encoding.Unicode.GetString(snapshot.AsSpan(2)).EndsWith("; unsaved edit\n")
+                    && (await File.ReadAllBytesAsync(file)).SequenceEqual(bytes),
                     "Import snapshot includes unsaved edits without saving the file");
                 await File.WriteAllTextAsync(file, "external change");
                 try
@@ -128,8 +116,7 @@ internal static class RegistryFileTests
                 var copy = Path.Combine(folder.FullName, "copy.reg");
                 await buffer.SaveAsync(copy);
                 check(
-                    !buffer.IsDirty && buffer.FilePath == copy &&
-                    (await RegistryFileBuffer.OpenAsync(copy)).Text == buffer.Text,
+                    !buffer.IsDirty && buffer.FilePath == copy && (await RegistryFileBuffer.OpenAsync(copy)).Text == buffer.Text,
                     "Save as preserves source and establishes the new file baseline");
                 File.Delete(copy);
                 buffer.Text += "; after external deletion\n";
@@ -141,9 +128,10 @@ internal static class RegistryFileTests
                 catch (IOException ex)
                 {
                     check(
-                        ex.Message ==
-                        "The file changed outside Registry Editor. Reload it or use Save as to keep your changes." &&
-                        ex.InnerException is FileNotFoundException && !File.Exists(copy) && buffer.IsDirty,
+                        ex.Message == "The file changed outside Registry Editor. Reload it or use Save as to keep your changes."
+                        && ex.InnerException is FileNotFoundException
+                        && !File.Exists(copy)
+                        && buffer.IsDirty,
                         "External deletion reports a save conflict and retains unsaved data without recreating the file");
                 }
 
@@ -180,19 +168,21 @@ internal static class RegistryFileTests
     private static void MetadataAndKeyChanges(Action<bool, string> check)
     {
         const string root = "HKEY_CURRENT_USER\\Software\\Preview";
-        var text = Header +
-                   "; title = First\n;TITLE=Example tweak\n;Description=Unicode café = data\n;Author=Example author\n" +
-                   ";Requires=explorerrestart\n;Requires=Logoff\n;Requires=Restart\n;Requires=Restart\n;Requires=Unknown\n;Unknown=ignored\n" +
-                   $"[{root}]\n;Title=Ignored after a section\n";
+        var text = Header
+                   + "; title = First\n;TITLE=Example tweak\n;Description=Unicode café = data\n;Author=Example author\n"
+                   + ";Requires=explorerrestart\n;Requires=Logoff\n;Requires=Restart\n;Requires=Restart\n;Requires=Unknown\n;Unknown=ignored\n"
+                   + $"[{root}]\n;Title=Ignored after a section\n";
         var document = RegistryFileDocument.Parse(text);
         check(
-            document.CanImport && document.Metadata.Title == "Example tweak" &&
-            document.Metadata.Description == "Unicode café = data" && document.Metadata.Author == "Example author",
+            document.CanImport
+            && document.Metadata.Title == "Example tweak"
+            && document.Metadata.Description == "Unicode café = data"
+            && document.Metadata.Author == "Example author",
             "Registry metadata accepts header directives, whitespace, case and the last scalar value");
         check(
-            document.Metadata.FollowUp == (RegistryFileFollowUp.ExplorerRestart | RegistryFileFollowUp.Logoff |
-                                           RegistryFileFollowUp.Restart) &&
-            document.Metadata.FollowUpText == "Restart Windows Explorer; Sign out; Restart Windows",
+            document.Metadata.FollowUp
+            == (RegistryFileFollowUp.ExplorerRestart | RegistryFileFollowUp.Logoff | RegistryFileFollowUp.Restart)
+            && document.Metadata.FollowUpText == "Restart Windows Explorer; Sign out; Restart Windows",
             "Registry follow-up directives accumulate, deduplicate and ignore unknown actions");
         check(
             !RegistryFileDocument.Parse(Header + $";Unknown=x\n;Requires=Unknown\n[{root}]").Metadata.HasContent,
@@ -204,8 +194,7 @@ internal static class RegistryFileTests
             RegistryFileDocument.Parse("REGEDIT4\n;Title=Legacy\n[" + root + "]").Metadata.Title == "Legacy",
             "Registry metadata works with REGEDIT4");
         check(
-            document.Metadata.HasContent &&
-            RegistryFileDocument.Parse(Header + $"[{root}]").Metadata == RegistryFileMetadata.Empty,
+            document.Metadata.HasContent && RegistryFileDocument.Parse(Header + $"[{root}]").Metadata == RegistryFileMetadata.Empty,
             "Metadata-free registry files retain an empty metadata value");
 
         RegistryFileDocument Parse(params string[] sections)
@@ -213,9 +202,7 @@ internal static class RegistryFileTests
             return RegistryFileDocument.Parse(Header + string.Join("\n", sections));
         }
 
-        check(
-            Parse($"[-{root}]").KeyChanges[root] == RegistryFileKeyChange.Delete,
-            "A final key deletion is marked as deletion");
+        check(Parse($"[-{root}]").KeyChanges[root] == RegistryFileKeyChange.Delete, "A final key deletion is marked as deletion");
         check(
             Parse($"[{root}]", $"[-{root}]").KeyChanges[root] == RegistryFileKeyChange.Delete,
             "Creating then deleting a key finishes deleted");
@@ -227,19 +214,18 @@ internal static class RegistryFileTests
             "A later deletion wins over an earlier recreation");
         var inherited = Parse($"[{root}\\Removed]", $"[-{root}]", $"[{root}\\Kept]");
         check(
-            inherited.KeyChanges[root] == RegistryFileKeyChange.Recreate &&
-            inherited.KeyChanges[root + "\\Kept"] == RegistryFileKeyChange.Recreate &&
-            inherited.KeyChanges[root + "\\Removed"] == RegistryFileKeyChange.Delete,
+            inherited.KeyChanges[root] == RegistryFileKeyChange.Recreate
+            && inherited.KeyChanges[root + "\\Kept"] == RegistryFileKeyChange.Recreate
+            && inherited.KeyChanges[root + "\\Removed"] == RegistryFileKeyChange.Delete,
             "Ancestor deletion removes old children and creating one child recreates only its ancestors");
         var descendant = Parse($"[{root}\\Child]", $"[-{root}\\Child]", $"[{root}]");
         check(
-            descendant.KeyChanges[root] == RegistryFileKeyChange.None &&
-            descendant.KeyChanges[root + "\\Child"] == RegistryFileKeyChange.Delete,
+            descendant.KeyChanges[root] == RegistryFileKeyChange.None
+            && descendant.KeyChanges[root + "\\Child"] == RegistryFileKeyChange.Delete,
             "Reopening a parent does not recreate a deleted descendant");
         var sibling = Parse($"[-{root}]", $"[{root}2]", $"[{root.ToUpperInvariant()}\\New]");
         check(
-            sibling.KeyChanges[root] == RegistryFileKeyChange.Recreate &&
-            sibling.KeyChanges[root + "2"] == RegistryFileKeyChange.None,
+            sibling.KeyChanges[root] == RegistryFileKeyChange.Recreate && sibling.KeyChanges[root + "2"] == RegistryFileKeyChange.None,
             "Key summaries compare case-insensitively at whole path-component boundaries");
         check(
             Parse($"[{root}]", $"[{root}]").KeyChanges[root] == RegistryFileKeyChange.None,
@@ -253,8 +239,9 @@ internal static class RegistryFileTests
         var sourceFile = Path.Combine(folder, "native.reg");
         try
         {
-            var source = Header + $"[{path}]\r\n\"Old\"=\"discard\"\r\n[-{path}]\r\n[{path}]\r\n" +
-                         "@=\"Unicode žluťoučký 🐈\"\r\n\"Number\"=dword:ffffffff\r\n\"Bytes\"=hex:01,ab,\\\r\n  ff\r\n";
+            var source = Header
+                         + $"[{path}]\r\n\"Old\"=\"discard\"\r\n[-{path}]\r\n[{path}]\r\n"
+                         + "@=\"Unicode žluťoučký 🐈\"\r\n\"Number\"=dword:ffffffff\r\n\"Bytes\"=hex:01,ab,\\\r\n  ff\r\n";
             await File.WriteAllTextAsync(sourceFile, source, new UTF8Encoding(true));
             var buffer = await RegistryFileBuffer.OpenAsync(sourceFile);
             buffer.Text += "\"Unsaved\"=\"present\"\r\n" + $"[{path}\\Name]]\r\n@=\"bracket key\"\r\n";
@@ -265,9 +252,11 @@ internal static class RegistryFileTests
             using (var key = root.OpenSubKey(subKey)!)
             {
                 check(
-                    (string?)key.GetValue("") == "Unicode žluťoučký 🐈" && key.GetValue("Old") is null &&
-                    (string?)key.GetValue("Unsaved") == "present" && (int)key.GetValue("Number")! == -1 &&
-                    ((byte[])key.GetValue("Bytes")!).SequenceEqual(new byte[] { 1, 171, 255 }),
+                    (string?)key.GetValue("") == "Unicode žluťoučký 🐈"
+                    && key.GetValue("Old") is null
+                    && (string?)key.GetValue("Unsaved") == "present"
+                    && (int)key.GetValue("Number")! == -1
+                    && ((byte[])key.GetValue("Bytes")!).SequenceEqual(new byte[] { 1, 171, 255 }),
                     "Windows imports the exact Unicode buffer and preserves ordered deletion, types, continuations and unsaved changes");
                 using var bracketKey = root.OpenSubKey(subKey + "\\Name]");
                 check(
@@ -275,8 +264,7 @@ internal static class RegistryFileTests
                     "Windows key names containing a closing bracket agree with the file preview");
             }
 
-            await File.WriteAllTextAsync(
-                sourceFile, $"REGEDIT4\r\n[{path}]\r\n\"Legacy\"=hex(2):41,00\r\n", Encoding.ASCII);
+            await File.WriteAllTextAsync(sourceFile, $"REGEDIT4\r\n[{path}]\r\n\"Legacy\"=hex(2):41,00\r\n", Encoding.ASCII);
             var legacy = await RegistryFileBuffer.OpenAsync(sourceFile);
             await File.WriteAllBytesAsync(snapshot, legacy.ImportBytes());
             await RegistryService.RunRegAsync("import", snapshot, "/reg:32");

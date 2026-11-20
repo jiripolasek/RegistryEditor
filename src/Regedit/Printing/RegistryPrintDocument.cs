@@ -21,9 +21,8 @@ internal sealed class RegistryPrintDocument(string title, string report)
     private readonly HashSet<int> _pendingPreviews = [];
     private readonly RegistryPrintLayoutGeneration _layoutGeneration = new();
 
-    private readonly DispatcherQueue _dispatcher = DispatcherQueue.GetForCurrentThread() ??
-                                                   throw new InvalidOperationException(
-                                                       "A UI dispatcher is required for print preview.");
+    private readonly DispatcherQueue _dispatcher = DispatcherQueue.GetForCurrentThread()
+                                                   ?? throw new InvalidOperationException("A UI dispatcher is required for print preview.");
 
     private CancellationToken _token;
     private Action<Exception>? _fail;
@@ -41,8 +40,7 @@ internal sealed class RegistryPrintDocument(string title, string report)
         this._document.GetPreviewPage += this.GetPreviewPage;
         this._document.AddPages += this.AddPages;
 
-        var finished
-            = new TaskCompletionSource<PrintTaskCompletion>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finished = new TaskCompletionSource<PrintTaskCompletion>(TaskCreationOptions.RunContinuationsAsynchronously);
         this._fail = exception => finished.TrySetException(exception);
         PrintTask? activeTask = null;
         TypedEventHandler<PrintTask, PrintTaskCompletedEventArgs>? completed = null;
@@ -154,8 +152,7 @@ internal sealed class RegistryPrintDocument(string title, string report)
         try
         {
             var complete = this._layoutGeneration.CompleteSynchronously(
-                generation, () => this._paginationActive && !this._token.IsCancellationRequested,
-                () => this.BuildNextPage(generation));
+                generation, () => this._paginationActive && !this._token.IsCancellationRequested, () => this.BuildNextPage(generation));
             if (complete && !this._token.IsCancellationRequested)
             {
                 foreach (var page in this._pages)
@@ -233,8 +230,7 @@ internal sealed class RegistryPrintDocument(string title, string report)
         var left = Math.Max(48, description.ImageableRect.Left);
         var top = Math.Max(48, description.ImageableRect.Top);
         var width = Math.Max(80, Math.Min(description.PageSize.Width - 2 * left, description.ImageableRect.Width));
-        var height = Math.Max(
-            80, Math.Min(description.PageSize.Height - 2 * top, description.ImageableRect.Height) - 72);
+        var height = Math.Max(80, Math.Min(description.PageSize.Height - 2 * top, description.ImageableRect.Height) - 72);
         var body = new TextBlock
         {
             FontFamily = new FontFamily("Consolas"),
@@ -277,9 +273,7 @@ internal sealed class RegistryPrintDocument(string title, string report)
         content.Children.Add(
             new TextBlock
             {
-                Text = $"Registry Editor · Page {this._pages.Count + 1}",
-                FontSize = 10,
-                Foreground = new SolidColorBrush(Colors.Black)
+                Text = $"Registry Editor · Page {this._pages.Count + 1}", FontSize = 10, Foreground = new SolidColorBrush(Colors.Black)
             });
         var page = new Grid
         {
@@ -318,10 +312,11 @@ internal sealed class RegistryPrintDocument(string title, string report)
 
     private static bool SamePage(PrintPageDescription left, PrintPageDescription right)
     {
-        return left.PageSize.Width == right.PageSize.Width && left.PageSize.Height == right.PageSize.Height &&
-               left.ImageableRect.Left == right.ImageableRect.Left &&
-               left.ImageableRect.Top == right.ImageableRect.Top &&
-               left.ImageableRect.Width == right.ImageableRect.Width &&
-               left.ImageableRect.Height == right.ImageableRect.Height;
+        return left.PageSize.Width == right.PageSize.Width
+               && left.PageSize.Height == right.PageSize.Height
+               && left.ImageableRect.Left == right.ImageableRect.Left
+               && left.ImageableRect.Top == right.ImageableRect.Top
+               && left.ImageableRect.Width == right.ImageableRect.Width
+               && left.ImageableRect.Height == right.ImageableRect.Height;
     }
 }

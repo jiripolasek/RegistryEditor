@@ -121,9 +121,7 @@ internal static class JournalCaptureTests
                 capped.Write(new byte[4], 0, 4);
                 capped.Write(new byte[4].AsSpan());
                 Reject(() => capped.WriteByte(9));
-                check(
-                    target.Length == 8,
-                    "Both write paths permit the exact file cap and reject excess before forwarding");
+                check(target.Length == 8, "Both write paths permit the exact file cap and reject excess before forwarding");
             }
 
             target.WriteByte(9);
@@ -169,9 +167,8 @@ internal static class JournalCaptureTests
                 !ran && raw.ReadValue(single, "value")!.SameData(large) && Empty("single"),
                 "An oversized before-state leaves the registry and history untouched");
             check(
-                raw.Read(single).Values.Single().Data.Length == large.Data.Length &&
-                RegistryBranchSnapshot.Capture(raw, single).Keys.Single().Values.Single().Data.Length ==
-                large.Data.Length,
+                raw.Read(single).Values.Single().Data.Length == large.Data.Length
+                && RegistryBranchSnapshot.Capture(raw, single).Keys.Single().Values.Single().Data.Length == large.Data.Length,
                 "Unjournaled reads and manual snapshots retain their full data without the journal budget");
 
             journal = Journal("incoming");
@@ -209,8 +206,7 @@ internal static class JournalCaptureTests
             journal = Journal("scopes");
             ran = false;
             Reject(() => journal.Execute(
-                "Edit value", [new JournalScope(first, ["value"]), new JournalScope(second, ["value"])],
-                () => ran = true));
+                "Edit value", [new JournalScope(first, ["value"]), new JournalScope(second, ["value"])], () => ran = true));
             check(!ran && Empty("scopes"), "Multiple before-state scopes share one capture budget");
 
             var wide = Key("Wide");
@@ -220,9 +216,7 @@ internal static class JournalCaptureTests
             }
 
             Reject(() => raw.Read(wide, new JournalCaptureBudget(1024)));
-            check(
-                raw.SubKeys(wide).Length == 20,
-                "A wide key is rejected using its minimum child metadata before enumeration");
+            check(raw.SubKeys(wide).Length == 20, "A wide key is rejected using its minimum child metadata before enumeration");
             var names = Key("Names");
             for (var i = 0; i < 20; i++)
             {
@@ -241,29 +235,23 @@ internal static class JournalCaptureTests
             Reject(() => raw.Read(longNames, new JournalCaptureBudget(4096)));
             var ordered = raw.Read(longNames, new JournalCaptureBudget(16 * 1024));
             check(
-                ordered.Values.Select(item => item.Name)
-                    .SequenceEqual(raw.Read(longNames).Values.Select(item => item.Name)),
+                ordered.Values.Select(item => item.Name).SequenceEqual(raw.Read(longNames).Values.Select(item => item.Name)),
                 "Incremental native name enumeration bounds long names and preserves ordinary ordering");
             journal = Journal("scope-names");
             ran = false;
-            Reject(() => journal.Execute(
-                "Edit value", [new JournalScope(root, [new string('n', 4096)])], () => ran = true));
-            check(
-                !ran && Empty("scope-names"),
-                "Supplied scope names are bounded before normalization copies their arrays");
+            Reject(() => journal.Execute("Edit value", [new JournalScope(root, [new string('n', 4096)])], () => ran = true));
+            check(!ran && Empty("scope-names"), "Supplied scope names are bounded before normalization copies their arrays");
 
             var secured = Key("Security");
             using (var user = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, secured.View))
-            using (var key = user.OpenSubKey(
-                       secured.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.FullControl)!)
+            using (var key = user.OpenSubKey(secured.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.FullControl)!)
             {
                 var security = key.GetAccessControl();
                 for (var i = 1000; i < 1100; i++)
                 {
                     security.AddAccessRule(
                         new RegistryAccessRule(
-                            new SecurityIdentifier("S-1-5-21-1-2-3-" + i), RegistryRights.ReadKey,
-                            AccessControlType.Allow));
+                            new SecurityIdentifier("S-1-5-21-1-2-3-" + i), RegistryRights.ReadKey, AccessControlType.Allow));
                 }
 
                 key.SetAccessControl(security);
@@ -289,16 +277,15 @@ internal static class JournalCaptureTests
             journal = Journal("legacy-restore");
             Reject(() => journal.Revert(journal.ReadEntries().Single().Id));
             check(
-                raw.ReadValue(legacy, "value")!.Data.SequenceEqual(new byte[] { 1 }) &&
-                File.ReadAllBytes(legacyFile).SequenceEqual(legacyBytes) &&
-                Directory.GetFiles(legacyFolder, "*.json").Length == 1,
+                raw.ReadValue(legacy, "value")!.Data.SequenceEqual(new byte[] { 1 })
+                && File.ReadAllBytes(legacyFile).SequenceEqual(legacyBytes)
+                && Directory.GetFiles(legacyFolder, "*.json").Length == 1,
                 "Revert refuses a known oversized legacy restoration before mutation or new history");
 
             var duplicate = Key("DuplicateNames");
             raw.Write(duplicate, new RegistryValue("value", RegistryValueType.Binary, [7]), null);
             journal = Journal("duplicate-names");
-            journal.Execute(
-                "Edit value", [new JournalScope(duplicate, Enumerable.Repeat("value", 100).ToArray())], () => { });
+            journal.Execute("Edit value", [new JournalScope(duplicate, Enumerable.Repeat("value", 100).ToArray())], () => { });
             check(
                 journal.ReadEntries().Single().Before.Single().Scope.ValueNames!.Length == 1,
                 "Repeated supplied value names normalize once without charging duplicate targets");
@@ -313,16 +300,16 @@ internal static class JournalCaptureTests
             Reject(() => journal.Execute(
                 "Edit value", [new JournalScope(afterFirst, ["value"]), new JournalScope(afterSecond, ["value"])], () =>
                 {
-                    beforeScopes = File.ReadAllBytes(
-                        Directory.GetFiles(Path.Combine(folder.FullName, "after-scopes"), "*.json").Single());
+                    beforeScopes = File.ReadAllBytes(Directory.GetFiles(Path.Combine(folder.FullName, "after-scopes"), "*.json").Single());
                     raw.Write(afterFirst, small with { Data = new byte[4096] }, small);
                     raw.Write(afterSecond, small with { Data = new byte[4096] }, small);
                 }));
             check(
-                journal.ReadEntries().Single().Before.Length == 2 &&
-                File.ReadAllBytes(Directory.GetFiles(Path.Combine(folder.FullName, "after-scopes"), "*.json").Single())
-                    .SequenceEqual(beforeScopes!) && raw.ReadValue(afterFirst, "value")!.Data.Length == 4096 &&
-                raw.ReadValue(afterSecond, "value")!.Data.Length == 4096,
+                journal.ReadEntries().Single().Before.Length == 2
+                && File.ReadAllBytes(Directory.GetFiles(Path.Combine(folder.FullName, "after-scopes"), "*.json").Single())
+                    .SequenceEqual(beforeScopes!)
+                && raw.ReadValue(afterFirst, "value")!.Data.Length == 4096
+                && raw.ReadValue(afterSecond, "value")!.Data.Length == 4096,
                 "All after-state scopes share the same budget already consumed by their before-states");
 
             var blocked = Key("BlockedReplace");
@@ -335,8 +322,7 @@ internal static class JournalCaptureTests
                 Reject(() => journal.Execute(
                     "Edit value", [new JournalScope(blocked, ["value"])], () =>
                     {
-                        var path = Directory.GetFiles(Path.Combine(folder.FullName, "blocked-replace"), "*.json")
-                            .Single();
+                        var path = Directory.GetFiles(Path.Combine(folder.FullName, "blocked-replace"), "*.json").Single();
                         blockedBefore = File.ReadAllBytes(path);
                         reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
                         raw.Write(blocked, small with { Data = [2] }, small);
@@ -348,27 +334,22 @@ internal static class JournalCaptureTests
             }
 
             check(
-                File.ReadAllBytes(
-                        Directory.GetFiles(Path.Combine(folder.FullName, "blocked-replace"), "*.json").Single())
-                    .SequenceEqual(blockedBefore!) && journal.ReadEntries().Single().After is null &&
-                Directory.GetFiles(Path.Combine(folder.FullName, "blocked-replace"), "*.tmp").Length == 0,
+                File.ReadAllBytes(Directory.GetFiles(Path.Combine(folder.FullName, "blocked-replace"), "*.json").Single())
+                    .SequenceEqual(blockedBefore!)
+                && journal.ReadEntries().Single().After is null
+                && Directory.GetFiles(Path.Combine(folder.FullName, "blocked-replace"), "*.tmp").Length == 0,
                 "Failed atomic replacement preserves the durable pending file and removes the flushed temporary file");
             journal.RecordActivity("After replacement failure", blocked, "test", () => { });
-            check(
-                journal.ReadEntries().Length == 2,
-                "An existing pending file reopens and the next writer runs after replacement failure");
+            check(journal.ReadEntries().Length == 2, "An existing pending file reopens and the next writer runs after replacement failure");
 
             var initial = Key("InitialFile");
             journal = Journal("initial-file", 8192, 1024);
             ran = false;
             Reject(() => journal.Execute(new string('x', 4096), [new JournalScope(initial)], () => ran = true));
-            check(
-                !ran && Empty("initial-file"),
-                "An oversized initial serialized record invokes no mutation and leaks no temporary file");
+            check(!ran && Empty("initial-file"), "An oversized initial serialized record invokes no mutation and leaks no temporary file");
 
             var revert = Key("Revert");
-            var original = new RegistryValue(
-                "value", RegistryValueType.Binary, Enumerable.Repeat((byte)1, 2048).ToArray());
+            var original = new RegistryValue("value", RegistryValueType.Binary, Enumerable.Repeat((byte)1, 2048).ToArray());
             var replacement = original with { Data = Enumerable.Repeat((byte)2, 2048).ToArray() };
             raw.Write(revert, original, null);
             journal = Journal("revert");
@@ -381,13 +362,11 @@ internal static class JournalCaptureTests
             var existing = Directory.GetFiles(Path.Combine(folder.FullName, "revert"), "*.json")
                 .ToDictionary(file => file, File.ReadAllBytes);
             var tiny = Journal("revert", 64);
-            check(
-                tiny.ReadEntries().Length == 2,
-                "Small new capture limits do not restrict loading compatible historical entries");
+            check(tiny.ReadEntries().Length == 2, "Small new capture limits do not restrict loading compatible historical entries");
             Reject(() => tiny.Revert(journal.ReadEntries().Last().Id));
             check(
-                existing.All(pair => File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value)) &&
-                Directory.GetFiles(Path.Combine(folder.FullName, "revert"), "*.json").Length == 2,
+                existing.All(pair => File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value))
+                && Directory.GetFiles(Path.Combine(folder.FullName, "revert"), "*.json").Length == 2,
                 "An oversized Revert preserves existing historical files byte for byte");
 
             RegistryLocation Key(string name)
@@ -403,9 +382,9 @@ internal static class JournalCaptureTests
 
             bool Empty(string name)
             {
-                return !Directory.Exists(Path.Combine(folder.FullName, name)) ||
-                       Directory.GetFiles(Path.Combine(folder.FullName, name), "*.json").Length == 0 &&
-                       Directory.GetFiles(Path.Combine(folder.FullName, name), "*.tmp").Length == 0;
+                return !Directory.Exists(Path.Combine(folder.FullName, name))
+                       || Directory.GetFiles(Path.Combine(folder.FullName, name), "*.json").Length == 0
+                       && Directory.GetFiles(Path.Combine(folder.FullName, name), "*.tmp").Length == 0;
             }
 
             void FinalFailure(string name, long capture, long file, int bytes, bool failMutation)
@@ -418,8 +397,7 @@ internal static class JournalCaptureTests
                 var failed = Reject(() => writer.Execute(
                     "Edit value", [new JournalScope(target)], () =>
                     {
-                        pending = File.ReadAllBytes(
-                            Directory.GetFiles(Path.Combine(folder.FullName, name), "*.json").Single());
+                        pending = File.ReadAllBytes(Directory.GetFiles(Path.Combine(folder.FullName, name), "*.json").Single());
                         raw.Write(target, before with { Data = new byte[bytes] }, before);
                         if (failMutation)
                         {
@@ -429,26 +407,25 @@ internal static class JournalCaptureTests
                 var files = Directory.GetFiles(Path.Combine(folder.FullName, name), "*.json");
                 var saved = new RegistryJournal(Path.Combine(folder.FullName, name)).ReadEntries().Single();
                 check(
-                    pending is not null && File.ReadAllBytes(files.Single()).SequenceEqual(pending) &&
-                    saved.After is null &&
-                    saved.Before.Single().Snapshot.Keys.Single().Values.Single().SameData(before) &&
-                    raw.ReadValue(target, "value")!.Data.Length == bytes &&
-                    saved.RevertUnavailableReason(new HashSet<Guid>()) is not null &&
-                    failed.Message.Contains("before-state is retained") &&
-                    Directory.GetFiles(Path.Combine(folder.FullName, name), "*.tmp").Length == 0,
+                    pending is not null
+                    && File.ReadAllBytes(files.Single()).SequenceEqual(pending)
+                    && saved.After is null
+                    && saved.Before.Single().Snapshot.Keys.Single().Values.Single().SameData(before)
+                    && raw.ReadValue(target, "value")!.Data.Length == bytes
+                    && saved.RevertUnavailableReason(new HashSet<Guid>()) is not null
+                    && failed.Message.Contains("before-state is retained")
+                    && Directory.GetFiles(Path.Combine(folder.FullName, name), "*.tmp").Length == 0,
                     "Failed final capture or serialization retains exact reloadable pending bytes: " + name);
                 if (failMutation)
                 {
                     check(
-                        failed.InnerException is AggregateException errors &&
-                        errors.InnerExceptions.Any(error => error.Message == "mutation fixture"),
+                        failed.InnerException is AggregateException errors
+                        && errors.InnerExceptions.Any(error => error.Message == "mutation fixture"),
                         "Final capture failure preserves the original mutation failure");
                 }
 
                 writer.RecordActivity("After failure", target, "test", () => { });
-                check(
-                    writer.ReadEntries().Length == 2,
-                    "Capture/persistence failure releases all files for the next writer: " + name);
+                check(writer.ReadEntries().Length == 2, "Capture/persistence failure releases all files for the next writer: " + name);
             }
         }
         finally

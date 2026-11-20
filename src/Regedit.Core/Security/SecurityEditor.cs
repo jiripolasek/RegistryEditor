@@ -112,14 +112,11 @@ public sealed partial class RegistrySecurityInformation : ISecurityInformation, 
         for (var i = 0; i < rights.Length; i++)
         {
             Marshal.StructureToPtr(
-                new SecurityAccess
-                {
-                    Mask = rights[i].Mask, Name = this.Text(rights[i].Name), Flags = i < 2 ? 0x30000u : 0x10000u
-                }, this._access + i * Marshal.SizeOf<SecurityAccess>(), false);
+                new SecurityAccess { Mask = rights[i].Mask, Name = this.Text(rights[i].Name), Flags = i < 2 ? 0x30000u : 0x10000u },
+                this._access + i * Marshal.SizeOf<SecurityAccess>(), false);
         }
 
-        (string Name, uint Flags)[] inheritance =
-            [("This key only", 0), ("This key and subkeys", 2), ("Subkeys only", 10)];
+        (string Name, uint Flags)[] inheritance = [("This key only", 0), ("This key and subkeys", 2), ("Subkeys only", 10)];
         this._inherit = this.Allocate(Marshal.SizeOf<SecurityInherit>() * inheritance.Length);
         for (var i = 0; i < inheritance.Length; i++)
         {
@@ -127,20 +124,6 @@ public sealed partial class RegistrySecurityInformation : ISecurityInformation, 
                 new SecurityInherit { Flags = inheritance[i].Flags, Name = this.Text(inheritance[i].Name) },
                 this._inherit + i * Marshal.SizeOf<SecurityInherit>(), false);
         }
-    }
-
-    private nint Text(string value)
-    {
-        var pointer = Marshal.StringToHGlobalUni(value);
-        this._allocations.Add(pointer);
-        return pointer;
-    }
-
-    private nint Allocate(int size)
-    {
-        var pointer = Marshal.AllocHGlobal(size);
-        this._allocations.Add(pointer);
-        return pointer;
     }
 
     public void Dispose()
@@ -151,16 +134,6 @@ public sealed partial class RegistrySecurityInformation : ISecurityInformation, 
         }
 
         this._allocations.Clear();
-    }
-
-    private RegistryKey Open(uint rights)
-    {
-        using var root = this._location.Machine is null
-            ? RegistryKey.OpenBaseKey(this._location.Hive!.Value, this._location.View)
-            : RemoteRegistryCredentials.OpenBaseKey(
-                this._location.Hive!.Value, this._location.Machine, this._location.View);
-        return root.OpenSubKey(this._location.SubKey, RegistryKeyPermissionCheck.Default, (RegistryRights)rights) ??
-               throw new IOException("The registry key no longer exists.");
     }
 
     public int GetObjectInformation(out SecurityObjectInfo info)
@@ -180,8 +153,7 @@ public sealed partial class RegistrySecurityInformation : ISecurityInformation, 
         try
         {
             using var key = this.Open((requested & 8) != 0 ? 0x1020000u : 0x20000u);
-            var result = SecurityNative.GetSecurityInfo(
-                key.Handle, 4, requested, out _, out _, out _, out _, out descriptor);
+            var result = SecurityNative.GetSecurityInfo(key.Handle, 4, requested, out _, out _, out _, out _, out descriptor);
             // ACLUI owns this LocalAlloc descriptor and releases it with LocalFree.
             return HResult(result);
         }
@@ -205,45 +177,6 @@ public sealed partial class RegistrySecurityInformation : ISecurityInformation, 
                 $"Native Windows permission change (flags 0x{requested:X}). Previous access rules are not retained for automatic revert.",
                 () => Marshal.ThrowExceptionForHR(this.SetSecurityCore(requested, descriptor)));
             return 0;
-        }
-        catch (Exception ex)
-        {
-            return Marshal.GetHRForException(ex);
-        }
-    }
-
-    private int SetSecurityCore(uint requested, nint descriptor)
-    {
-        try
-        {
-            nint owner = 0, group = 0, dacl = 0, sacl = 0;
-            uint rights = 0;
-            if ((requested & 1) != 0)
-            {
-                CheckBool(SecurityNative.GetSecurityDescriptorOwner(descriptor, out owner, out _));
-                rights |= 0x80000;
-            }
-
-            if ((requested & 2) != 0)
-            {
-                CheckBool(SecurityNative.GetSecurityDescriptorGroup(descriptor, out group, out _));
-                rights |= 0x80000;
-            }
-
-            if ((requested & 4) != 0)
-            {
-                CheckBool(SecurityNative.GetSecurityDescriptorDacl(descriptor, out _, out dacl, out _));
-                rights |= 0x40000;
-            }
-
-            if ((requested & 8) != 0)
-            {
-                CheckBool(SecurityNative.GetSecurityDescriptorSacl(descriptor, out _, out sacl, out _));
-                rights |= 0x1000000;
-            }
-
-            using var key = this.Open(rights);
-            return HResult(SecurityNative.SetSecurityInfo(key.Handle, 4, requested, owner, group, dacl, sacl));
         }
         catch (Exception ex)
         {
@@ -298,6 +231,68 @@ public sealed partial class RegistrySecurityInformation : ISecurityInformation, 
         return 0;
     }
 
+    private nint Text(string value)
+    {
+        var pointer = Marshal.StringToHGlobalUni(value);
+        this._allocations.Add(pointer);
+        return pointer;
+    }
+
+    private nint Allocate(int size)
+    {
+        var pointer = Marshal.AllocHGlobal(size);
+        this._allocations.Add(pointer);
+        return pointer;
+    }
+
+    private RegistryKey Open(uint rights)
+    {
+        using var root = this._location.Machine is null
+            ? RegistryKey.OpenBaseKey(this._location.Hive!.Value, this._location.View)
+            : RemoteRegistryCredentials.OpenBaseKey(this._location.Hive!.Value, this._location.Machine, this._location.View);
+        return root.OpenSubKey(this._location.SubKey, RegistryKeyPermissionCheck.Default, (RegistryRights)rights)
+               ?? throw new IOException("The registry key no longer exists.");
+    }
+
+    private int SetSecurityCore(uint requested, nint descriptor)
+    {
+        try
+        {
+            nint owner = 0, group = 0, dacl = 0, sacl = 0;
+            uint rights = 0;
+            if ((requested & 1) != 0)
+            {
+                CheckBool(SecurityNative.GetSecurityDescriptorOwner(descriptor, out owner, out _));
+                rights |= 0x80000;
+            }
+
+            if ((requested & 2) != 0)
+            {
+                CheckBool(SecurityNative.GetSecurityDescriptorGroup(descriptor, out group, out _));
+                rights |= 0x80000;
+            }
+
+            if ((requested & 4) != 0)
+            {
+                CheckBool(SecurityNative.GetSecurityDescriptorDacl(descriptor, out _, out dacl, out _));
+                rights |= 0x40000;
+            }
+
+            if ((requested & 8) != 0)
+            {
+                CheckBool(SecurityNative.GetSecurityDescriptorSacl(descriptor, out _, out sacl, out _));
+                rights |= 0x1000000;
+            }
+
+            using var key = this.Open(rights);
+            return HResult(SecurityNative.SetSecurityInfo(key.Handle, 4, requested, owner, group, dacl, sacl));
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
+    }
+
     private static int HResult(uint error)
     {
         return error == 0 ? 0 : unchecked((int)(0x80070000 | error));
@@ -342,16 +337,8 @@ internal static partial class SecurityNative
     internal static partial int GetSecurityDescriptorGroup(nint descriptor, out nint group, out int defaulted);
 
     [LibraryImport("advapi32.dll", SetLastError = true)]
-    internal static partial int GetSecurityDescriptorDacl(
-        nint descriptor,
-        out int present,
-        out nint dacl,
-        out int defaulted);
+    internal static partial int GetSecurityDescriptorDacl(nint descriptor, out int present, out nint dacl, out int defaulted);
 
     [LibraryImport("advapi32.dll", SetLastError = true)]
-    internal static partial int GetSecurityDescriptorSacl(
-        nint descriptor,
-        out int present,
-        out nint sacl,
-        out int defaulted);
+    internal static partial int GetSecurityDescriptorSacl(nint descriptor, out int present, out nint sacl, out int defaulted);
 }

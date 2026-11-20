@@ -21,31 +21,27 @@ internal static class ComputerRootTests
         var local = RegistryLocation.Parse("Computer\\", RegistryView.Registry32);
         var remote = RegistryLocation.Parse("\\\\SERVER01\\", RegistryView.Registry32);
         check(
-            local.IsComputer && local.Address == "Computer" && local.GetNavigationParent() is null,
-            "Computer address is a navigable root");
+            local.IsComputer && local.Address == "Computer" && local.GetNavigationParent() is null, "Computer address is a navigable root");
         check(
             remote.IsComputer && remote.Name == "SERVER01" && remote.Address == "\\\\SERVER01",
             "Server root addresses round-trip without a hive");
-        check(
-            RegistryLocation.Parse(remote.Address, remote.View) == remote,
-            "Remote root round-trip retains its registry view");
+        check(RegistryLocation.Parse(remote.Address, remote.View) == remote, "Remote root round-trip retains its registry view");
         var localHives = local.GetHives();
         var remoteHives = remote.GetHives();
         check(
-            localHives.Length == 5 && localHives.All(hive =>
-                !hive.IsComputer && hive.Machine is null && hive.View == RegistryView.Registry32),
+            localHives.Length == 5
+            && localHives.All(hive => !hive.IsComputer && hive.Machine is null && hive.View == RegistryView.Registry32),
             "Computer lists five local hives in its selected view");
         check(
-            remoteHives.Select(hive => hive.Hive)
-                .SequenceEqual(new RegistryHive?[] { RegistryHive.LocalMachine, RegistryHive.Users }) &&
-            remoteHives.All(hive => hive.Machine == "SERVER01" && hive.View == RegistryView.Registry32),
+            remoteHives.Select(hive => hive.Hive).SequenceEqual(new RegistryHive?[] { RegistryHive.LocalMachine, RegistryHive.Users })
+            && remoteHives.All(hive => hive.Machine == "SERVER01" && hive.View == RegistryView.Registry32),
             "Server lists only its supported remote hives");
         check(
             remoteHives.All(hive => hive.GetNavigationParent() == remote && hive.Parent is null),
             "Hive navigation reaches the computer without giving hives a mutable key parent");
         check(
-            remote.GetScopeRoots().SequenceEqual(remoteHives) && local.GetScopeRoots().SequenceEqual(
-                localHives.Where(hive => hive.Hive is RegistryHive.LocalMachine or RegistryHive.Users)),
+            remote.GetScopeRoots().SequenceEqual(remoteHives)
+            && local.GetScopeRoots().SequenceEqual(localHives.Where(hive => hive.Hive is RegistryHive.LocalMachine or RegistryHive.Users)),
             "Whole-computer search, print and export visit only HKLM and HKU in the selected view");
         check(
             localHives.All(hive => hive.GetScopeRoots().SequenceEqual([hive])),
@@ -96,19 +92,16 @@ internal static class ComputerRootTests
         check(restored.Tabs.SequenceEqual(workspace.Tabs), "Workspaces retain computer roots alongside key tabs");
         var tab = JsonSerializer.Deserialize<SavedTab>(JsonSerializer.Serialize(new SavedTab(remote.Address, true)))!;
         check(
-            RegistryLocation.Parse(tab.Address, tab.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64) ==
-            remote, "Saved tabs restore a server root and view");
-        check(
-            new Favorite("Server", remote.Address, true).Matches(remote), "Favorites can navigate to a computer root");
+            RegistryLocation.Parse(tab.Address, tab.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64) == remote,
+            "Saved tabs restore a server root and view");
+        check(new Favorite("Server", remote.Address, true).Matches(remote), "Favorites can navigate to a computer root");
 
         var journalFolder = Directory.CreateTempSubdirectory("RegeditComputerRoot.");
         try
         {
             var journal = new RegistryJournal(journalFolder.FullName);
             journal.RecordActivity("Computer activity", local, "Test activity without registry changes", () => { });
-            check(
-                journal.ReadEntries().Single().ActivityLocation == local,
-                "Whole-computer activities retain their scope in the journal");
+            check(journal.ReadEntries().Single().ActivityLocation == local, "Whole-computer activities retain their scope in the journal");
         }
         finally
         {
@@ -126,8 +119,8 @@ internal static class ComputerRootTests
             viewModel.Location == local && !viewModel.CanGoUp && !viewModel.IsKeyLocation && viewModel.HasSubKeys,
             "Up from a hive opens its computer and disables key editing");
         check(
-            viewModel.Entries.Count == 5 && viewModel.Entries.All(entry =>
-                entry.IsKey && entry.Type == "Hive" && !entry.IsDefaultPlaceholder),
+            viewModel.Entries.Count == 5
+            && viewModel.Entries.All(entry => entry.IsKey && entry.Type == "Hive" && !entry.IsDefaultPlaceholder),
             "Computer pane contains only hives with no default value");
         check(
             viewModel.Title == "Computer · 32-bit" && viewModel.Status == "5 hives",
@@ -158,30 +151,26 @@ internal static class ComputerRootTests
             "Typing leaves the current list in place and invalidates edit selection immediately");
         await Task.WhenAll(firstFilter, viewModel.PendingFilter);
         check(
-            entryUpdates == 1 && viewModel.Entries.Count == 1 &&
-            viewModel.Entries[0].Key!.Hive == RegistryHive.LocalMachine,
+            entryUpdates == 1 && viewModel.Entries.Count == 1 && viewModel.Entries[0].Key!.Hive == RegistryHive.LocalMachine,
             "A typing burst publishes only the final matching list");
         viewModel.Filter = "USERS";
         var clearedFilter = viewModel.PendingFilter;
         viewModel.Filter = string.Empty;
         await clearedFilter;
-        check(
-            viewModel.Entries.Count == 2 && entryUpdates == 2,
-            "Clearing the text restores rows immediately and cancels the old match");
+        check(viewModel.Entries.Count == 2 && entryUpdates == 2, "Clearing the text restores rows immediately and cancels the old match");
         viewModel.Filter = "missing";
         var previousLocationFilter = viewModel.PendingFilter;
         await viewModel.BackCommand.ExecuteAsync(null);
         await previousLocationFilter;
-        check(
-            viewModel.Filter.Length == 0 && viewModel.Entries.Count == 5,
-            "Pending filter results cannot replace another key's rows");
+        check(viewModel.Filter.Length == 0 && viewModel.Entries.Count == 5, "Pending filter results cannot replace another key's rows");
         check(viewModel.Location == local, "Back restores the previous computer root");
         await viewModel.ForwardCommand.ExecuteAsync(null);
         check(viewModel.Location == remote, "Forward restores the server root");
         await viewModel.NavigateAsync(remote with { View = RegistryView.Registry64 });
         check(
-            !viewModel.Is32Bit && viewModel.Title == "SERVER01" &&
-            viewModel.Entries.All(entry => entry.Key!.View == RegistryView.Registry64),
+            !viewModel.Is32Bit
+            && viewModel.Title == "SERVER01"
+            && viewModel.Entries.All(entry => entry.Key!.View == RegistryView.Registry64),
             "Changing the computer view updates every listed hive");
 
         if (!registryTests)
@@ -222,8 +211,6 @@ internal static class ComputerRootTests
             viewModel.Error is null && viewModel.Location == hive && viewModel.IsKeyLocation,
             "Opening an overview hive reads the actual registry and enables editing");
         await viewModel.BackCommand.ExecuteAsync(null);
-        check(
-            viewModel.Location == hive.GetComputer() && viewModel.Entries.Count == 5,
-            "Back from an opened hive restores the overview");
+        check(viewModel.Location == hive.GetComputer() && viewModel.Entries.Count == 5, "Back from an opened hive restores the overview");
     }
 }

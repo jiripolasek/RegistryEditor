@@ -13,8 +13,7 @@ public partial class App
     private void OpenNotificationPrototype()
     {
         var window = new NotificationPrototypeWindow(
-            this.OpenNotificationPrototype,
-            error => this._logger.LogFailure(LogLevel.Warning, "Notification action", error));
+            this.OpenNotificationPrototype, error => this._logger.LogFailure(LogLevel.Warning, "Notification action", error));
         this._windows.Add(window);
         window.Closed += (_, _) =>
         {

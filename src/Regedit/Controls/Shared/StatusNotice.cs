@@ -21,8 +21,7 @@ internal static class StatusNotice
         bar.Title = title;
         bar.Message = message;
         bar.Severity = severity;
-        var peer = FrameworkElementAutomationPeer.FromElement(bar) ??
-                   FrameworkElementAutomationPeer.CreatePeerForElement(bar);
+        var peer = FrameworkElementAutomationPeer.FromElement(bar) ?? FrameworkElementAutomationPeer.CreatePeerForElement(bar);
         bar.IsOpen = true;
         // InfoBar announces its native opening, but not changes while it remains open.
         if (wasOpen)
@@ -31,8 +30,7 @@ internal static class StatusNotice
                 AutomationNotificationKind.Other,
                 severity is InfoBarSeverity.Error or InfoBarSeverity.Warning
                     ? AutomationNotificationProcessing.ImportantAll
-                    : AutomationNotificationProcessing.CurrentThenMostRecent, title + Environment.NewLine + message,
-                "RegistryStatus");
+                    : AutomationNotificationProcessing.CurrentThenMostRecent, title + Environment.NewLine + message, "RegistryStatus");
         }
     }
 }

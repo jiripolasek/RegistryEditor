@@ -22,9 +22,7 @@ internal sealed class FindOptionsViewModel(RegistryLocation location, string que
 
     public bool MatchCase { get; set; } = previous?.MatchCase ?? false;
 
-    public string Types { get; set; } = previous?.Types is { } types
-        ? string.Join(", ", types.Select(type => (uint)type))
-        : string.Empty;
+    public string Types { get; set; } = previous?.Types is { } types ? string.Join(", ", types.Select(type => (uint)type)) : string.Empty;
 
     public bool CanChooseScope => !location.IsComputer;
 
@@ -41,11 +39,9 @@ internal sealed class FindOptionsViewModel(RegistryLocation location, string que
         }
 
         var options = new SearchOptions(
-            this.Query, this.Keys, this.Values, this.Data, this.MatchCase, this.Whole,
-            RegistrySearch.ParseTypes(this.Types));
+            this.Query, this.Keys, this.Values, this.Data, this.MatchCase, this.Whole, RegistrySearch.ParseTypes(this.Types));
         var name = string.IsNullOrWhiteSpace(this.Query) ? "Registry search" : this.Query;
-        var search = new SavedSearch(
-            name, location.GetScopeRoots(location.IsComputer || this.ScopeIndex == 1), options);
+        var search = new SavedSearch(name, location.GetScopeRoots(location.IsComputer || this.ScopeIndex == 1), options);
         RegistrySearch.Validate(search);
         return search;
     }

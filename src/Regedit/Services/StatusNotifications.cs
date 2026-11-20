@@ -32,9 +32,7 @@ internal static class StatusNotifications
             Message = message,
             Severity = severity,
             Key = key,
-            Duration = kind is NoticeKind.Warning or NoticeKind.Error || actions is { Count: > 0 }
-                ? null
-                : TimeSpan.FromSeconds(6),
+            Duration = kind is NoticeKind.Warning or NoticeKind.Error || actions is { Count: > 0 } ? null : TimeSpan.FromSeconds(6),
             Actions = actions ?? []
         };
     }

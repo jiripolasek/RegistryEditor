@@ -14,9 +14,19 @@ namespace JPSoftworks.Regedit.ViewModels.Shell;
 
 internal sealed partial class MainWindowViewModel
 {
+    internal event Action? SearchFocusRequested;
+
     private SearchResultsViewModel? _activeSearch;
 
-    internal event Action? SearchFocusRequested;
+    public ObservableCollection<WindowTab> BottomTabs { get; } = [];
+
+    [ObservableProperty]
+    public partial WindowTab? ActiveBottomTab { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsBottomPaneOpen { get; set; }
+
+    public double BottomPaneHeight { get; private set; } = 240;
 
     partial void OnActiveBottomTabChanged(WindowTab? value)
     {
@@ -45,8 +55,7 @@ internal sealed partial class MainWindowViewModel
         var browser = destination.Browser;
         if (search.SelectNext() is not { } match)
         {
-            browser.Search.ReportStatus(
-                $"{search.Title} · " + (search.IsBusy ? "Searching for more matches…" : "No more results."));
+            browser.Search.ReportStatus($"{search.Title} · " + (search.IsBusy ? "Searching for more matches…" : "No more results."));
             return;
         }
 
@@ -58,8 +67,10 @@ internal sealed partial class MainWindowViewModel
             this._searchDestinations[search] = (destination, version);
             await navigation;
             token.ThrowIfCancellationRequested();
-            if (this._activeSearch != search || this.VisibleBrowser != browser ||
-                !ReferenceEquals(search.Selected, selected) || browser.NavigationVersion != version)
+            if (this._activeSearch != search
+                || this.VisibleBrowser != browser
+                || !ReferenceEquals(search.Selected, selected)
+                || browser.NavigationVersion != version)
             {
                 return;
             }
@@ -84,16 +95,6 @@ internal sealed partial class MainWindowViewModel
         }
     }
 
-    public ObservableCollection<WindowTab> BottomTabs { get; } = [];
-
-    [ObservableProperty]
-    public partial WindowTab? ActiveBottomTab { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsBottomPaneOpen { get; set; }
-
-    public double BottomPaneHeight { get; private set; } = 240;
-
     internal void ShowBottomPane()
     {
         if (this.BottomTabs.Count == 0)
@@ -114,8 +115,7 @@ internal sealed partial class MainWindowViewModel
 
     internal void OpenBottomTool(ToolKind tool)
     {
-        var tab = this.BottomTabs.Concat(this.Tabs).OfType<ToolTab>().FirstOrDefault(tab => tab.Tool == tool) ??
-                  new ToolTab(tool);
+        var tab = this.BottomTabs.Concat(this.Tabs).OfType<ToolTab>().FirstOrDefault(tab => tab.Tool == tool) ?? new ToolTab(tool);
         this.DockTab(tab);
     }
 
@@ -159,9 +159,7 @@ internal sealed partial class MainWindowViewModel
         this.BottomTabs.Remove(tab);
         if (this.ActiveBottomTab == tab)
         {
-            this.ActiveBottomTab = this.BottomTabs.Count == 0
-                ? null
-                : this.BottomTabs[Math.Min(index, this.BottomTabs.Count - 1)];
+            this.ActiveBottomTab = this.BottomTabs.Count == 0 ? null : this.BottomTabs[Math.Min(index, this.BottomTabs.Count - 1)];
         }
 
         this.IsBottomPaneOpen &= this.BottomTabs.Count > 0;
@@ -177,9 +175,7 @@ internal sealed partial class MainWindowViewModel
 
         var index = this.BottomTabs.IndexOf(tab);
         this.BottomTabs.Remove(tab);
-        this.ActiveBottomTab = this.BottomTabs.Count == 0
-            ? null
-            : this.BottomTabs[Math.Min(index, this.BottomTabs.Count - 1)];
+        this.ActiveBottomTab = this.BottomTabs.Count == 0 ? null : this.BottomTabs[Math.Min(index, this.BottomTabs.Count - 1)];
         this.IsBottomPaneOpen &= this.BottomTabs.Count > 0;
         this.SelectTab(tab);
     }

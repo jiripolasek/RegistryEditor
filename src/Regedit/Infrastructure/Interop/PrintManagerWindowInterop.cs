@@ -63,8 +63,7 @@ internal static partial class PrintManagerWindowInterop
     [GeneratedComClass]
     internal sealed partial class CompletionHandler : ICompletionHandler
     {
-        internal TaskCompletionSource<AsyncStatus> Finished { get; }
-            = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource<AsyncStatus> Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Invoke(nint operation, AsyncStatus status)
         {

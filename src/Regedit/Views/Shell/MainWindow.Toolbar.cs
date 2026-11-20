@@ -38,8 +38,7 @@ public sealed partial class MainWindow
                 {
                     IconSource = new FontIconSource
                     {
-                        FontFamily = new FontFamily(ToolPresentation.FluentSystemIconsFontFamily),
-                        Glyph = "\uF56B"
+                        FontFamily = new FontFamily(ToolPresentation.FluentSystemIconsFontFamily), Glyph = "\uF56B"
                     },
                     AutomationId = "ToolbarNotes",
                     ToolTip = "Open Notes in the right sidebar",
@@ -136,9 +135,7 @@ public sealed partial class MainWindow
                 items.Add(new MenuFlyoutSeparator());
             }
 
-            MenuFlyoutItem item = command.IsToggle
-                ? new ToggleMenuFlyoutItem { IsChecked = command.IsChecked }
-                : new MenuFlyoutItem();
+            MenuFlyoutItem item = command.IsToggle ? new ToggleMenuFlyoutItem { IsChecked = command.IsChecked } : new MenuFlyoutItem();
             item.Text = command.Label;
             item.KeyboardAcceleratorTextOverride = command.ShortcutText ?? string.Empty;
             item.Icon = command.IconSource is { } source
@@ -190,8 +187,7 @@ public sealed partial class MainWindow
                 Command = this.Preferences.HideToolbarButtonCommand,
                 CommandParameter = button
             };
-            hide.Click += (_, _) => this.DispatcherQueue.TryEnqueue(() =>
-                (this.SelectedTabContent as BrowserPage)?.FocusToolsButton());
+            hide.Click += (_, _) => this.DispatcherQueue.TryEnqueue(() => (this.SelectedTabContent as BrowserPage)?.FocusToolsButton());
             menu.Items.Add(hide);
         }
 

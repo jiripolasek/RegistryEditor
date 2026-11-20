@@ -19,6 +19,12 @@ internal sealed partial class FavoritesViewModel(
     Func<RegistryLocation, bool, Task> navigate,
     Action<RegistryLocation> openBackground) : ObservableObject
 {
+    internal event Action<string, Exception>? ActionFailed;
+
+    internal event EventHandler? ItemsChanged;
+
+    internal event EventHandler? SelectionChanged;
+
     internal FavoritesStore Store { get; } = store;
 
     internal bool Compact { get; } = compact;
@@ -34,8 +40,7 @@ internal sealed partial class FavoritesViewModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSingleSelection), nameof(HasSelectedBookmark))]
     [NotifyCanExecuteChangedFor(
-        nameof(OpenCommand), nameof(OpenNewTabCommand), nameof(RenameCommand), nameof(MoveToFolderCommand),
-        nameof(RemoveCommand))]
+        nameof(OpenCommand), nameof(OpenNewTabCommand), nameof(RenameCommand), nameof(MoveToFolderCommand), nameof(RemoveCommand))]
     internal partial IReadOnlyList<FavoriteItemId> Selected { get; private set; } = [];
 
     [ObservableProperty]
@@ -64,24 +69,35 @@ internal sealed partial class FavoritesViewModel(
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(
-        nameof(AddCommand), nameof(NewFolderCommand), nameof(OpenCommand), nameof(OpenNewTabCommand),
-        nameof(OpenBackgroundCommand), nameof(RenameCommand), nameof(MoveToFolderCommand), nameof(MoveUpCommand),
-        nameof(MoveDownCommand), nameof(RemoveCommand), nameof(ToggleDetailsCommand))]
+        nameof(AddCommand), nameof(NewFolderCommand), nameof(OpenCommand), nameof(OpenNewTabCommand), nameof(OpenBackgroundCommand),
+        nameof(RenameCommand), nameof(MoveToFolderCommand), nameof(MoveUpCommand), nameof(MoveDownCommand), nameof(RemoveCommand),
+        nameof(ToggleDetailsCommand))]
     internal partial bool IsBusy { get; private set; }
-
-    internal event Action<string, Exception>? ActionFailed;
 
     internal IReadOnlyList<FavoriteRow> Rows { get; private set; } = [];
 
-    internal FavoriteRow Root { get; private set; } = new(
-        new FavoriteItemId(string.Empty, true), "Favorites", "Favorites", string.Empty);
+    internal FavoriteRow Root { get; private set; } = new(new FavoriteItemId(string.Empty, true), "Favorites", "Favorites", string.Empty);
 
     internal string FolderTitle =>
         this.Store.Folders.FirstOrDefault(folder => folder.Id == this.FolderId)?.Name ?? "Favorites";
 
-    internal event EventHandler? ItemsChanged;
+    private bool Available => !this.IsBusy;
 
-    internal event EventHandler? SelectionChanged;
+    private bool CanAdd => this.Available && (!this.Compact || this.CurrentLocation is not null);
+
+    private bool CanUseSelection => this.Available && this.Selected.Count > 0;
+
+    public bool HasSingleSelection => this.Selected.Count == 1;
+
+    public bool HasSelectedBookmark => this.Selected is [{ IsFolder: false }];
+
+    private bool CanUseSingleItem => this.Available && this.HasSingleSelection;
+
+    private bool CanOpenNewTab => this.Available && this.HasSelectedBookmark;
+
+    private bool CanMoveUp => this.Available && this.CanMove(-1);
+
+    private bool CanMoveDown => this.Available && this.CanMove(1);
 
     internal void Activate()
     {
@@ -175,31 +191,12 @@ internal sealed partial class FavoritesViewModel(
         this.ShowDetails = source.ShowDetails;
     }
 
-    private bool Available => !this.IsBusy;
-
-    private bool CanAdd => this.Available && (!this.Compact || this.CurrentLocation is not null);
-
-    private bool CanUseSelection => this.Available && this.Selected.Count > 0;
-
-    public bool HasSingleSelection => this.Selected.Count == 1;
-
-    public bool HasSelectedBookmark => this.Selected is [{ IsFolder: false }];
-
-    private bool CanUseSingleItem => this.Available && this.HasSingleSelection;
-
-    private bool CanOpenNewTab => this.Available && this.HasSelectedBookmark;
-
-    private bool CanMoveUp => this.Available && this.CanMove(-1);
-
-    private bool CanMoveDown => this.Available && this.CanMove(1);
-
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private Task AddAsync()
     {
         return this.CanAdd
             ? this.RunAsync(
-                this.AddLabel,
-                () => AddFavoriteAsync(this.Store, dialogs, this.Compact ? this.CurrentLocation : null, this.FolderId))
+                this.AddLabel, () => AddFavoriteAsync(this.Store, dialogs, this.Compact ? this.CurrentLocation : null, this.FolderId))
             : Task.CompletedTask;
     }
 
@@ -211,8 +208,7 @@ internal sealed partial class FavoritesViewModel(
         bool onlyIfMissing = false)
     {
         var draft = new Favorite(
-            current?.Name ?? string.Empty, current?.Address ?? string.Empty, current?.View == RegistryView.Registry32,
-            folderId);
+            current?.Name ?? string.Empty, current?.Address ?? string.Empty, current?.View == RegistryView.Registry32, folderId);
         string? error = null;
         while (await dialogs.EditFavoriteAsync(draft, current is not null, store.FolderChoices(), error) is { } edited)
         {
@@ -272,9 +268,7 @@ internal sealed partial class FavoritesViewModel(
     {
         return this.RunAsync(
             "Open in new tab",
-            () => this.Selected is [{ IsFolder: false } item]
-                ? navigate(this.Location(item), true)
-                : Task.CompletedTask);
+            () => this.Selected is [{ IsFolder: false } item] ? navigate(this.Location(item), true) : Task.CompletedTask);
     }
 
     [RelayCommand(CanExecute = nameof(CanUseSingleItem))]
@@ -306,8 +300,7 @@ internal sealed partial class FavoritesViewModel(
             {
                 var items = this.Selected;
                 var excluded = this.Store.Subtree(FavoritesStore.FolderIds(items));
-                if (items.Count > 0 &&
-                    await dialogs.ChooseFolderAsync(this.Store.FolderChoices(excluded), this.FolderId) is { } folder)
+                if (items.Count > 0 && await dialogs.ChooseFolderAsync(this.Store.FolderChoices(excluded), this.FolderId) is { } folder)
                 {
                     this.Store.Move(items, folder.Id.Length == 0 ? null : folder.Id);
                 }
@@ -441,8 +434,7 @@ internal sealed partial class FavoritesViewModel(
     internal RegistryLocation Location(FavoriteItemId item)
     {
         var favorite = this.Store.Bookmark(item.Id);
-        return RegistryLocation.Parse(
-            favorite.Address, favorite.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
+        return RegistryLocation.Parse(favorite.Address, favorite.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
     }
 
     private void Refresh(bool rebuildTree = true)
@@ -459,16 +451,15 @@ internal sealed partial class FavoritesViewModel(
 
         bool Matches(FavoriteRow row)
         {
-            return row.Title.Contains(this.Query, StringComparison.OrdinalIgnoreCase) ||
-                   row.Path.Contains(this.Query, StringComparison.OrdinalIgnoreCase) ||
-                   row.Subtitle.Contains(this.Query, StringComparison.OrdinalIgnoreCase);
+            return row.Title.Contains(this.Query, StringComparison.OrdinalIgnoreCase)
+                   || row.Path.Contains(this.Query, StringComparison.OrdinalIgnoreCase)
+                   || row.Subtitle.Contains(this.Query, StringComparison.OrdinalIgnoreCase);
         }
 
         FavoriteRow Bookmark(Favorite item, bool includeFolder)
         {
             return new FavoriteRow(
-                new FavoriteItemId(item.Id, false), item.Name,
-                item.Address + (item.Is32Bit ? " · 32-bit" : " · 64-bit"),
+                new FavoriteItemId(item.Id, false), item.Name, item.Address + (item.Is32Bit ? " · 32-bit" : " · 64-bit"),
                 includeFolder ? this.Store.FolderPath(item.FolderId) : string.Empty)
             {
                 RegistryPath = item.Address, RegistryView = item.Is32Bit ? "32-bit" : "64-bit"
@@ -478,15 +469,13 @@ internal sealed partial class FavoritesViewModel(
         FavoriteRow Folder(FavoriteFolder folder)
         {
             var id = folder.Id.Length == 0 ? null : folder.Id;
-            var children = byParent[id].Select(Folder)
-                .Where(child => !this.Compact || child.Children.Count > 0 || Matches(child)).ToList();
+            var children = byParent[id].Select(Folder).Where(child => !this.Compact || child.Children.Count > 0 || Matches(child)).ToList();
             if (this.Compact)
             {
                 children.AddRange(byFolder[id].Select(item => Bookmark(item, true)).Where(Matches));
             }
 
-            return new FavoriteRow(
-                new FavoriteItemId(folder.Id, true), folder.Name, this.Store.FolderPath(id), string.Empty)
+            return new FavoriteRow(new FavoriteItemId(folder.Id, true), folder.Name, this.Store.FolderPath(id), string.Empty)
             {
                 Children = children
             };

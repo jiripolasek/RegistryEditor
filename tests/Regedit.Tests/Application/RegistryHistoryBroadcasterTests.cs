@@ -46,14 +46,11 @@ internal static class RegistryHistoryBroadcasterTests
 
             await history.PublishAsync(source, [Change(local)]);
             check(
-                refreshed.Count == 3 && refreshed.Contains(sibling) && refreshed.Contains(peer) &&
-                refreshed.Contains(otherView),
+                refreshed.Count == 3 && refreshed.Contains(sibling) && refreshed.Contains(peer) && refreshed.Contains(otherView),
                 "History refresh reaches loaded tabs in both windows and registry views, excluding its source, other computers and unloaded tabs");
             refreshed.Clear();
             await history.PublishAsync(remote, [Change(remote.Location)]);
-            check(
-                refreshed.SequenceEqual([remotePeer]),
-                "The window history filter compares computer names without case sensitivity");
+            check(refreshed.SequenceEqual([remotePeer]), "The window history filter compares computer names without case sensitivity");
 
             var delivered = false;
             var failing = new RegistryHistoryBroadcaster();
@@ -73,8 +70,7 @@ internal static class RegistryHistoryBroadcasterTests
                 reported = true;
             }
 
-            check(
-                reported && delivered, "A failed refresh is reported after notifying the remaining window subscribers");
+            check(reported && delivered, "A failed refresh is reported after notifying the remaining window subscribers");
             var closed = ClosedWindow(history);
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -95,8 +91,7 @@ internal static class RegistryHistoryBroadcasterTests
 
     private static async Task CheckUndoRedoAsync(Action<bool, string> check)
     {
-        var root = RegistryLocation.Parse(
-            @"HKCU\Software\RegeditModern.Tests\HistoryBroadcast_" + Guid.NewGuid().ToString("N"));
+        var root = RegistryLocation.Parse(@"HKCU\Software\RegeditModern.Tests\HistoryBroadcast_" + Guid.NewGuid().ToString("N"));
         var folder = Directory.CreateTempSubdirectory("RegeditHistoryBroadcast-");
         var history = new RegistryHistoryBroadcaster();
         var first = NewWindow(history, new RegistryService { Journal = new RegistryJournal(folder.FullName) });
@@ -165,8 +160,7 @@ internal static class RegistryHistoryBroadcasterTests
         var settings = new AppSettings();
         return new MainWindowViewModel(
             settings, new InvestigationStore(settings, () => { }), registry,
-            location => new BrowserViewModel(
-                registry, location, new RegistryEntryClipboard(), historyBroadcaster: history),
+            location => new BrowserViewModel(registry, location, new RegistryEntryClipboard(), historyBroadcaster: history),
             NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings), history);
     }
 
@@ -182,8 +176,8 @@ internal static class RegistryHistoryBroadcasterTests
     {
         var now = DateTimeOffset.UtcNow;
         var state = new JournalState(
-            new JournalScope(location),
-            new RegistryBranchSnapshot(1, location, now, now, [], location.Machine ?? Environment.MachineName), []);
+            new JournalScope(location), new RegistryBranchSnapshot(1, location, now, now, [], location.Machine ?? Environment.MachineName),
+            []);
         return new JournalEntry(Guid.NewGuid(), now, "Revert", [state], [state], Kind: JournalOperation.Revert);
     }
 }

@@ -37,13 +37,7 @@ public sealed partial class MainWindow
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
-    private static unsafe nint WindowSubclass(
-        nint window,
-        uint message,
-        nuint key,
-        nint data,
-        nuint id,
-        nuint reference)
+    private static unsafe nint WindowSubclass(nint window, uint message, nuint key, nint data, nuint id, nuint reference)
     {
         if (key == SystemMenuHit && message is NonClientLeftDoubleClickMessage or NonClientRightButtonUpMessage)
         {
@@ -54,7 +48,8 @@ public sealed partial class MainWindow
             var target = reference == 0 ? window : (nint)reference;
             if (PostMessage(
                     target, systemCommandMessage, message == NonClientRightButtonUpMessage ? keyMenu : close,
-                    message == NonClientRightButtonUpMessage ? 0x20 : 0) != 0)
+                    message == NonClientRightButtonUpMessage ? 0x20 : 0)
+                != 0)
             {
                 return 0;
             }

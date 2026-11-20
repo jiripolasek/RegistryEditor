@@ -21,8 +21,8 @@ internal static class DuplicateValueTests
         {
             prompts++;
             check(
-                prompt is RegistryNamePrompt { Operation: RegistryNameOperation.DuplicateValue } &&
-                !preview.DuplicateValueCommand.CanExecute(null),
+                prompt is RegistryNamePrompt { Operation: RegistryNameOperation.DuplicateValue }
+                && !preview.DuplicateValueCommand.CanExecute(null),
                 "Duplicate uses the existing name prompt and disables edits while it is open");
             return Task.FromResult(false);
         };
@@ -43,8 +43,7 @@ internal static class DuplicateValueTests
         preview.DuplicateValueCommand.CanExecuteChanged += (_, _) => notifications++;
         preview.SelectedEntry = source;
         check(
-            preview.DuplicateValueCommand.CanExecute(null) && notifications > 0,
-            "Selecting a stored value updates the Duplicate command");
+            preview.DuplicateValueCommand.CanExecute(null) && notifications > 0, "Selecting a stored value updates the Duplicate command");
         await preview.DuplicateValueCommand.ExecuteAsync(null);
         check(prompts == 1 && preview.CanPrompt, "Canceling Duplicate restores the edit commands without writing");
         preview.CancelPending();
@@ -81,8 +80,7 @@ internal static class DuplicateValueTests
             }
 
             var taken = new RegistryValue(
-                "pAyLoAd - cOpY", RegistryValueType.String,
-                RegistryValue.ParseData(RegistryValueType.String, "existing"));
+                "pAyLoAd - cOpY", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "existing"));
             raw.Write(root, taken, null);
             raw.Write(root, taken with { Name = "Payload - Copy (2)" }, null);
             await tab.NavigateAsync(root, false);
@@ -106,13 +104,10 @@ internal static class DuplicateValueTests
             {
                 tab.SelectedEntry = tab.Entries.Single(entry => entry.Value?.Name == value.Name);
                 await tab.DuplicateValueCommand.ExecuteAsync(null);
-                lastCopy = value.Name == "Payload"
-                    ? "Payload - Copy (3)"
-                    : (value.Name.Length == 0 ? "Default" : value.Name) + " - Copy";
+                lastCopy = value.Name == "Payload" ? "Payload - Copy (3)" : (value.Name.Length == 0 ? "Default" : value.Name) + " - Copy";
                 var copy = raw.ReadValue(root, lastCopy);
                 check(
-                    copy?.Type == value.Type && copy.Data.SequenceEqual(value.Data) &&
-                    value.SameData(raw.ReadValue(root, value.Name)),
+                    copy?.Type == value.Type && copy.Data.SequenceEqual(value.Data) && value.SameData(raw.ReadValue(root, value.Name)),
                     "Duplicate preserves the original type and every byte: " + value.DisplayName);
                 check(
                     tab.SelectedEntry?.Value?.Name == lastCopy && ReferenceEquals(clipboard.Entry, source),
@@ -122,9 +117,8 @@ internal static class DuplicateValueTests
             }
 
             check(
-                taken.SameData(raw.ReadValue(root, taken.Name)) &&
-                journal.ReadEntries().Count(entry => entry.OperationKind == JournalOperation.CreateValue) ==
-                values.Length,
+                taken.SameData(raw.ReadValue(root, taken.Name))
+                && journal.ReadEntries().Count(entry => entry.OperationKind == JournalOperation.CreateValue) == values.Length,
                 "Duplicate skips filtered names without overwriting and journals each copy as a creation");
             await tab.UndoCommand.ExecuteAsync(null);
             check(
@@ -141,8 +135,9 @@ internal static class DuplicateValueTests
             tab.SelectedEntry = tab.Entries.Single(entry => entry.Value?.Name == longValue.Name);
             await tab.DuplicateValueCommand.ExecuteAsync(null);
             check(
-                tab.SelectedEntry?.Value is { Name.Length: 16383 } longCopy && longCopy.Name != longValue.Name &&
-                longCopy.Data.SequenceEqual(longValue.Data),
+                tab.SelectedEntry?.Value is { Name.Length: 16383 } longCopy
+                && longCopy.Name != longValue.Name
+                && longCopy.Data.SequenceEqual(longValue.Data),
                 "The suggested duplicate name fits the Windows limit even for a maximum-length source");
 
             tab.EditPromptRequested -= Confirm;
@@ -162,8 +157,10 @@ internal static class DuplicateValueTests
             var undoBefore = tab.UndoLabel;
             await tab.DuplicateValueCommand.ExecuteAsync(null);
             check(
-                collisionShown && taken.SameData(raw.ReadValue(root, taken.Name)) &&
-                source.Value!.SameData(raw.ReadValue(root, "Payload")) && tab.UndoLabel == undoBefore,
+                collisionShown
+                && taken.SameData(raw.ReadValue(root, taken.Name))
+                && source.Value!.SameData(raw.ReadValue(root, "Payload"))
+                && tab.UndoLabel == undoBefore,
                 "An existing name reports a retryable conflict without overwriting data or adding an Undo step");
         }
         finally

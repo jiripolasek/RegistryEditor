@@ -14,6 +14,10 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed partial class NotesViewModel : ObservableObject
 {
+    internal event Action<string, Exception>? ActionFailed;
+
+    internal event Func<Task<RegistryLocation?>>? TargetRequested;
+
     private readonly NotesStore _notes;
     private readonly Func<RegistryLocation, bool, Task> _navigate;
     private readonly Action<RegistryLocation> _openBackground;
@@ -22,29 +26,13 @@ internal sealed partial class NotesViewModel : ObservableObject
     private readonly Func<NoteDraft, Task<bool>> _confirmDelete;
     private bool _active = true;
 
-    internal NotesViewModel(
-        NotesStore notes,
-        Func<RegistryLocation, bool, Task> navigate,
-        Action<RegistryLocation> openBackground,
-        bool followContext,
-        Action<string> copy,
-        Func<NoteDraft, Task<bool>> confirmDelete)
-    {
-        this._notes = notes;
-        this._navigate = navigate;
-        this._openBackground = openBackground;
-        this._followContext = followContext;
-        this._copy = copy;
-        this._confirmDelete = confirmDelete;
-    }
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(Text), nameof(HasNote), nameof(Title), nameof(Path), nameof(Scope), nameof(Status),
-        nameof(ShowUseCurrentKey), nameof(ShowOpenKey), nameof(CanUndoDelete), nameof(HasSaveError))]
+        nameof(Text), nameof(HasNote), nameof(Title), nameof(Path), nameof(Scope), nameof(Status), nameof(ShowUseCurrentKey),
+        nameof(ShowOpenKey), nameof(CanUndoDelete), nameof(HasSaveError))]
     [NotifyCanExecuteChangedFor(
-        nameof(SaveCommand), nameof(OpenCommand), nameof(DeleteCommand), nameof(UndoDeleteCommand),
-        nameof(CopyPathCommand), nameof(CopyNoteCommand))]
+        nameof(SaveCommand), nameof(OpenCommand), nameof(DeleteCommand), nameof(UndoDeleteCommand), nameof(CopyPathCommand),
+        nameof(CopyNoteCommand))]
     public partial NoteDraft? Selected { get; set; }
 
     [ObservableProperty]
@@ -72,14 +60,14 @@ internal sealed partial class NotesViewModel : ObservableObject
     public string Title =>
         this.Selected?.Location.Name ?? (this._followContext ? "Select a registry key" : "Select a note");
 
-    public string Path => this.Selected?.Location.Address ?? (this._followContext
-        ? "Select a key in the registry tab to view or write its note."
-        : "Choose a note or use New note to enter a registry key.");
+    public string Path => this.Selected?.Location.Address
+                          ?? (this._followContext
+                              ? "Select a key in the registry tab to view or write its note."
+                              : "Choose a note or use New note to enter a registry key.");
 
     public string Scope => this.Selected is { } note
-        ? (note.Location.Machine ?? "This computer") + (note.Location.View == RegistryView.Registry32
-            ? " · 32-bit registry"
-            : " · 64-bit registry")
+        ? (note.Location.Machine ?? "This computer")
+          + (note.Location.View == RegistryView.Registry32 ? " · 32-bit registry" : " · 64-bit registry")
         : string.Empty;
 
     public string CurrentKeyHelp => this.CurrentLocation is { } location ? Address(location) : "Select a registry tab";
@@ -94,16 +82,27 @@ internal sealed partial class NotesViewModel : ObservableObject
 
     public bool ShowOpenKey => !this._followContext || this.IsDetached;
 
-    private bool IsDetached => this.Selected is { } note &&
-                               (this.CurrentLocation is null || !note.Matches(this.CurrentLocation));
+    private bool IsDetached => this.Selected is { } note && (this.CurrentLocation is null || !note.Matches(this.CurrentLocation));
 
     public bool CanUndoDelete => this.Selected?.CanUndoDelete == true;
 
     public bool HasSaveError => this.Selected?.SaveError is not null;
 
-    internal event Action<string, Exception>? ActionFailed;
-
-    internal event Func<Task<RegistryLocation?>>? TargetRequested;
+    internal NotesViewModel(
+        NotesStore notes,
+        Func<RegistryLocation, bool, Task> navigate,
+        Action<RegistryLocation> openBackground,
+        bool followContext,
+        Action<string> copy,
+        Func<NoteDraft, Task<bool>> confirmDelete)
+    {
+        this._notes = notes;
+        this._navigate = navigate;
+        this._openBackground = openBackground;
+        this._followContext = followContext;
+        this._copy = copy;
+        this._confirmDelete = confirmDelete;
+    }
 
     [RelayCommand]
     private async Task NewAsync()
@@ -179,8 +178,8 @@ internal sealed partial class NotesViewModel : ObservableObject
     internal IEnumerable<InvestigationRow> VisibleRows(IEnumerable<NoteDraft> notes, string query)
     {
         return notes.Where(note => note.HasContent || note.IsDirty || note == this.Selected).Where(note =>
-            new[] { note.Location.Name, Address(note.Location), note.Text }.Any(text =>
-                text.Contains(query, StringComparison.OrdinalIgnoreCase))).Select(InvestigationRow.Note);
+            new[] { note.Location.Name, Address(note.Location), note.Text }.Any(text => text.Contains(
+                query, StringComparison.OrdinalIgnoreCase))).Select(InvestigationRow.Note);
     }
 
     private void AttachDraft()

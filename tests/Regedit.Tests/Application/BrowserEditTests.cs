@@ -19,9 +19,7 @@ internal static class BrowserEditTests
         var number = new RegistryValueEditorViewModel(
             new RegistryValue("count", RegistryValueType.DWord, [255, 0, 0, 0]), RegistryValueType.DWord, false, false);
         number.BaseIndex = 1;
-        check(
-            number.Data == "255" && number.IsNumeric && number.IsNameReadOnly,
-            "The numeric editor converts hexadecimal to decimal");
+        check(number.Data == "255" && number.IsNumeric && number.IsNameReadOnly, "The numeric editor converts hexadecimal to decimal");
         number.Data = "invalid";
         number.BaseIndex = 0;
         check(
@@ -50,55 +48,61 @@ internal static class BrowserEditTests
             emptyMulti.Validate() && emptyMulti.Value.Data.SequenceEqual(new byte[] { (byte)'x', 0, 0, 0, 0, 0 }),
             "Editing the empty multi-string writes the canonical double terminator");
         var singleTerminator = new RegistryValueEditorViewModel(
-            new RegistryValue("m", RegistryValueType.MultiString, [(byte)'a', 0, 0, 0]), RegistryValueType.MultiString,
-            false, false);
+            new RegistryValue("m", RegistryValueType.MultiString, [(byte)'a', 0, 0, 0]), RegistryValueType.MultiString, false, false);
         check(
             !singleTerminator.IsRaw && singleTerminator.Data == "a",
             "A multi-string missing its final terminator opens in the text editor");
         var unterminated = new RegistryValueEditorViewModel(
             new RegistryValue("s", RegistryValueType.String, [(byte)'a', 0]), RegistryValueType.String, false, false);
-        check(
-            !unterminated.IsRaw && unterminated.Data == "a", "A string without a terminator opens in the text editor");
+        check(!unterminated.IsRaw && unterminated.Data == "a", "A string without a terminator opens in the text editor");
         foreach (var type in new RegistryValueType[] { RegistryValueType.String, RegistryValueType.ExpandString })
         {
             var singleLine = new RegistryValue("plain", type, RegistryValue.ParseData(type, "original"));
             var singleLineEditor = new RegistryValueEditorViewModel(singleLine, type, false, false);
             check(
-                singleLineEditor.CanToggleMultiline && !singleLineEditor.IsMultiline &&
-                !new RegistryValueEditorViewModel(null, type, false, true).IsMultiline,
+                singleLineEditor.CanToggleMultiline
+                && !singleLineEditor.IsMultiline
+                && !new RegistryValueEditorViewModel(null, type, false, true).IsMultiline,
                 $"Type {type} opens existing single-line and new values with multiline editing off");
             check(
-                !singleLineEditor.ValidateLineBreaks("pasted\r\nlines") && singleLineEditor.Data == "original" &&
-                singleLineEditor.ValidateLineBreaks("single line") && !singleLineEditor.HasError,
-                $"Type {type} rejects multiline paste before the text box can truncate it");
+                !singleLineEditor.ValidateLineBreaks("pasted\r\nlines")
+                && singleLineEditor.Data == "original"
+                && singleLineEditor.ValidateLineBreaks("single line")
+                && !singleLineEditor.HasError, $"Type {type} rejects multiline paste before the text box can truncate it");
             singleLineEditor.Data = "pasted\r\nlines";
             check(
-                !singleLineEditor.Validate() && singleLineEditor.HasError &&
-                singleLineEditor.Value.SameData(singleLine) && singleLineEditor.Data == "pasted\r\nlines",
+                !singleLineEditor.Validate()
+                && singleLineEditor.HasError
+                && singleLineEditor.Value.SameData(singleLine)
+                && singleLineEditor.Data == "pasted\r\nlines",
                 $"Type {type} blocks saving pasted line breaks without changing the draft or original value");
             singleLineEditor.IsMultiline = true;
             check(
-                !singleLineEditor.HasError && singleLineEditor.Validate() &&
-                singleLineEditor.Value.EditText(false) == "pasted\r\nlines" &&
-                !new RegistryValueEditorViewModel(singleLine, type, false, false).IsMultiline,
+                !singleLineEditor.HasError
+                && singleLineEditor.Validate()
+                && singleLineEditor.Value.EditText(false) == "pasted\r\nlines"
+                && !new RegistryValueEditorViewModel(singleLine, type, false, false).IsMultiline,
                 $"Type {type} permits line breaks only in the editor instance that opted in");
             singleLineEditor.IsMultiline = false;
             check(
-                !singleLineEditor.CanToggleMultiline && singleLineEditor.IsMultiline && singleLineEditor.Validate() &&
-                singleLineEditor.Data == "pasted\r\nlines",
+                !singleLineEditor.CanToggleMultiline
+                && singleLineEditor.IsMultiline
+                && singleLineEditor.Validate()
+                && singleLineEditor.Data == "pasted\r\nlines",
                 $"Type {type} keeps multiline editing on while the draft contains line breaks");
             singleLineEditor.Data = "single line";
             singleLineEditor.IsMultiline = false;
             check(
-                singleLineEditor.CanToggleMultiline && !singleLineEditor.IsMultiline && singleLineEditor.Validate() &&
-                singleLineEditor.Value.EditText(false) == "single line",
+                singleLineEditor.CanToggleMultiline
+                && !singleLineEditor.IsMultiline
+                && singleLineEditor.Validate()
+                && singleLineEditor.Value.EditText(false) == "single line",
                 $"Type {type} can save again after removing line breaks while multiline editing is off");
             const string lines = "one\r\ntwo\rthree\nfour";
             var original = new RegistryValue("lines", type, RegistryValue.ParseData(type, lines));
             var editor = new RegistryValueEditorViewModel(original, type, false, false);
             check(
-                editor.IsMultiline && !editor.IsRaw && editor.Data == lines && editor.Validate() &&
-                editor.Value.SameData(original),
+                editor.IsMultiline && !editor.IsRaw && editor.Data == lines && editor.Validate() && editor.Value.SameData(original),
                 $"Type {type} opens and confirms embedded line breaks without changing any bytes");
             editor.Data += "\nlast";
             check(
@@ -109,26 +113,28 @@ internal static class BrowserEditTests
         foreach (var lineBreak in new[] { "\r\n", "\r", "\n", "\f", "\u0085", "\u2028", "\u2029" })
         {
             var text = "one" + lineBreak + "two";
-            var original = new RegistryValue(
-                "lines", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, text));
+            var original = new RegistryValue("lines", RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, text));
             var editor = new RegistryValueEditorViewModel(original, RegistryValueType.String, false, false);
             check(
                 editor.IsMultiline && editor.Validate() && editor.Value.SameData(original),
                 "Existing strings detect supported line break characters and preserve their bytes");
             editor.IsMultiline = false;
             check(
-                editor.IsMultiline && !editor.CanToggleMultiline && editor.Validate() &&
-                editor.Value.SameData(original),
+                editor.IsMultiline && !editor.CanToggleMultiline && editor.Validate() && editor.Value.SameData(original),
                 "Multiline mode cannot be disabled while the value still contains a line break");
         }
 
         var binary = new RegistryValueEditorViewModel(
             new RegistryValue("b", RegistryValueType.Binary, [1, 2]), RegistryValueType.Binary, false, false);
         check(
-            !number.CanToggleMultiline && !number.IsMultiline && !binary.CanToggleMultiline && binary.IsMultiline &&
-            !emptyMulti.CanToggleMultiline && emptyMulti.IsMultiline && !malformed.CanToggleMultiline &&
-            malformed.IsMultiline,
-            "Numeric multi-string binary and malformed-string editors keep their existing input modes");
+            !number.CanToggleMultiline
+            && !number.IsMultiline
+            && !binary.CanToggleMultiline
+            && binary.IsMultiline
+            && !emptyMulti.CanToggleMultiline
+            && emptyMulti.IsMultiline
+            && !malformed.CanToggleMultiline
+            && malformed.IsMultiline, "Numeric multi-string binary and malformed-string editors keep their existing input modes");
         binary.Data = "0A 0B 0C";
         check(binary.PreviewBytes.SequenceEqual(new byte[] { 10, 11, 12 }), "The hex preview follows valid raw edits");
         binary.Data = "0A 0";
@@ -147,10 +153,7 @@ internal static class BrowserEditTests
         var unset = new RegistryEntry(null, null, true);
         var value = new RegistryEntry(null, new RegistryValue("Example", RegistryValueType.Binary, [1]));
         var childRow = new RegistryEntry(software.Child("Example child"), null);
-        foreach (var rows in new RegistryEntry[][]
-                 {
-                     [], [parent], [unset], [new RegistryEntry(software.Parent, null)]
-                 })
+        foreach (var rows in new RegistryEntry[][] { [], [parent], [unset], [new RegistryEntry(software.Parent, null)] })
         {
             preview.SetSelection(rows);
             check(
@@ -167,20 +170,17 @@ internal static class BrowserEditTests
             "A mixed selection permits batch deletion and disables rename");
         preview.SelectedEntry = childRow;
         check(
-            ReferenceEquals(preview.ActivateEntryCommand, preview.NavigateEntryCommand) &&
-            preview.RenameCommand.CanExecute(null), "A child key activates navigation and enables rename");
+            ReferenceEquals(preview.ActivateEntryCommand, preview.NavigateEntryCommand) && preview.RenameCommand.CanExecute(null),
+            "A child key activates navigation and enables rename");
         preview.SelectedEntry = value;
         check(
-            ReferenceEquals(preview.ActivateEntryCommand, preview.EditValueCommand) &&
-            preview.CopyCommand.CanExecute(null), "A stored value activates editing and enables copy");
+            ReferenceEquals(preview.ActivateEntryCommand, preview.EditValueCommand) && preview.CopyCommand.CanExecute(null),
+            "A stored value activates editing and enables copy");
         preview.Filter = "filtered";
-        check(
-            !preview.HasSelection && !preview.DeleteCommand.CanExecute(null),
-            "Filtering invalidates a captured edit selection");
+        check(!preview.HasSelection && !preview.DeleteCommand.CanExecute(null), "Filtering invalidates a captured edit selection");
         var createStates = new List<bool>();
         var entriesChanged = 0;
-        preview.CreateKeyCommand.CanExecuteChanged
-            += (_, _) => createStates.Add(preview.CreateKeyCommand.CanExecute(null));
+        preview.CreateKeyCommand.CanExecuteChanged += (_, _) => createStates.Add(preview.CreateKeyCommand.CanExecute(null));
         preview.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(preview.Entries))
@@ -190,8 +190,7 @@ internal static class BrowserEditTests
         };
         await preview.NavigateAsync(software.GetComputer());
         check(
-            createStates.Contains(false) && !preview.UpCommand.CanExecute(null) &&
-            !preview.CreateValueCommand.CanExecute("3"),
+            createStates.Contains(false) && !preview.UpCommand.CanExecute(null) && !preview.CreateValueCommand.CanExecute("3"),
             "Leaving a key with no selection invalidates the location-dependent commands");
         check(
             preview.Filter == string.Empty && entriesChanged == 1 && preview.Entries.All(entry => entry.IsKey),
@@ -226,10 +225,7 @@ internal static class BrowserEditTests
             var journal = new RegistryJournal(folder.FullName);
             var service = new RegistryService { Journal = journal };
             var clipboard = new RegistryEntryClipboard();
-            var tab = new BrowserViewModel(service, fixture, clipboard)
-            {
-                ShowKeysInList = true, ShowParentKeyInList = true
-            };
+            var tab = new BrowserViewModel(service, fixture, clipboard) { ShowKeysInList = true, ShowParentKeyInList = true };
             var dialogs = new Dialogs();
             tab.EditPromptRequested += dialogs.ShowAsync;
             var invalidations = 0;
@@ -265,8 +261,7 @@ internal static class BrowserEditTests
             {
                 var prompts = dialogs.Count;
                 var writes = invalidations;
-                check(
-                    !Enabled(tab.DeleteCommand) && !Enabled(tab.RenameCommand), situation + " disables Delete and F2");
+                check(!Enabled(tab.DeleteCommand) && !Enabled(tab.RenameCommand), situation + " disables Delete and F2");
                 await Run(tab.DeleteCommand);
                 await Run(tab.RenameCommand);
                 check(
@@ -280,8 +275,7 @@ internal static class BrowserEditTests
             tab.RenameCommand.CanExecuteChanged += (_, _) => renameNotifications++;
             tab.SelectedEntry = Row("First");
             check(
-                renameNotifications > 0 && tab.RenameCommand.CanExecute(null),
-                "Selecting a named value notifies the bound Rename command");
+                renameNotifications > 0 && tab.RenameCommand.CanExecute(null), "Selecting a named value notifies the bound Rename command");
             tab.Filter = "no visible value";
             await CheckInertAsync("Filtering away the selected row");
             tab.Filter = string.Empty;
@@ -293,8 +287,8 @@ internal static class BrowserEditTests
             tab.SelectedEntry = Row("(Default)");
             await CheckInertAsync("An unset default value");
             check(
-                Enabled(tab.ActivateEntryCommand) && Enabled(tab.EditBinaryCommand) &&
-                !tab.CopyCommand.CanExecute(null), "The default placeholder can be edited but cannot be copied");
+                Enabled(tab.ActivateEntryCommand) && Enabled(tab.EditBinaryCommand) && !tab.CopyCommand.CanExecute(null),
+                "The default placeholder can be edited but cannot be copied");
             dialogs.Value = new RegistryValue(
                 string.Empty, RegistryValueType.String, RegistryValue.ParseData(RegistryValueType.String, "stored"));
             var defaultEntries = tab.Entries;
@@ -307,14 +301,16 @@ internal static class BrowserEditTests
                 tab.SelectedEntry == Row("(Default)") && tab.SelectedEntry.Value?.DisplayData == "stored",
                 "Editing the unset default keeps the stored default value selected");
             check(
-                ReferenceEquals(tab.Entries, defaultEntries) && ReferenceEquals(Row("First"), firstEntry) &&
-                ReferenceEquals(Row("(Default)"), defaultRow) && !defaultRow.IsDefaultPlaceholder &&
-                defaultRow.GetHashCode() == defaultHash && defaultSelection.Contains(defaultRow),
+                ReferenceEquals(tab.Entries, defaultEntries)
+                && ReferenceEquals(Row("First"), firstEntry)
+                && ReferenceEquals(Row("(Default)"), defaultRow)
+                && !defaultRow.IsDefaultPlaceholder
+                && defaultRow.GetHashCode() == defaultHash
+                && defaultSelection.Contains(defaultRow),
                 "Editing the default updates its placeholder in place with a stable hash and selection identity");
             var modified = setup.ReadKeyDetails(fixture, false).LastWriteTimeUtc;
             check(
-                tab.Entries.Where(entry => !entry.IsKey && !entry.IsParent)
-                    .All(entry => entry.LastWriteTimeUtc == modified),
+                tab.Entries.Where(entry => !entry.IsKey && !entry.IsParent).All(entry => entry.LastWriteTimeUtc == modified),
                 "An in-place edit updates the shared containing-key timestamp on existing value rows");
             tab.SelectedEntry = Row("(Default)");
             check(
@@ -377,18 +373,24 @@ internal static class BrowserEditTests
                 "Binary editing keeps the bytes and writes through the registry service");
             check(tab.SelectedEntry == Row("NewValue"), "Binary editing keeps the updated value selected");
             check(
-                ReferenceEquals(tab.Entries, binaryEntries) && ReferenceEquals(Row("NewValue"), binaryRow) &&
-                editChanges.Count == 0 &&
-                binarySiblings.All(entry => tab.Entries.Any(current => ReferenceEquals(current, entry))),
+                ReferenceEquals(tab.Entries, binaryEntries)
+                && ReferenceEquals(Row("NewValue"), binaryRow)
+                && editChanges.Count == 0
+                && binarySiblings.All(entry => tab.Entries.Any(current => ReferenceEquals(current, entry))),
                 "Binary editing updates the existing row without any collection changes");
             check(
-                selectionChanges == 0 && !wrongInspector && tab.Inspector?.RawBytes == "00FF2A" &&
-                binaryRow.DataPreview != oldPreview && binaryRow.AccessibleName != oldAccessibleName,
+                selectionChanges == 0
+                && !wrongInspector
+                && tab.Inspector?.RawBytes == "00FF2A"
+                && binaryRow.DataPreview != oldPreview
+                && binaryRow.AccessibleName != oldAccessibleName,
                 "Editing keeps selection and inspector on the value while updating its cached presentation");
             check(
-                binaryRow.GetHashCode() == binaryHash && binarySelection.Contains(binaryRow) &&
-                binaryLookup.TryGetValue(binaryRow, out var lookup) && lookup == "selected" &&
-                previousInspector?.RawBytes == "00FF07",
+                binaryRow.GetHashCode() == binaryHash
+                && binarySelection.Contains(binaryRow)
+                && binaryLookup.TryGetValue(binaryRow, out var lookup)
+                && lookup == "selected"
+                && previousInspector?.RawBytes == "00FF07",
                 "An in-place edit preserves hash set and dictionary lookups while the old inspector keeps its snapshot");
             check(
                 clipboard.Entry?.Value?.Data.SequenceEqual(new byte[] { 0, 255, 7 }) == true,
@@ -399,10 +401,11 @@ internal static class BrowserEditTests
             dialogs.Value = new RegistryValue("NewValue", RegistryValueType.Binary, [0, 255, 43]);
             await Run(tab.EditValueCommand);
             check(
-                tab.SelectedEntry == Row("NewValue") &&
-                tab.SelectedEntry.Value!.Data.SequenceEqual(new byte[] { 0, 255, 43 }) && tab.Filter == "NewValue" &&
-                tab.SortColumn == RegistrySortColumn.Data && !tab.SortDescending,
-                "Normal value editing keeps the updated row selected with the current filter and sort");
+                tab.SelectedEntry == Row("NewValue")
+                && tab.SelectedEntry.Value!.Data.SequenceEqual(new byte[] { 0, 255, 43 })
+                && tab.Filter == "NewValue"
+                && tab.SortColumn == RegistrySortColumn.Data
+                && !tab.SortDescending, "Normal value editing keeps the updated row selected with the current filter and sort");
             tab.Filter = string.Empty;
             var sortedEntries = tab.Entries;
             var sortedSiblings = tab.Entries.Where(entry => entry.Name != "NewValue").ToArray();
@@ -423,10 +426,14 @@ internal static class BrowserEditTests
             await tab.PendingPreview;
             tab.PropertyChanged -= ObserveEdit;
             check(
-                ReferenceEquals(tab.Entries, sortedEntries) && tab.Entries[^1].Name == "NewValue" &&
-                ReferenceEquals(tab.SelectedEntry, sortedRow) && !tab.IsUpdatingValue && selectionChanges == 0 &&
-                !wrongInspector && tab.Inspector?.RawBytes == "FF" &&
-                sortedSiblings.All(entry => tab.Entries.Any(current => ReferenceEquals(current, entry))),
+                ReferenceEquals(tab.Entries, sortedEntries)
+                && tab.Entries[^1].Name == "NewValue"
+                && ReferenceEquals(tab.SelectedEntry, sortedRow)
+                && !tab.IsUpdatingValue
+                && selectionChanges == 0
+                && !wrongInspector
+                && tab.Inspector?.RawBytes == "FF"
+                && sortedSiblings.All(entry => tab.Entries.Any(current => ReferenceEquals(current, entry))),
                 "Editing data moves only the changed row without changing selection or flashing the key inspector");
             tab.Filter = "FF";
             await tab.PendingFilter;
@@ -435,11 +442,13 @@ internal static class BrowserEditTests
             dialogs.Value = new RegistryValue("NewValue", RegistryValueType.Binary, [3]);
             await Run(tab.EditValueCommand);
             check(
-                ReferenceEquals(tab.Entries, filteredEntries) && tab.Entries.All(entry => entry.IsParent) &&
-                !tab.HasSelection && tab.Status.EndsWith("0 shown", StringComparison.Ordinal),
-                $"An edit that stops matching the filter removes only that row and clears its selection " +
-                $"(same list: {ReferenceEquals(tab.Entries, filteredEntries)}, rows: {string.Join(", ", tab.Entries.Select(entry => entry.Name))}, " +
-                $"selected: {tab.SelectedEntry?.Name}, status: {tab.Status})");
+                ReferenceEquals(tab.Entries, filteredEntries)
+                && tab.Entries.All(entry => entry.IsParent)
+                && !tab.HasSelection
+                && tab.Status.EndsWith("0 shown", StringComparison.Ordinal),
+                $"An edit that stops matching the filter removes only that row and clears its selection "
+                + $"(same list: {ReferenceEquals(tab.Entries, filteredEntries)}, rows: {string.Join(", ", tab.Entries.Select(entry => entry.Name))}, "
+                + $"selected: {tab.SelectedEntry?.Name}, status: {tab.Status})");
             tab.Filter = string.Empty;
             tab.SelectedEntry = Row("NewValue");
             dialogs.Value = new RegistryValue("NewValue", RegistryValueType.Binary, [4]);
@@ -450,8 +459,9 @@ internal static class BrowserEditTests
             };
             await Run(tab.EditValueCommand);
             check(
-                tab.PendingFilter.IsCompleted && tab.Entries.Where(entry => !entry.IsParent).ToArray() is
-                    [{ Name: "NewValue" }] && !tab.HasSelection,
+                tab.PendingFilter.IsCompleted
+                && tab.Entries.Where(entry => !entry.IsParent).ToArray() is [{ Name: "NewValue" }]
+                && !tab.HasSelection,
                 "An edit waits for a pending filter and inserts only the newly matching row without restoring an old selection");
             tab.Filter = string.Empty;
             tab.SelectedEntry = Row("NewValue");
@@ -479,9 +489,7 @@ internal static class BrowserEditTests
             var pasteNotifications = 0;
             other.PasteCommand.CanExecuteChanged += (_, _) => pasteNotifications++;
             tab.CopyCommand.Execute(null);
-            check(
-                pasteNotifications > 0 && other.PasteCommand.CanExecute(null),
-                "Copy notifies the Paste binding in another tab");
+            check(pasteNotifications > 0 && other.PasteCommand.CanExecute(null), "Copy notifies the Paste binding in another tab");
             dialogs.Name = "Pasted";
             await Run(other.PasteCommand);
             check(branches.Count == 0, "Value edits and value paste leave every tree branch alone");
@@ -500,9 +508,7 @@ internal static class BrowserEditTests
             tab.CopyCommand.Execute(null);
             dialogs.Name = "NestedCopy";
             await Run(other.PasteCommand);
-            check(
-                branches.Count == 2 && branches[^1] == (child, null),
-                "Cross-tab key paste refreshes the destination tab's branch");
+            check(branches.Count == 2 && branches[^1] == (child, null), "Cross-tab key paste refreshes the destination tab's branch");
 
             tab.SelectedEntry = Row("RenamedValue");
             var old = tab.SelectedEntry.Value;
@@ -516,8 +522,9 @@ internal static class BrowserEditTests
             var conflictSibling = Row("First");
             await Run(tab.EditBinaryCommand);
             check(
-                Row("RenamedValue").Value!.Data.SequenceEqual(new byte[] { 98, 97 }) &&
-                ReferenceEquals(tab.Entries, conflictEntries) && ReferenceEquals(Row("First"), conflictSibling),
+                Row("RenamedValue").Value!.Data.SequenceEqual(new byte[] { 98, 97 })
+                && ReferenceEquals(tab.Entries, conflictEntries)
+                && ReferenceEquals(Row("First"), conflictSibling),
                 "A conflicting edit reads back only the changed row and preserves its newer bytes without rebuilding the list");
 
             var removedValue = new RegistryValue("RemovedWhileEditing", RegistryValueType.Binary, [1]);
@@ -533,9 +540,10 @@ internal static class BrowserEditTests
             };
             await Run(tab.EditValueCommand);
             check(
-                ReferenceEquals(tab.Entries, removedEntries) &&
-                !tab.Entries.Any(entry => entry.Name == removedValue.Name) && !tab.HasSelection &&
-                setup.ReadValue(fixture, removedValue.Name) is null,
+                ReferenceEquals(tab.Entries, removedEntries)
+                && !tab.Entries.Any(entry => entry.Name == removedValue.Name)
+                && !tab.HasSelection
+                && setup.ReadValue(fixture, removedValue.Name) is null,
                 "A value deleted while its editor is open is removed in place without recreating it");
 
             var first = Row("First");
@@ -553,10 +561,14 @@ internal static class BrowserEditTests
             };
             await Run(tab.DeleteCommand);
             check(
-                tab.Error?.Contains("Deleted 1 of 2") == true && dialogs.Title == "Delete 2 items?" &&
-                !dialogs.Message.Contains("..") && setup.ReadValue(fixture, "First") is null &&
-                Row("Second").Value!.Data[0] == 99 && invalidations == previous + 1 && !tab.HasSelection &&
-                journal.ReadEntries().Any(e => e.Operation == "Delete value" && e.Error is not null),
+                tab.Error?.Contains("Deleted 1 of 2") == true
+                && dialogs.Title == "Delete 2 items?"
+                && !dialogs.Message.Contains("..")
+                && setup.ReadValue(fixture, "First") is null
+                && Row("Second").Value!.Data[0] == 99
+                && invalidations == previous + 1
+                && !tab.HasSelection
+                && journal.ReadEntries().Any(e => e.Operation == "Delete value" && e.Error is not null),
                 "Partial delete reports the completed count, skips synthetic rows, refreshes and journals the stale write");
 
             dialogs.Name = "Sibling";
@@ -566,30 +578,23 @@ internal static class BrowserEditTests
                 branches.Count == 3 && branches[^1] == (fixture, ("Child", "Sibling")),
                 "Tree rename identifies both names within their parent");
             check(
-                tab.Location == fixture && setup.SubKeys(fixture).Contains("Sibling") &&
-                Row("Second").Value!.Data[0] == 99,
+                tab.Location == fixture && setup.SubKeys(fixture).Contains("Sibling") && Row("Second").Value!.Data[0] == 99,
                 "Tree rename targets the invoked node independently of the selected list value");
             tab.SelectedEntry = Row("Cloned");
             await Run(tab.DeleteCommand);
+            check(branches.Count == 4 && branches[^1] == (fixture, null), "Deleting a selected key refreshes just its parent");
             check(
-                branches.Count == 4 && branches[^1] == (fixture, null),
-                "Deleting a selected key refreshes just its parent");
-            check(
-                !setup.SubKeys(fixture).Contains("Cloned") && tab.Location == fixture,
-                "Deleting a selected child leaves its parent open");
+                !setup.SubKeys(fixture).Contains("Cloned") && tab.Location == fixture, "Deleting a selected child leaves its parent open");
             dialogs.Name = "Created";
             await Run(tab.CreateKeyCommand);
-            check(
-                branches.Count == 5 && branches[^1] == (fixture, null),
-                "Creating a key refreshes its captured parent once");
+            check(branches.Count == 5 && branches[^1] == (fixture, null), "Creating a key refreshes its captured parent once");
             check(tab.Location == fixture.Child("Created"), "Creating a key opens the new child");
             dialogs.Name = "Moved";
             await tab.RenameTreeKeyCommand.ExecuteAsync(tab.Location);
             check(tab.Location == fixture.Child("Moved"), "Renaming the displayed tree node opens its new path");
             await tab.DeleteTreeKeyCommand.ExecuteAsync(tab.Location);
             check(
-                tab.Location == fixture && !setup.SubKeys(fixture).Contains("Moved"),
-                "Deleting the displayed tree node opens its parent");
+                tab.Location == fixture && !setup.SubKeys(fixture).Contains("Moved"), "Deleting the displayed tree node opens its parent");
 
             dialogs.Name = "Sibling";
             dialogs.RetryName = "AfterConflict";
@@ -604,8 +609,7 @@ internal static class BrowserEditTests
             check(
                 tab.Location == fixture.Child("Sibling") && setup.SubKeys(fixture).Contains("WhileAway"),
                 "A pending edit honors its original registry target and preserves a newer navigation");
-            check(
-                branches[^1] == (fixture, null), "Navigating while creating a key does not redirect its tree refresh");
+            check(branches[^1] == (fixture, null), "Navigating while creating a key does not redirect its tree refresh");
             var siblingKey = fixture.Child("Sibling");
             setup.Write(fixture, new RegistryValue("NavigationEdit", RegistryValueType.Binary, [1]), null);
             setup.Write(siblingKey, new RegistryValue("NavigationEdit", RegistryValueType.Binary, [2]), null);
@@ -615,9 +619,10 @@ internal static class BrowserEditTests
             dialogs.Before = () => tab.NavigateAsync(siblingKey);
             await Run(tab.EditValueCommand);
             check(
-                tab.Location == siblingKey && !tab.HasSelection &&
-                Row("NavigationEdit").Value!.Data.SequenceEqual(new byte[] { 2 }) &&
-                setup.ReadValue(fixture, "NavigationEdit")!.Data.SequenceEqual(new byte[] { 3 }),
+                tab.Location == siblingKey
+                && !tab.HasSelection
+                && Row("NavigationEdit").Value!.Data.SequenceEqual(new byte[] { 2 })
+                && setup.ReadValue(fixture, "NavigationEdit")!.Data.SequenceEqual(new byte[] { 3 }),
                 "A value edit does not select a same-named value after navigating to another key");
             setup.CreateKey(fixture, "RemoveFirst");
             setup.CreateKey(fixture, "RemoveSecond");
@@ -631,9 +636,10 @@ internal static class BrowserEditTests
             int beforeDelete = branches.Count;
             await Run(tab.DeleteCommand);
             check(
-                tab.Error?.Contains("Deleted 1 of 2") == true && branches.Count == beforeDelete + 1 &&
-                branches[^1] == (fixture, null) && treeRefreshes == 0,
-                "A partial key deletion reconciles its parent once and key edits never rebuild the tree");
+                tab.Error?.Contains("Deleted 1 of 2") == true
+                && branches.Count == beforeDelete + 1
+                && branches[^1] == (fixture, null)
+                && treeRefreshes == 0, "A partial key deletion reconciles its parent once and key edits never rebuild the tree");
             var ui = new ConcurrentExclusiveSchedulerPair();
             await Task.Factory.StartNew(
                 async () =>
@@ -643,8 +649,9 @@ internal static class BrowserEditTests
                     var pending = firstOpen.ExecuteAsync(null);
                     tab.SelectedEntry = Row("WhileAway");
                     check(
-                        firstOpen.IsRunning && ReferenceEquals(firstOpen, tab.NavigateEntryCommand) &&
-                        tab.ActivateEntryCommand.CanExecute(null),
+                        firstOpen.IsRunning
+                        && ReferenceEquals(firstOpen, tab.NavigateEntryCommand)
+                        && tab.ActivateEntryCommand.CanExecute(null),
                         "A second key activation is enabled while the first is still running");
                     await Task.WhenAll(pending, tab.ActivateEntryCommand.ExecuteAsync(null));
                 }, CancellationToken.None, TaskCreationOptions.None, ui.ExclusiveScheduler).Unwrap();

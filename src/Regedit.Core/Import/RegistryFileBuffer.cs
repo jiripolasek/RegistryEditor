@@ -77,8 +77,7 @@ public sealed class RegistryFileBuffer
         var samePath = StringComparer.OrdinalIgnoreCase.Equals(path, this.FilePath);
         if (samePath)
         {
-            const string changed
-                = "The file changed outside Registry Editor. Reload it or use Save as to keep your changes.";
+            const string changed = "The file changed outside Registry Editor. Reload it or use Save as to keep your changes.";
             byte[] currentBytes;
             try
             {
@@ -136,8 +135,7 @@ public sealed class RegistryFileBuffer
         }
 
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        return Encoding.GetEncoding(0, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)
-            .GetBytes(text);
+        return Encoding.GetEncoding(0, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback).GetBytes(text);
     }
 
     private byte[] Encode(string text)

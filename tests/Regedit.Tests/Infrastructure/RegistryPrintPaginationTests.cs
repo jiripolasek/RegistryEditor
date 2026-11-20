@@ -50,8 +50,8 @@ internal static class RegistryPrintPaginationTests
         var surrogate = "a\U0001F600b";
         var surrogatePages = SliceAll(surrogate, 2);
         check(
-            surrogatePages.Select(page => surrogate.Substring(page.Start, page.Length))
-                .SequenceEqual(["a", "\U0001F600", "b"]), "Print pagination keeps surrogate pairs intact and advances");
+            surrogatePages.Select(page => surrogate.Substring(page.Start, page.Length)).SequenceEqual(["a", "\U0001F600", "b"]),
+            "Print pagination keeps surrogate pairs intact and advances");
 
         using var cancelled = new CancellationTokenSource();
         var cancelledProbes = 0;
@@ -86,8 +86,7 @@ internal static class RegistryPrintPaginationTests
                 completedPages++;
             });
         check(
-            complete && completedPages == 3,
-            "An early final page request synchronously completes the current layout before adding pages");
+            complete && completedPages == 3, "An early final page request synchronously completes the current layout before adding pages");
         generations.Cancel();
         check(!generations.IsCurrent(current), "Cancelling print preview invalidates queued layout work");
     }
@@ -97,8 +96,7 @@ internal static class RegistryPrintPaginationTests
         var slices = new List<RegistryPrintPageSlice>();
         for (var offset = 0; offset < report.Length;)
         {
-            var page = RegistryPrintPagination.FindNextSlice(
-                report, offset, (_, length) => length <= capacity, CancellationToken.None);
+            var page = RegistryPrintPagination.FindNextSlice(report, offset, (_, length) => length <= capacity, CancellationToken.None);
             slices.Add(page);
             offset += page.Length;
         }

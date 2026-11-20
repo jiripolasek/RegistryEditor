@@ -26,8 +26,7 @@ public sealed record ToolComparison(
         ReadOnlySpan<byte> before = this.BeforeValue?.Data;
         ReadOnlySpan<byte> after = this.AfterValue?.Data;
         var offset = before.CommonPrefixLength(after);
-        if (this.BeforeValue is not null && this.AfterValue is not null && offset == before.Length &&
-            offset == after.Length)
+        if (this.BeforeValue is not null && this.AfterValue is not null && offset == before.Length && offset == after.Length)
         {
             return "Raw byte data is identical.";
         }

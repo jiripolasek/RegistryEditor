@@ -11,8 +11,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Windows.UI.ViewManagement;
 using Windows.Foundation;
+using Windows.UI.ViewManagement;
 
 namespace JPSoftworks.Notifications.WinUI;
 
@@ -39,25 +39,29 @@ namespace JPSoftworks.Notifications.WinUI;
 [TemplatePart(Name = "PART_PeekExpand", Type = typeof(Button))]
 public sealed partial class NotificationHost : Control, IDisposable
 {
+    /// <summary>Occurs when the host observes a notification action failure.</summary>
+    /// <remarks>
+    /// The argument is the callback exception. The session retains the matching failed revision for retry.
+    /// The event follows the awaiting caller's continuation context; actions invoked from this host's UI use the UI thread.
+    /// Cancellation observed after host disposal is suppressed.
+    /// </remarks>
+    public event Action<Exception>? ActionFailed;
+
     /// <summary>Identifies the <see cref="Strings"/> dependency property.</summary>
     public static readonly DependencyProperty StringsProperty = DependencyProperty.Register(
-        nameof(Strings), typeof(ResourceDictionary), typeof(NotificationHost),
-        new PropertyMetadata(null, Strings_Changed));
+        nameof(Strings), typeof(ResourceDictionary), typeof(NotificationHost), new PropertyMetadata(null, Strings_Changed));
 
     /// <summary>Identifies the <see cref="DismissText"/> dependency property.</summary>
     public static readonly DependencyProperty DismissTextProperty = DependencyProperty.Register(
-        nameof(DismissText), typeof(string), typeof(NotificationHost),
-        new PropertyMetadata(NotificationText.Get(null, "Dismiss")));
+        nameof(DismissText), typeof(string), typeof(NotificationHost), new PropertyMetadata(NotificationText.Get(null, "Dismiss")));
 
     /// <summary>Identifies the <see cref="DismissAllText"/> dependency property.</summary>
     public static readonly DependencyProperty DismissAllTextProperty = DependencyProperty.Register(
-        nameof(DismissAllText), typeof(string), typeof(NotificationHost),
-        new PropertyMetadata(NotificationText.Get(null, "DismissAll")));
+        nameof(DismissAllText), typeof(string), typeof(NotificationHost), new PropertyMetadata(NotificationText.Get(null, "DismissAll")));
 
     /// <summary>Identifies the <see cref="ExpandStackText"/> dependency property.</summary>
     public static readonly DependencyProperty ExpandStackTextProperty = DependencyProperty.Register(
-        nameof(ExpandStackText), typeof(string), typeof(NotificationHost),
-        new PropertyMetadata(NotificationText.Get(null, "ExpandStack")));
+        nameof(ExpandStackText), typeof(string), typeof(NotificationHost), new PropertyMetadata(NotificationText.Get(null, "ExpandStack")));
 
     /// <summary>Identifies the <see cref="Position"/> dependency property.</summary>
     public static readonly DependencyProperty PositionProperty = DependencyProperty.Register(
@@ -129,30 +133,6 @@ public sealed partial class NotificationHost : Control, IDisposable
     private ScrollViewer _cardsViewport = null!;
     private ToggleButton _stackToggle = null!;
 
-    /// <summary>Initializes an unattached notification host on the current UI thread.</summary>
-    public NotificationHost()
-    {
-        this.DefaultStyleKey = typeof(NotificationHost);
-        this.ActualThemeChanged += (_, _) => this.RequestRender();
-        this._uiSettings.AnimationsEnabledChanged += this.AnimationsEnabled_Changed;
-        this.RegisterPropertyChangedCallback(PaddingProperty, (_, _) => this.UpdateBounds());
-        this.GettingFocus += (_, args) =>
-        {
-            if (args.OldFocusedElement is Control previous && !this.Contains(previous))
-            {
-                this._returnFocus = new WeakReference<Control>(previous);
-            }
-        };
-        this._history.Opening += (_, _) => this.BuildHistory();
-        this._history.Closed += (_, _) => this.ClearHistory();
-        this.SizeChanged += (_, _) => this.UpdateBounds();
-        this._timer = this.DispatcherQueue.CreateTimer();
-        this._timer.Interval = TimeSpan.FromMilliseconds(200);
-        this._timer.Tick += this.Tick;
-        this.Loaded += (_, _) => this.StartPresentation();
-        this.Unloaded += (_, _) => this.Detach();
-    }
-
     /// <summary>Gets or sets localized notification text forwarded to generated cards.</summary>
     /// <remarks>
     /// Missing or non-string resources and malformed formats use built-in English defaults. Assign a new dictionary
@@ -209,8 +189,7 @@ public sealed partial class NotificationHost : Control, IDisposable
         set => this.SetValue(PositionProperty, value);
     }
 
-    private bool IsTop => this.Position is NotificationPosition.TopLeft or NotificationPosition.TopCenter
-        or NotificationPosition.TopRight;
+    private bool IsTop => this.Position is NotificationPosition.TopLeft or NotificationPosition.TopCenter or NotificationPosition.TopRight;
 
     /// <summary>Gets or sets the factory that resolves notification icon keys.</summary>
     /// <remarks>
@@ -331,6 +310,30 @@ public sealed partial class NotificationHost : Control, IDisposable
         }
     }
 
+    /// <summary>Initializes an unattached notification host on the current UI thread.</summary>
+    public NotificationHost()
+    {
+        this.DefaultStyleKey = typeof(NotificationHost);
+        this.ActualThemeChanged += (_, _) => this.RequestRender();
+        this._uiSettings.AnimationsEnabledChanged += this.AnimationsEnabled_Changed;
+        this.RegisterPropertyChangedCallback(PaddingProperty, (_, _) => this.UpdateBounds());
+        this.GettingFocus += (_, args) =>
+        {
+            if (args.OldFocusedElement is Control previous && !this.Contains(previous))
+            {
+                this._returnFocus = new WeakReference<Control>(previous);
+            }
+        };
+        this._history.Opening += (_, _) => this.BuildHistory();
+        this._history.Closed += (_, _) => this.ClearHistory();
+        this.SizeChanged += (_, _) => this.UpdateBounds();
+        this._timer = this.DispatcherQueue.CreateTimer();
+        this._timer.Interval = TimeSpan.FromMilliseconds(200);
+        this._timer.Tick += this.Tick;
+        this.Loaded += (_, _) => this.StartPresentation();
+        this.Unloaded += (_, _) => this.Detach();
+    }
+
     /// <summary>Releases this host's subscriptions, timer, cards, and history presentation.</summary>
     /// <remarks>
     /// Call on the UI thread. Disposal is idempotent and does not dispose or cancel the attached session.
@@ -376,8 +379,12 @@ public sealed partial class NotificationHost : Control, IDisposable
         this._cardsPanel = (this.GetTemplateChild("PART_CardsPanel") as StackPanel)!;
         this._cardsViewport = (this.GetTemplateChild("PART_CardsViewport") as ScrollViewer)!;
         this._stackToggle = (this.GetTemplateChild("PART_StackToggle") as ToggleButton)!;
-        if (this._hostStack is null || this._stackDeck is null || this._footer is null || this._cardsPanel is null ||
-            this._cardsViewport is null || this._stackToggle is null)
+        if (this._hostStack is null
+            || this._stackDeck is null
+            || this._footer is null
+            || this._cardsPanel is null
+            || this._cardsViewport is null
+            || this._stackToggle is null)
         {
             return;
         }
@@ -451,7 +458,10 @@ public sealed partial class NotificationHost : Control, IDisposable
         return arranged;
     }
 
-    private void UpdateBounds() => this.UpdateBounds(new Size(this.ActualWidth, this.ActualHeight));
+    private void UpdateBounds()
+    {
+        this.UpdateBounds(new Size(this.ActualWidth, this.ActualHeight));
+    }
 
     private void UpdateBounds(Size size)
     {
@@ -460,8 +470,7 @@ public sealed partial class NotificationHost : Control, IDisposable
             return;
         }
 
-        this._hostStack.Width = Math.Max(
-            0, Math.Min(this._hostStack.MaxWidth, size.Width - this.Padding.Left - this.Padding.Right));
+        this._hostStack.Width = Math.Max(0, Math.Min(this._hostStack.MaxWidth, size.Width - this.Padding.Left - this.Padding.Right));
         this._hostClip?.Rect = new Rect(0, 0, size.Width, size.Height);
         this.RequestRender();
     }
@@ -479,7 +488,10 @@ public sealed partial class NotificationHost : Control, IDisposable
         this.UpdateStackFan();
     }
 
-    private void PeekExpand_Click(object sender, RoutedEventArgs args) => this.SetExpanded(true);
+    private void PeekExpand_Click(object sender, RoutedEventArgs args)
+    {
+        this.SetExpanded(true);
+    }
 
     private void PeekExpand_PointerEntered(object sender, PointerRoutedEventArgs args)
     {
@@ -490,15 +502,25 @@ public sealed partial class NotificationHost : Control, IDisposable
         }
     }
 
-    private void PeekExpand_PointerExited(object sender, PointerRoutedEventArgs args) => this._peekHover.Reset();
+    private void PeekExpand_PointerExited(object sender, PointerRoutedEventArgs args)
+    {
+        this._peekHover.Reset();
+    }
 
-    private void StackToggle_Click(object sender, RoutedEventArgs args) =>
+    private void StackToggle_Click(object sender, RoutedEventArgs args)
+    {
         this.SetExpanded(this._stackToggle.IsChecked == true);
+    }
 
-    private void Footer_SizeChanged(object sender, SizeChangedEventArgs args) => this.RequestRender();
+    private void Footer_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        this.RequestRender();
+    }
 
-    private static void Presentation_Changed(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
+    private static void Presentation_Changed(DependencyObject sender, DependencyPropertyChangedEventArgs args)
+    {
         ((NotificationHost)sender).RequestRender();
+    }
 
     private static void Expanded_Changed(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
@@ -507,14 +529,6 @@ public sealed partial class NotificationHost : Control, IDisposable
         host._scrollToFront = (bool)args.NewValue;
         host.RequestRender();
     }
-
-    /// <summary>Occurs when the host observes a notification action failure.</summary>
-    /// <remarks>
-    /// The argument is the callback exception. The session retains the matching failed revision for retry.
-    /// The event follows the awaiting caller's continuation context; actions invoked from this host's UI use the UI thread.
-    /// Cancellation observed after host disposal is suppressed.
-    /// </remarks>
-    public event Action<Exception>? ActionFailed;
 
     /// <summary>Opens recent messages from an application-owned command.</summary>
     /// <remarks>
@@ -615,7 +629,10 @@ public sealed partial class NotificationHost : Control, IDisposable
         host.RequestRender();
     }
 
-    private void Session_Changed(object? sender, EventArgs args) => this.RequestRender();
+    private void Session_Changed(object? sender, EventArgs args)
+    {
+        this.RequestRender();
+    }
 
     private void RequestRender()
     {
@@ -678,16 +695,13 @@ public sealed partial class NotificationHost : Control, IDisposable
         {
             // shortcut: expansion realizes at most 50 cards; virtualize if the session capacity grows.
             var ordered = this.IsTop ? candidates : candidates.Reverse();
-            visible = this._scrollToFront
-                ? ordered.ToArray()
-                : existing.Concat(ordered).DistinctBy(item => item.Id).ToArray();
+            visible = this._scrollToFront ? ordered.ToArray() : existing.Concat(ordered).DistinctBy(item => item.Id).ToArray();
         }
         else
         {
             var held = collapsed && this._isStackHovered
                 ? existing
-                : existing.Where(item => this._cards[item.Id].IsPointerOver || HasFocus(this._cards[item.Id].View))
-                    .ToArray();
+                : existing.Where(item => this._cards[item.Id].IsPointerOver || HasFocus(this._cards[item.Id].View)).ToArray();
             var selection = held.Length > 0 ? held.Concat(existing.Reverse()).Concat(candidates) : candidates;
             var selected = selection.DistinctBy(item => item.Id).Take(collapsed ? 1 : 2);
             visible = (this.IsTop ? selected : selected.Reverse()).ToArray();
@@ -704,8 +718,7 @@ public sealed partial class NotificationHost : Control, IDisposable
         Grid.SetRow(this._footer, this.IsTop ? 0 : 1);
         this._backplateDirection?.ScaleY = this.IsTop ? -1 : 1;
         this._backplateDirection?.ScaleX = this._hostStack.HorizontalAlignment == HorizontalAlignment.Left ? -1 : 1;
-        this._cardsPanel.Margin = new Thickness(
-            8, collapsed && !this.IsTop ? 24 : 8, 8, collapsed && this.IsTop ? 24 : 8);
+        this._cardsPanel.Margin = new Thickness(8, collapsed && !this.IsTop ? 24 : 8, 8, collapsed && this.IsTop ? 24 : 8);
         this._peekNear?.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
         this._peekFar?.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
         this._peekExpand?.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
@@ -716,19 +729,15 @@ public sealed partial class NotificationHost : Control, IDisposable
 
         this.UpdateStackFan();
         this._stackToggle.Visibility = many ? Visibility.Visible : Visibility.Collapsed;
-        VisualStateManager.GoToState(
-            this, (this.IsTop ? "Top" : "Bottom") + (expanded ? "Expanded" : "Collapsed"), false);
+        VisualStateManager.GoToState(this, (this.IsTop ? "Top" : "Bottom") + (expanded ? "Expanded" : "Collapsed"), false);
         AutomationProperties.SetName(
             this._stackToggle,
-            NotificationText.Format(
-                this.Strings, expanded ? "CollapseStackFormat" : "ExpandStackFormat", active.Length));
+            NotificationText.Format(this.Strings, expanded ? "CollapseStackFormat" : "ExpandStackFormat", active.Length));
         AutomationProperties.SetHelpText(
-            this._stackToggle,
-            NotificationText.Get(this.Strings, expanded ? "ExpandedStackHelp" : "CollapsedStackHelp"));
+            this._stackToggle, NotificationText.Get(this.Strings, expanded ? "ExpandedStackHelp" : "CollapsedStackHelp"));
         var availableHeight = Math.Max(
             0, this.ActualHeight - this.Padding.Top - this.Padding.Bottom - (many ? this._footer.ActualHeight + 4 : 0));
-        this._cardsViewport.MaxHeight
-            = expanded ? Math.Min(availableHeight, Math.Min(480, this.ActualHeight * 0.6)) : availableHeight;
+        this._cardsViewport.MaxHeight = expanded ? Math.Min(availableHeight, Math.Min(480, this.ActualHeight * 0.6)) : availableHeight;
         if (!expanded)
         {
             this._cardsViewport.Height = double.NaN;
@@ -783,8 +792,10 @@ public sealed partial class NotificationHost : Control, IDisposable
             {
                 this._stackToggle.Focus(FocusState.Programmatic);
             }
-            else if (this._returnFocus is { } reference && reference.TryGetTarget(out var target) && target.IsLoaded &&
-                     target.XamlRoot == this.XamlRoot)
+            else if (this._returnFocus is { } reference
+                     && reference.TryGetTarget(out var target)
+                     && target.IsLoaded
+                     && target.XamlRoot == this.XamlRoot)
             {
                 target.Focus(FocusState.Programmatic);
             }
@@ -795,13 +806,11 @@ public sealed partial class NotificationHost : Control, IDisposable
             this._scrollToFront = false;
             this.DispatcherQueue.TryEnqueue(() =>
             {
-                if (!this._disposed && this._templateReady && this.IsExpanded &&
-                    ReferenceEquals(this._session, session))
+                if (!this._disposed && this._templateReady && this.IsExpanded && ReferenceEquals(this._session, session))
                 {
                     this._cardsViewport.UpdateLayout();
                     this._cardsViewport.Height = this._cardsViewport.ActualHeight;
-                    this._cardsViewport.ChangeView(
-                        null, this.IsTop ? 0 : this._cardsViewport.ScrollableHeight, null, true);
+                    this._cardsViewport.ChangeView(null, this.IsTop ? 0 : this._cardsViewport.ScrollableHeight, null, true);
                 }
             });
         }
@@ -812,8 +821,7 @@ public sealed partial class NotificationHost : Control, IDisposable
                 if (!this._disposed && this._templateReady && !this.IsExpanded)
                 {
                     this._cardsViewport.UpdateLayout();
-                    this._cardsViewport.ChangeView(
-                        null, this.IsTop ? 0 : this._cardsViewport.ScrollableHeight, null, true);
+                    this._cardsViewport.ChangeView(null, this.IsTop ? 0 : this._cardsViewport.ScrollableHeight, null, true);
                 }
             });
         }
@@ -832,8 +840,7 @@ public sealed partial class NotificationHost : Control, IDisposable
         this._peekExpand?.Height = fanned ? 48 : 16;
         this._peekExpand?.VerticalAlignment = this.IsTop ? VerticalAlignment.Bottom : VerticalAlignment.Top;
         this._peekExpand?.Margin = new Thickness(0, fanned && !this.IsTop ? -32 : 0, 0, fanned && this.IsTop ? -32 : 0);
-        VisualStateManager.GoToState(
-            this, fanned ? "StackFanned" : collapsed ? "StackRest" : "StackInactive", motionEnabled);
+        VisualStateManager.GoToState(this, fanned ? "StackFanned" : collapsed ? "StackRest" : "StackInactive", motionEnabled);
     }
 
     private void SetExpanded(bool expanded)
@@ -902,21 +909,21 @@ public sealed partial class NotificationHost : Control, IDisposable
 
         var elapsed = this._clock.Elapsed;
         this._clock.Restart();
-        if (this._windowActive && this._peekExpand?.Visibility == Visibility.Visible && this._peekHover.IsRunning &&
-            this._peekHover.Elapsed >= TimeSpan.FromSeconds(1))
+        if (this._windowActive
+            && this._peekExpand?.Visibility == Visibility.Visible
+            && this._peekHover.IsRunning
+            && this._peekHover.Elapsed >= TimeSpan.FromSeconds(1))
         {
             this.SetExpanded(true);
             return;
         }
 
-        if (!this._windowActive || this.IsExpanded ||
-            this._isStackHovered && this._peekNear?.Visibility == Visibility.Visible)
+        if (!this._windowActive || this.IsExpanded || this._isStackHovered && this._peekNear?.Visibility == Visibility.Visible)
         {
             return;
         }
 
-        var presented = this._cards.Values
-            .Where(card => !card.IsPointerOver && !HasFocus(card.View) && this.IsPresented(card.View))
+        var presented = this._cards.Values.Where(card => !card.IsPointerOver && !HasFocus(card.View) && this.IsPresented(card.View))
             .Select(card => card.Id).ToArray();
         this._session?.Advance(elapsed, presented);
     }
@@ -928,17 +935,13 @@ public sealed partial class NotificationHost : Control, IDisposable
             return false;
         }
 
-        var bounds = card.TransformToVisual(this._cardsViewport)
-            .TransformBounds(new Rect(0, 0, card.ActualWidth, card.ActualHeight));
-        return bounds.Bottom > 0 && bounds.Top < this._cardsViewport.ActualHeight &&
-               this._cardsViewport.ActualHeight > 0;
+        var bounds = card.TransformToVisual(this._cardsViewport).TransformBounds(new Rect(0, 0, card.ActualWidth, card.ActualHeight));
+        return bounds.Bottom > 0 && bounds.Top < this._cardsViewport.ActualHeight && this._cardsViewport.ActualHeight > 0;
     }
 
     private static bool HasFocus(FrameworkElement element)
     {
-        var focused = element.XamlRoot is null
-            ? null
-            : FocusManager.GetFocusedElement(element.XamlRoot) as DependencyObject;
+        var focused = element.XamlRoot is null ? null : FocusManager.GetFocusedElement(element.XamlRoot) as DependencyObject;
         while (focused is not null)
         {
             if (ReferenceEquals(focused, element))
@@ -973,15 +976,14 @@ public sealed partial class NotificationHost : Control, IDisposable
         }
 
         this.ClearHistory();
-        if (this.HistoryTemplate?.LoadContent() is not FrameworkElement content ||
-            content.FindName("PART_HistoryList") is not ListView list)
+        if (this.HistoryTemplate?.LoadContent() is not FrameworkElement content
+            || content.FindName("PART_HistoryList") is not ListView list)
         {
             return;
         }
 
         content.DataContext = this;
-        content.MaxWidth = Math.Min(
-            content.MaxWidth, Math.Max(0, this.ActualWidth - this.Padding.Left - this.Padding.Right));
+        content.MaxWidth = Math.Min(content.MaxWidth, Math.Max(0, this.ActualWidth - this.Padding.Left - this.Padding.Right));
         if (content.FindName("PART_HistoryDismissAll") is ButtonBase clear)
         {
             clear.Click += (_, _) =>
@@ -1034,8 +1036,7 @@ public sealed partial class NotificationHost : Control, IDisposable
         AutomationProperties.SetName(list, NotificationText.Format(this.Strings, "HistoryTitleFormat", retained.Count));
         if (this._historyOmitted is not null)
         {
-            this._historyOmitted.Text = NotificationText.Format(
-                this.Strings, "HistoryOmittedFormat", session.OmittedCount);
+            this._historyOmitted.Text = NotificationText.Format(this.Strings, "HistoryOmittedFormat", session.OmittedCount);
             this._historyOmitted.Visibility = session.OmittedCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
     }
@@ -1045,11 +1046,11 @@ public sealed partial class NotificationHost : Control, IDisposable
         var list = this._historyList!;
         if (!this._historyRows.TryGetValue(id, out var entry))
         {
-            if (this.HistoryItemTemplate?.LoadContent() is not FrameworkElement row ||
-                row.FindName("PART_HistoryTitle") is not TextBlock title ||
-                row.FindName("PART_HistoryMessage") is not TextBlock message ||
-                row.FindName("PART_HistoryDismiss") is not ButtonBase dismiss ||
-                row.FindName("PART_HistoryActions") is not Panel actions)
+            if (this.HistoryItemTemplate?.LoadContent() is not FrameworkElement row
+                || row.FindName("PART_HistoryTitle") is not TextBlock title
+                || row.FindName("PART_HistoryMessage") is not TextBlock message
+                || row.FindName("PART_HistoryDismiss") is not ButtonBase dismiss
+                || row.FindName("PART_HistoryActions") is not Panel actions)
             {
                 return;
             }
@@ -1070,8 +1071,7 @@ public sealed partial class NotificationHost : Control, IDisposable
 
         var restoreFocus = !active && HasFocus(entry.Dismiss);
         entry.Title.Text = NotificationText.Format(
-            this.Strings, "HistoryItemFormat",
-            NotificationText.Get(this.Strings, active ? "HistoryActive" : "HistoryClosed"),
+            this.Strings, "HistoryItemFormat", NotificationText.Get(this.Strings, active ? "HistoryActive" : "HistoryClosed"),
             NotificationText.Name(this.Strings, notification));
         entry.Message.Text = notification.Message;
         entry.Dismiss.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
@@ -1130,24 +1130,19 @@ public sealed partial class NotificationHost : Control, IDisposable
         }
     }
 
-    private sealed record HistoryEntry(
-        FrameworkElement View,
-        TextBlock Title,
-        TextBlock Message,
-        ButtonBase Dismiss,
-        Panel Actions);
+    private sealed record HistoryEntry(FrameworkElement View, TextBlock Title, TextBlock Message, ButtonBase Dismiss, Panel Actions);
 
     private sealed class Card
     {
-        internal Card(Guid id)
-        {
-            this.Id = id;
-        }
-
         internal Guid Id { get; }
 
         internal NotificationCard View { get; } = new();
 
         internal bool IsPointerOver { get; set; }
+
+        internal Card(Guid id)
+        {
+            this.Id = id;
+        }
     }
 }

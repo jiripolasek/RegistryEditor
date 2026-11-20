@@ -8,8 +8,6 @@ namespace JPSoftworks.ColumnList.Sample;
 
 public sealed class SampleEntry : INotifyPropertyChanged
 {
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     public required string Name
     {
         get;
@@ -37,6 +35,8 @@ public sealed class SampleEntry : INotifyPropertyChanged
 
     public string SizeText => this.Size.ToString("N0") + " B";
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public override string ToString()
     {
         return this.Name;
@@ -59,8 +59,7 @@ public sealed class SampleEvent
 
 internal static class SampleData
 {
-    private static readonly string[] Kinds =
-        ["Key", "REG_SZ", "REG_DWORD", "REG_BINARY", "REG_EXPAND_SZ", "REG_MULTI_SZ"];
+    private static readonly string[] Kinds = ["Key", "REG_SZ", "REG_DWORD", "REG_BINARY", "REG_EXPAND_SZ", "REG_MULTI_SZ"];
 
     /// <summary>The first rows carry deliberately long values so auto-fit has something visible to measure.</summary>
     internal static SampleEntry[] Entries(int count)

@@ -30,8 +30,7 @@ internal static class ToolStateTests
         check(
             draft.IsDirty && draft.Matches(RegistryLocation.Parse("hkcu\\software\\EXAMPLE")),
             "Draft changes retain canonical key identity");
-        check(
-            !draft.Matches(location with { View = RegistryView.Registry32 }), "Draft identity preserves registry view");
+        check(!draft.Matches(location with { View = RegistryView.Registry32 }), "Draft identity preserves registry view");
         check(!draft.Matches(location.Child("Child")), "Draft identity excludes child keys");
         draft.Text = "Saved text";
         check(!draft.IsDirty, "Restoring original text clears the dirty state");
@@ -53,8 +52,7 @@ internal static class ToolStateTests
         {
             using var identity = WindowsIdentity.GetCurrent();
             var security = unreadable.GetAccessControl();
-            security.AddAccessRule(
-                new RegistryAccessRule(identity.User!, RegistryRights.ReadKey, AccessControlType.Deny));
+            security.AddAccessRule(new RegistryAccessRule(identity.User!, RegistryRights.ReadKey, AccessControlType.Deny));
             unreadable.SetAccessControl(security);
             session = new WatchSession(
                 registry, new WatchDefinition(root, "TRACKED"), action =>
@@ -79,15 +77,11 @@ internal static class ToolStateTests
                 root, new RegistryValue("Tracked", RegistryValueType.DWord, [2, 0, 0, 0]),
                 new RegistryValue("Tracked", RegistryValueType.DWord, [1, 0, 0, 0]));
             await Until(() => session.Observations.Count == 2 || !session.IsRunning);
-            check(
-                session.Observations.Count == 2 && session.IsRunning,
-                "Watch retains observations after its observer detaches");
+            check(session.Observations.Count == 2 && session.IsRunning, "Watch retains observations after its observer detaches");
             session.Stop();
             await session.Completion.WaitAsync(TimeSpan.FromSeconds(10));
             session.Stop();
-            check(
-                !session.IsRunning && session.Status == "Stopped",
-                "Explicit stop releases the watch and can be repeated");
+            check(!session.IsRunning && session.Status == "Stopped", "Explicit stop releases the watch and can be repeated");
 
             session = new WatchSession(
                 registry, new WatchDefinition(root, string.Empty), action =>
@@ -97,33 +91,32 @@ internal static class ToolStateTests
                 });
             await Until(() => session.Status == "Watching" || !session.IsRunning);
             check(
-                session.IsRunning && registry.ReadValue(root, string.Empty) is null &&
-                session.Title.EndsWith(" · (Default)"), "Default value watch starts before the value exists");
+                session.IsRunning && registry.ReadValue(root, string.Empty) is null && session.Title.EndsWith(" · (Default)"),
+                "Default value watch starts before the value exists");
             registry.Write(root, new RegistryValue("Other", RegistryValueType.DWord, [3, 0, 0, 0]), null);
             registry.CreateKey(root, "Child");
-            registry.Write(
-                root.Child("Child"), new RegistryValue(string.Empty, RegistryValueType.DWord, [4, 0, 0, 0]), null);
+            registry.Write(root.Child("Child"), new RegistryValue(string.Empty, RegistryValueType.DWord, [4, 0, 0, 0]), null);
             var original = new RegistryValue(string.Empty, RegistryValueType.DWord, [5, 0, 0, 0]);
             var updated = original with { Data = [6, 0, 0, 0] };
             registry.Write(root, original, null);
             await Until(() => session.Status == "Watching · 1 observation" || !session.IsRunning);
             check(
-                session.Observations.Count == 1 && session.Observations[0].Change is
-                    { Kind: RegistryChangeKind.ValueAdded, Before: null } added && original.SameData(added.After),
-                "Default value watch observes creation and ignores named values and subkeys");
+                session.Observations.Count == 1
+                && session.Observations[0].Change is { Kind: RegistryChangeKind.ValueAdded, Before: null } added
+                && original.SameData(added.After), "Default value watch observes creation and ignores named values and subkeys");
             registry.Write(root, updated, original);
             await Until(() => session.Observations.Count >= 2 || !session.IsRunning);
             check(
-                session.Observations.Count == 2 &&
-                session.Observations[1].Change is { Kind: RegistryChangeKind.ValueChanged } changed &&
-                original.SameData(changed.Before) && updated.SameData(changed.After),
-                "Default value watch retains exact before and after bytes");
+                session.Observations.Count == 2
+                && session.Observations[1].Change is { Kind: RegistryChangeKind.ValueChanged } changed
+                && original.SameData(changed.Before)
+                && updated.SameData(changed.After), "Default value watch retains exact before and after bytes");
             registry.DeleteValue(root, updated);
             await Until(() => session.Observations.Count >= 3 || !session.IsRunning);
             check(
-                session.Observations.Count == 3 && session.Observations[2].Change is
-                    { Kind: RegistryChangeKind.ValueRemoved, After: null } removed && updated.SameData(removed.Before),
-                "Default value watch observes deletion");
+                session.Observations.Count == 3
+                && session.Observations[2].Change is { Kind: RegistryChangeKind.ValueRemoved, After: null } removed
+                && updated.SameData(removed.Before), "Default value watch observes deletion");
             session.Stop();
             await session.Completion.WaitAsync(TimeSpan.FromSeconds(10));
 
@@ -141,9 +134,11 @@ internal static class ToolStateTests
             registry.DeleteKey(removedKey);
             await session.Completion.WaitAsync(TimeSpan.FromSeconds(10));
             check(
-                !session.IsRunning && session.Status.Contains("deleted") && session.Observations.Count == 2 &&
-                session.Observations.Any(item => item.Change.Kind == RegistryChangeKind.KeyRemoved) &&
-                session.Observations.Any(item =>
+                !session.IsRunning
+                && session.Status.Contains("deleted")
+                && session.Observations.Count == 2
+                && session.Observations.Any(item => item.Change.Kind == RegistryChangeKind.KeyRemoved)
+                && session.Observations.Any(item =>
                     item.Change.Kind == RegistryChangeKind.ValueRemoved && original.SameData(item.Change.Before)),
                 "Deleting the watched key retains its value removal and stops the watch");
 
@@ -157,8 +152,7 @@ internal static class ToolStateTests
             await stopped.Completion.WaitAsync(TimeSpan.FromSeconds(10));
             check(!stopped.IsRunning, "A watch can stop while capturing its baseline");
 
-            var queued = System.Threading.Channels.Channel
-                .CreateUnbounded<(Action Action, TaskCompletionSource Done)>();
+            var queued = System.Threading.Channels.Channel.CreateUnbounded<(Action Action, TaskCompletionSource Done)>();
             session = new WatchSession(
                 registry, new WatchDefinition(root, "Queued"), action =>
                 {
@@ -238,11 +232,9 @@ internal static class ToolStateTests
         {
             var settings = new AppSettings();
             settings.Notes.Add(new KeyNote(location, "Old text"));
-            settings.Notes.Add(
-                new KeyNote(location with { SubKey = location.SubKey.ToUpperInvariant() }, "Duplicate legacy note"));
+            settings.Notes.Add(new KeyNote(location with { SubKey = location.SubKey.ToUpperInvariant() }, "Duplicate legacy note"));
             settings.Notes.Add(new KeyNote(location with { View = RegistryView.Registry32 }, "Other view"));
-            settings.Notes.Add(
-                new KeyNote(location with { Hive = RegistryHive.LocalMachine, Machine = "SERVER" }, "Other computer"));
+            settings.Notes.Add(new KeyNote(location with { Hive = RegistryHive.LocalMachine, Machine = "SERVER" }, "Other computer"));
             var draft = new NoteDraft(location, "Old text") { Text = "Updated note: žluťoučký 日本語" };
             var dirtyNotifications = 0;
             draft.PropertyChanged += (_, args) =>
@@ -256,16 +248,14 @@ internal static class ToolStateTests
             notes.Save(draft);
             var loaded = AppSettings.Load(path);
             check(
-                loaded.LoadError is null && loaded.Notes.Count == 3 &&
-                loaded.Notes.Single(note => note.Matches(location)).Text == draft.Text,
+                loaded.LoadError is null
+                && loaded.Notes.Count == 3
+                && loaded.Notes.Single(note => note.Matches(location)).Text == draft.Text,
                 "Saving a note replaces canonical duplicates and preserves Unicode text");
             check(
-                loaded.Notes.Any(note => note.Text == "Other view") &&
-                loaded.Notes.Any(note => note.Text == "Other computer"),
+                loaded.Notes.Any(note => note.Text == "Other view") && loaded.Notes.Any(note => note.Text == "Other computer"),
                 "Saving a note preserves other computers and registry views");
-            check(
-                !draft.IsDirty && dirtyNotifications == 1,
-                "Successful note save notifies all draft observers of its saved state");
+            check(!draft.IsDirty && dirtyNotifications == 1, "Successful note save notifies all draft observers of its saved state");
             var saved = File.ReadAllBytes(path);
             var previous = settings.Notes.ToArray();
             foreach (var text in new[] { "Unsaved replacement", string.Empty })
@@ -285,8 +275,11 @@ internal static class ToolStateTests
                 }
 
                 check(
-                    failed && draft.IsDirty && draft.Text == text && settings.Notes.SequenceEqual(previous) &&
-                    saved.SequenceEqual(File.ReadAllBytes(path)),
+                    failed
+                    && draft.IsDirty
+                    && draft.Text == text
+                    && settings.Notes.SequenceEqual(previous)
+                    && saved.SequenceEqual(File.ReadAllBytes(path)),
                     text.Length == 0
                         ? "Failed note removal preserves the saved note and its unsaved clearing draft"
                         : "Failed note save preserves the shared draft and previous persisted notes");
@@ -294,12 +287,9 @@ internal static class ToolStateTests
 
             notes.Save(draft);
             check(
-                !draft.IsDirty && AppSettings.Load(path).Notes.All(note => !note.Matches(location)) &&
-                settings.Notes.Count == 2,
+                !draft.IsDirty && AppSettings.Load(path).Notes.All(note => !note.Matches(location)) && settings.Notes.Count == 2,
                 "Retrying a cleared note removes only its own computer and view after the file unlocks");
-            check(
-                !Directory.EnumerateFiles(folder, "*.tmp").Any(),
-                "Note save failures leave no temporary settings files");
+            check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "Note save failures leave no temporary settings files");
         }
         finally
         {

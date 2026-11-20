@@ -46,16 +46,25 @@ public sealed partial class ColumnHeaderRow : Grid
     private readonly Border _ghost;
     private readonly TextBlock _ghostText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
 
-    private readonly Rectangle _marker = new()
-    {
-        Width = 2, RadiusX = 1, RadiusY = 1, Visibility = Visibility.Collapsed
-    };
+    private readonly Rectangle _marker = new() { Width = 2, RadiusX = 1, RadiusY = 1, Visibility = Visibility.Collapsed };
 
     private ColumnListView? _owner;
     private ColumnArrangement _arrangement = ColumnArrangement.Empty;
     private DragState? _drag;
     private DispatcherQueueTimer? _autoScroll;
     private double _autoScrollStep;
+
+    internal MenuFlyout Menu => this._menu;
+
+    internal bool IsDragging => this._drag is { Started: true, Cancelled: false };
+
+    internal FrameworkElement DragGhost => this._ghost;
+
+    internal FrameworkElement InsertionMarker => this._marker;
+
+    /// <summary>The column the current drag would drop before (null = after the last column), when the drop is valid.</summary>
+    internal (bool Valid, string? BeforeId) DragTarget =>
+        this._drag is { } drag ? (drag.Valid, drag.BeforeId) : (false, null);
 
     public ColumnHeaderRow()
     {
@@ -85,18 +94,6 @@ public sealed partial class ColumnHeaderRow : Grid
         this.AddHandler(KeyDownEvent, new KeyEventHandler(this.HeaderKeyDown), true);
     }
 
-    internal MenuFlyout Menu => this._menu;
-
-    internal bool IsDragging => this._drag is { Started: true, Cancelled: false };
-
-    internal FrameworkElement DragGhost => this._ghost;
-
-    internal FrameworkElement InsertionMarker => this._marker;
-
-    /// <summary>The column the current drag would drop before (null = after the last column), when the drop is valid.</summary>
-    internal (bool Valid, string? BeforeId) DragTarget =>
-        this._drag is { } drag ? (drag.Valid, drag.BeforeId) : (false, null);
-
     internal Button? LabelFor(ListColumn column)
     {
         return this._headers.TryGetValue(column, out var header) ? header.Label : null;
@@ -112,11 +109,7 @@ public sealed partial class ColumnHeaderRow : Grid
         return this._headers.TryGetValue(column, out var header) ? header.SortIcon : null;
     }
 
-    internal void Rebuild(
-        ColumnListView owner,
-        IEnumerable<ListColumn> columns,
-        Style? labelStyle,
-        Style? sortIconStyle)
+    internal void Rebuild(ColumnListView owner, IEnumerable<ListColumn> columns, Style? labelStyle, Style? sortIconStyle)
     {
         this.CancelColumnDrag();
         this._drag = null;
@@ -132,11 +125,7 @@ public sealed partial class ColumnHeaderRow : Grid
                 Orientation = Orientation.Horizontal,
                 Spacing = 6,
                 VerticalAlignment = VerticalAlignment.Center,
-                Children =
-                {
-                    new TextBlock { Text = column.Header, VerticalAlignment = VerticalAlignment.Center },
-                    sortIcon
-                }
+                Children = { new TextBlock { Text = column.Header, VerticalAlignment = VerticalAlignment.Center }, sortIcon }
             };
             var label = new Button
             {
@@ -177,15 +166,13 @@ public sealed partial class ColumnHeaderRow : Grid
             Canvas.SetZIndex(grip, 1);
             AutomationProperties.SetName(grip, "Resize " + column.Name + " column");
             AutomationProperties.SetAutomationId(grip, column.Id + "Resize");
-            grip.DragDelta += (_, args) => owner.ResizeColumn(
-                column.Id, owner.CurrentWidth(column.Id) + args.HorizontalChange);
+            grip.DragDelta += (_, args) => owner.ResizeColumn(column.Id, owner.CurrentWidth(column.Id) + args.HorizontalChange);
             grip.KeyDown += (_, args) =>
             {
                 if (args.Key is VirtualKey.Left or VirtualKey.Right)
                 {
                     owner.ResizeColumn(
-                        column.Id,
-                        owner.CurrentWidth(column.Id) + (args.Key == VirtualKey.Left ? -KeyboardStep : KeyboardStep));
+                        column.Id, owner.CurrentWidth(column.Id) + (args.Key == VirtualKey.Left ? -KeyboardStep : KeyboardStep));
                     args.Handled = true;
                 }
                 else if (args.Key == VirtualKey.Enter)
@@ -235,9 +222,7 @@ public sealed partial class ColumnHeaderRow : Grid
             sortIcon.Visibility = sorted ? Visibility.Visible : Visibility.Collapsed;
             sortIcon.Glyph = sortDescending ? SortDescendingGlyph : SortAscendingGlyph;
             AutomationProperties.SetItemStatus(
-                label,
-                !column.Sortable ? string.Empty :
-                sorted ? sortDescending ? "Sorted descending" : "Sorted ascending" : "Not sorted");
+                label, !column.Sortable ? string.Empty : sorted ? sortDescending ? "Sorted descending" : "Sorted ascending" : "Not sorted");
         }
     }
 
@@ -383,11 +368,11 @@ public sealed partial class ColumnHeaderRow : Grid
             return;
         }
 
-        if (args.Key is VirtualKey.Left or VirtualKey.Right &&
-            this._owner is { KeyboardReorderModifiers: not VirtualKeyModifiers.None } owner &&
-            CurrentModifiers() == owner.KeyboardReorderModifiers &&
-            (args.OriginalSource as Button)?.Tag is ListColumn column &&
-            this.MoveByKeyboard(column, args.Key == VirtualKey.Left ? -1 : 1))
+        if (args.Key is VirtualKey.Left or VirtualKey.Right
+            && this._owner is { KeyboardReorderModifiers: not VirtualKeyModifiers.None } owner
+            && CurrentModifiers() == owner.KeyboardReorderModifiers
+            && (args.OriginalSource as Button)?.Tag is ListColumn column
+            && this.MoveByKeyboard(column, args.Key == VirtualKey.Left ? -1 : 1))
         {
             args.Handled = true;
         }
@@ -400,12 +385,10 @@ public sealed partial class ColumnHeaderRow : Grid
             return InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
         }
 
-        return (Down(VirtualKey.Control) ? VirtualKeyModifiers.Control : VirtualKeyModifiers.None) |
-               (Down(VirtualKey.Shift) ? VirtualKeyModifiers.Shift : VirtualKeyModifiers.None) |
-               (Down(VirtualKey.Menu) ? VirtualKeyModifiers.Menu : VirtualKeyModifiers.None) |
-               (Down(VirtualKey.LeftWindows) || Down(VirtualKey.RightWindows)
-                   ? VirtualKeyModifiers.Windows
-                   : VirtualKeyModifiers.None);
+        return (Down(VirtualKey.Control) ? VirtualKeyModifiers.Control : VirtualKeyModifiers.None)
+               | (Down(VirtualKey.Shift) ? VirtualKeyModifiers.Shift : VirtualKeyModifiers.None)
+               | (Down(VirtualKey.Menu) ? VirtualKeyModifiers.Menu : VirtualKeyModifiers.None)
+               | (Down(VirtualKey.LeftWindows) || Down(VirtualKey.RightWindows) ? VirtualKeyModifiers.Windows : VirtualKeyModifiers.None);
     }
 
     private void BeginVisuals(DragState drag, double x)
@@ -489,9 +472,13 @@ public sealed partial class ColumnHeaderRow : Grid
     // Scrolls a list wider than its viewport while the pointer rests near either edge.
     private void UpdateAutoScroll(ScrollViewer scroll, double xInScroll)
     {
-        var step = xInScroll < AutoScrollZone ? -AutoScrollMaxStep * (AutoScrollZone - xInScroll) / AutoScrollZone :
-            xInScroll > scroll.ViewportWidth - AutoScrollZone ? AutoScrollMaxStep *
-            (xInScroll - (scroll.ViewportWidth - AutoScrollZone)) / AutoScrollZone : 0;
+        var step = xInScroll < AutoScrollZone
+            ? -AutoScrollMaxStep * (AutoScrollZone - xInScroll) / AutoScrollZone
+            :
+            xInScroll > scroll.ViewportWidth - AutoScrollZone
+                ?
+                AutoScrollMaxStep * (xInScroll - (scroll.ViewportWidth - AutoScrollZone)) / AutoScrollZone
+                : 0;
         this._autoScrollStep = Math.Clamp(step, -AutoScrollMaxStep, AutoScrollMaxStep);
         if (this._autoScrollStep == 0 || scroll.ScrollableWidth <= 0)
         {
@@ -560,9 +547,7 @@ public sealed partial class ColumnHeaderRow : Grid
         {
             var item = new ToggleMenuFlyoutItem
             {
-                Text = column.Header,
-                IsChecked = owner.IsColumnVisible(column.Id),
-                IsEnabled = owner.CanToggleColumn(column.Id)
+                Text = column.Header, IsChecked = owner.IsColumnVisible(column.Id), IsEnabled = owner.CanToggleColumn(column.Id)
             };
             AutomationProperties.SetAutomationId(item, "ToggleColumn" + column.Id);
             item.Click += (_, _) => owner.ToggleColumn(column.Id);
@@ -572,12 +557,8 @@ public sealed partial class ColumnHeaderRow : Grid
         if ((this._menu.Target as Button)?.Tag is ListColumn target)
         {
             this._menu.Items.Add(new MenuFlyoutSeparator());
-            this.AddItem(
-                "Move column left", "MoveColumnLeft", owner.CanMoveColumn(target.Id, -1),
-                () => owner.MoveColumnBy(target.Id, -1));
-            this.AddItem(
-                "Move column right", "MoveColumnRight", owner.CanMoveColumn(target.Id, 1),
-                () => owner.MoveColumnBy(target.Id, 1));
+            this.AddItem("Move column left", "MoveColumnLeft", owner.CanMoveColumn(target.Id, -1), () => owner.MoveColumnBy(target.Id, -1));
+            this.AddItem("Move column right", "MoveColumnRight", owner.CanMoveColumn(target.Id, 1), () => owner.MoveColumnBy(target.Id, 1));
             this.AddItem("Size column to fit", "FitColumn", target.CanResize, () => owner.AutoFitColumn(target.Id));
         }
 

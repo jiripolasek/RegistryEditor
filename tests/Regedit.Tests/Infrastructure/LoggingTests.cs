@@ -39,16 +39,17 @@ internal static class LoggingTests
             var files = Directory.GetFiles(shared, "regedit-*.log").Where(path => path != yesterday).ToArray();
             var lines = files.SelectMany(File.ReadAllLines).ToArray();
             check(
-                files.Length > 0 && files.All(path => DateOnly.TryParseExact(
-                    Path.GetFileNameWithoutExtension(path)["regedit-".Length..], "yyyyMMdd",
-                    CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) &&
-                Enumerable.Range(0, 24).All(i => lines.Count(line => line.Contains($"shared-{i:D2}-end")) == 1),
+                files.Length > 0
+                && files.All(path => DateOnly.TryParseExact(
+                    Path.GetFileNameWithoutExtension(path)["regedit-".Length..], "yyyyMMdd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out _))
+                && Enumerable.Range(0, 24).All(i => lines.Count(line => line.Contains($"shared-{i:D2}-end")) == 1),
                 "Concurrent sessions preserve every event in the profile's Logs folder");
             var failure = lines.Single(line => line.Contains("Saving session"));
             check(
-                failure.Contains(nameof(IOException)) &&
-                (failure.Contains(error.HResult.ToString(CultureInfo.InvariantCulture)) || failure.Contains(
-                    error.HResult.ToString("X8"), StringComparison.OrdinalIgnoreCase)),
+                failure.Contains(nameof(IOException))
+                && (failure.Contains(error.HResult.ToString(CultureInfo.InvariantCulture))
+                    || failure.Contains(error.HResult.ToString("X8"), StringComparison.OrdinalIgnoreCase)),
                 "A logged failure identifies its operation, exception type and HRESULT");
             check(
                 !lines.Any(line => line.Contains("private-key-name") || line.Contains("private-registry-value")),
@@ -80,13 +81,10 @@ internal static class LoggingTests
             File.WriteAllText(blocked, "preserve");
             using (var factory = AppLogging.Open(blocked))
             {
-                factory.CreateLogger("Unavailable")
-                    .LogError("An unavailable destination must allow the app to continue");
+                factory.CreateLogger("Unavailable").LogError("An unavailable destination must allow the app to continue");
             }
 
-            check(
-                File.ReadAllText(blocked) == "preserve",
-                "Logging tolerates an unavailable folder and preserves existing data");
+            check(File.ReadAllText(blocked) == "preserve", "Logging tolerates an unavailable folder and preserves existing data");
         }
         finally
         {

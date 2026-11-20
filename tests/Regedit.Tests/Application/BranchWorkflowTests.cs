@@ -3,16 +3,15 @@
 // ------------------------------------------------------------
 
 using JPSoftworks.Notifications;
-using JPSoftworks.Regedit.Services;
 // ------------------------------------------------------------
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
-
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Core.Snapshots;
 using JPSoftworks.Regedit.Dialogs;
 using JPSoftworks.Regedit.Models.Registry;
 using JPSoftworks.Regedit.Models.Tools;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using Microsoft.Win32;
 
@@ -27,22 +26,19 @@ internal static class BranchWorkflowTests
         inspector.Length = 2;
         inspector.InterpretCommand.Execute(null);
         check(
-            inspector.RawBytes == "00FF0041" && !inspector.HasNumber && inspector.Result.Contains("FF") &&
-            inspector.Result.Contains("00"),
+            inspector.RawBytes == "00FF0041" && !inspector.HasNumber && inspector.Result.Contains("FF") && inspector.Result.Contains("00"),
             "Value inspection retains the physical bytes and interprets the selected range only");
         inspector.Length = 1.5;
         inspector.InterpretCommand.Execute(null);
         check(inspector.Result.Contains("whole numbers"), "A fractional byte range reports a validation error");
 
         var registry = new RegistryService();
-        var local = RegistryLocation.Parse(
-            @"HKCU\Software\RegeditWorkflow-" + Guid.NewGuid().ToString("N"), RegistryView.Registry32);
+        var local = RegistryLocation.Parse(@"HKCU\Software\RegeditWorkflow-" + Guid.NewGuid().ToString("N"), RegistryView.Registry32);
         var remote = RegistryLocation.Parse(@"\\fixture\HKLM\Software", RegistryView.Registry32);
         var file = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".regsnap");
         var exported = Path.ChangeExtension(file, ".reg");
         var now = DateTimeOffset.UtcNow;
-        var before = new RegistryBranchSnapshot(
-            1, local, now, now, [new SnapshotKey(string.Empty, [])], Environment.MachineName);
+        var before = new RegistryBranchSnapshot(1, local, now, now, [new SnapshotKey(string.Empty, [])], Environment.MachineName);
         var after = before with
         {
             Keys =
@@ -71,16 +67,12 @@ internal static class BranchWorkflowTests
             ]
         };
         var targetComparison = new RegistryComparison(targetBefore, targetAfter);
-        var targetInspector = new SnapshotComparisonViewModel(
-            targetComparison, () => Task.FromResult<string?>(null), _ => { });
-        check(
-            !targetInspector.HasTarget && targetInspector.Target == string.Empty,
-            "An unselected snapshot has no target readout");
+        var targetInspector = new SnapshotComparisonViewModel(targetComparison, () => Task.FromResult<string?>(null), _ => { });
+        check(!targetInspector.HasTarget && targetInspector.Target == string.Empty, "An unselected snapshot has no target readout");
         foreach (var difference in targetComparison.Differences)
         {
             targetInspector.Select([difference], difference);
-            var expected = difference.Location.Address +
-                           (difference.After is null ? string.Empty : "\r\n" + difference.After.DisplayName);
+            var expected = difference.Location.Address + (difference.After is null ? string.Empty : "\r\n" + difference.After.DisplayName);
             check(
                 targetInspector.HasTarget && targetInspector.Target == expected,
                 "Snapshot target preserves full path name and trailing spaces: " + difference.Kind);
@@ -94,8 +86,7 @@ internal static class BranchWorkflowTests
             "Multiple snapshot selections retain the current inspected target and unnamed-value display semantics");
         targetInspector.Select([], null);
         check(
-            !targetInspector.HasTarget && targetInspector.Target == string.Empty,
-            "Clearing snapshot selection removes its target readout");
+            !targetInspector.HasTarget && targetInspector.Target == string.Empty, "Clearing snapshot selection removes its target readout");
         var pick = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var copies = new List<string>();
         var diff = new SnapshotComparisonViewModel(comparison, () => pick.Task, copies.Add);
@@ -114,8 +105,10 @@ internal static class BranchWorkflowTests
             await export;
             var output = await File.ReadAllTextAsync(exported);
             check(
-                output.Contains("Chosen") && !output.Contains("Omitted") && copies.Count == 2 &&
-                copies.All(script => script.Contains("Chosen") && !script.Contains("Omitted")),
+                output.Contains("Chosen")
+                && !output.Contains("Omitted")
+                && copies.Count == 2
+                && copies.All(script => script.Contains("Chosen") && !script.Contains("Omitted")),
                 "Comparison export captures its selection before the picker and both scripts contain only selected values");
 
             var foreign = before with { Root = remote, Computer = "fixture" };
@@ -174,17 +167,18 @@ internal static class BranchWorkflowTests
             held.SetResult(file);
             await capture;
             check(
-                snapshots.LastSnapshot is null && snapshotStarts.Count == 1 &&
-                (await RegistryBranchSnapshot.LoadAsync(file)).Root == remote,
+                snapshots.LastSnapshot is null
+                && snapshotStarts.Count == 1
+                && (await RegistryBranchSnapshot.LoadAsync(file)).Root == remote,
                 "Closing the browser while the snapshot picker is open preserves the existing file");
 
             var prompts = new BranchDialogs();
             var commands = new RegistryBranchCommands(registry) { Dialogs = prompts };
             check(
-                !commands.SaveHiveCommand.CanExecute(new RegistryLocation()) &&
-                commands.LoadHiveCommand.CanExecute(RegistryLocation.Parse("HKU")) &&
-                !commands.LoadHiveCommand.CanExecute(local) &&
-                !commands.UnloadHiveCommand.CanExecute(RegistryLocation.Parse("HKLM")),
+                !commands.SaveHiveCommand.CanExecute(new RegistryLocation())
+                && commands.LoadHiveCommand.CanExecute(RegistryLocation.Parse("HKU"))
+                && !commands.LoadHiveCommand.CanExecute(local)
+                && !commands.UnloadHiveCommand.CanExecute(RegistryLocation.Parse("HKLM")),
                 "Hive eligibility follows the explicit target and rejects invalid roots");
             var refreshes = new List<RegistryLocation?>();
             commands.TreeChanged += navigateTo =>
@@ -207,8 +201,7 @@ internal static class BranchWorkflowTests
             await commands.ExportCommand.ExecuteAsync(local);
             await commands.PrintCommand.ExecuteAsync(local);
             check(
-                prompts.Calls.SequenceEqual(new[] { "save:.hiv", "open:*", "confirm", "save:.reg", "range" }) &&
-                prompts.Preview is null,
+                prompts.Calls.SequenceEqual(new[] { "save:.hiv", "open:*", "confirm", "save:.reg", "range" }) && prompts.Preview is null,
                 "Canceling pickers, hive confirmation and print range stops before side effects");
             check(
                 completedExports.Count == 0 && exportStarts.Count == 0,
@@ -256,8 +249,10 @@ internal static class BranchWorkflowTests
                     prompts.Range = ReportRange.CurrentKey;
                     await commands.PrintCommand.ExecuteAsync(local);
                     check(
-                        prompts.Preview is { } preview && preview.Title == local.Address &&
-                        preview.Report.Contains("OnlyHere") && !preview.Report.Contains("OnlyInChild"),
+                        prompts.Preview is { } preview
+                        && preview.Title == local.Address
+                        && preview.Report.Contains("OnlyHere")
+                        && !preview.Report.Contains("OnlyInChild"),
                         "Print preview receives the original key title, raw value and nonrecursive range");
 
                     var previewOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -282,8 +277,7 @@ internal static class BranchWorkflowTests
 
                     await current.CompareLastCommand.ExecuteAsync(null);
                     check(
-                        current.LastSnapshot?.Root == local && current.LastComparison?.Differences is
-                            [{ Name: "OnlyInChild" }],
+                        current.LastSnapshot?.Root == local && current.LastComparison?.Differences is [{ Name: "OnlyInChild" }],
                         "The browser retains its successful capture and compares the same branch and view");
                 }
                 finally
@@ -310,6 +304,8 @@ internal static class BranchWorkflowTests
         internal Func<CancellationToken, Task>? WaitForPreview { get; set; }
 
         internal (string Title, string Report)? Preview { get; private set; }
+
+        internal RegistryLocation? PermissionsTarget { get; private set; }
 
         public Task<string?> PickSaveAsync(string name, string extension, string description)
         {
@@ -350,8 +346,6 @@ internal static class BranchWorkflowTests
         {
             throw new InvalidOperationException();
         }
-
-        internal RegistryLocation? PermissionsTarget { get; private set; }
 
         public void ShowPermissions(RegistryLocation target)
         {

@@ -21,6 +21,9 @@ public sealed partial class ColumnRow : Grid
     private (ListColumn Column, TextBox Box)? _editor;
     private INotifyPropertyChanged? _observedItem;
 
+    internal IEnumerable<(ListColumn Column, FrameworkElement Cell)> Cells =>
+        this._cells.Select(pair => (pair.Key, pair.Value));
+
     public ColumnRow()
     {
         this.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
@@ -51,9 +54,6 @@ public sealed partial class ColumnRow : Grid
     {
         this.UpdateAutomationName();
     }
-
-    internal IEnumerable<(ListColumn Column, FrameworkElement Cell)> Cells =>
-        this._cells.Select(pair => (pair.Key, pair.Value));
 
     internal void SetOwner(ColumnListView owner)
     {
@@ -218,9 +218,7 @@ public sealed partial class ColumnRow : Grid
     private void RowLoaded(object sender, RoutedEventArgs args)
     {
         this.ObserveItem();
-        for (DependencyObject? parent = VisualTreeHelper.GetParent(this);
-             parent is not null;
-             parent = VisualTreeHelper.GetParent(parent))
+        for (DependencyObject? parent = VisualTreeHelper.GetParent(this); parent is not null; parent = VisualTreeHelper.GetParent(parent))
         {
             if (parent is ColumnListView owner)
             {

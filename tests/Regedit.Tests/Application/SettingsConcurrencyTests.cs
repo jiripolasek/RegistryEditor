@@ -28,14 +28,10 @@ internal static class SettingsConcurrencyTests
             second.AddFavorite("Second window", "HKLM\\Software", false, null);
             first.Save(file);
             second.Save(file);
-            check(
-                AppSettings.Load(file).Favorites.Count == 2,
-                "Independent windows retain both favorites when saving stale settings");
+            check(AppSettings.Load(file).Favorites.Count == 2, "Independent windows retain both favorites when saving stale settings");
             first.Save(file);
             second.Save(file);
-            check(
-                AppSettings.Load(file).Favorites.Count == 2,
-                "Later saves and window closure cannot erase another window's favorites");
+            check(AppSettings.Load(file).Favorites.Count == 2, "Later saves and window closure cannot erase another window's favorites");
 
             first = AppSettings.Load(file);
             second = AppSettings.Load(file);
@@ -69,8 +65,7 @@ internal static class SettingsConcurrencyTests
                 void SaveRestored()
                 {
                     restored.SaveSession(
-                        [new SavedTab("HKLM", Layout: new BrowserLayout(444))], true, sessionFile,
-                        new WindowLayout(PaneWidth: 600));
+                        [new SavedTab("HKLM", Layout: new BrowserLayout(444))], true, sessionFile, new WindowLayout(PaneWidth: 600));
                 }
 
                 if (ownerSavesFirst)
@@ -90,16 +85,16 @@ internal static class SettingsConcurrencyTests
                 restored.Save(sessionFile);
                 var sessions = AppSettings.Load(sessionFile);
                 check(
-                    sessions.LoadError is null && sessions.Tabs.Count == 2 &&
-                    sessions.Tabs.Any(tab => tab.Address == "HKCU\\Software" && tab.Layout?.NameWidth == 333) &&
-                    sessions.Tabs.Any(tab => tab.Address == "HKLM" && tab.Layout?.NameWidth == 444),
+                    sessions.LoadError is null
+                    && sessions.Tabs.Count == 2
+                    && sessions.Tabs.Any(tab => tab.Address == "HKCU\\Software" && tab.Layout?.NameWidth == 333)
+                    && sessions.Tabs.Any(tab => tab.Address == "HKLM" && tab.Layout?.NameWidth == 444),
                     "Restoring a live window's session lets both windows save their current tabs: " + ownerSavesFirst);
                 using var document = JsonDocument.Parse(File.ReadAllText(sessionFile));
                 check(
                     document.RootElement.GetProperty("WindowSessions").EnumerateArray()
                         .Select(session => session.GetProperty("Layout").GetProperty("PaneWidth").GetDouble()).Order()
-                        .SequenceEqual([400d, 600d]),
-                    "Restoring a live window's session retains both window layouts: " + ownerSavesFirst);
+                        .SequenceEqual([400d, 600d]), "Restoring a live window's session retains both window layouts: " + ownerSavesFirst);
             }
 
             var noteLocation = RegistryLocation.Parse("HKCU\\Software\\SettingsConcurrency");
@@ -113,19 +108,20 @@ internal static class SettingsConcurrencyTests
             var draft = new NoteDraft(noteLocation, "Original") { Text = "Second edit" };
             Reject(() => secondNotes.Save(draft), check, "Two edits to the same note produce an explicit conflict");
             check(
-                draft.IsDirty && draft.Text == "Second edit" && second.Notes.Single().Text == "Original" &&
-                AppSettings.Load(file).Notes.Single().Text == "First edit",
+                draft.IsDirty
+                && draft.Text == "Second edit"
+                && second.Notes.Single().Text == "Original"
+                && AppSettings.Load(file).Notes.Single().Text == "First edit",
                 "A note conflict retains the unsaved draft and the other window's saved text");
 
             var legacyFile = Path.Combine(folder, "legacy.json");
             File.WriteAllText(
-                legacyFile,
-                """{"Favorites":[{"Name":"Duplicate","Address":"HKCU"},{"Name":"Duplicate","Address":"HKCU"}]}""");
+                legacyFile, """{"Favorites":[{"Name":"Duplicate","Address":"HKCU"},{"Name":"Duplicate","Address":"HKCU"}]}""");
             first = AppSettings.Load(legacyFile);
             second = AppSettings.Load(legacyFile);
             check(
-                first.Favorites.Select(item => item.Id).SequenceEqual(second.Favorites.Select(item => item.Id)) &&
-                first.Favorites.Select(item => item.Id).Distinct().Count() == 2,
+                first.Favorites.Select(item => item.Id).SequenceEqual(second.Favorites.Select(item => item.Id))
+                && first.Favorites.Select(item => item.Id).Distinct().Count() == 2,
                 "Legacy duplicate favorites get stable and distinct identities across processes");
             first.Favorites[0] = first.Favorites[0] with { Name = "Renamed" };
             second.Favorites.RemoveAt(1);
@@ -141,8 +137,7 @@ internal static class SettingsConcurrencyTests
             first.Save(legacyFile);
             Reject(() => second.Save(legacyFile), check, "Deleting a concurrently edited favorite is rejected");
             check(
-                AppSettings.Load(legacyFile).Favorites.Single().Name == "Edited again",
-                "A rejected deletion preserves the newer favorite");
+                AppSettings.Load(legacyFile).Favorites.Single().Name == "Edited again", "A rejected deletion preserves the newer favorite");
 
             var graphFile = Path.Combine(folder, "folders.json");
             saved = AppSettings.Load(graphFile);
@@ -155,8 +150,7 @@ internal static class SettingsConcurrencyTests
             second.Save(graphFile);
             Reject(() => first.Save(graphFile), check, "Removing a folder cannot orphan a concurrently added favorite");
             check(
-                AppSettings.Load(graphFile).FavoriteFolders.Count == 1 &&
-                AppSettings.Load(graphFile).Favorites.Count == 1,
+                AppSettings.Load(graphFile).FavoriteFolders.Count == 1 && AppSettings.Load(graphFile).Favorites.Count == 1,
                 "A rejected folder removal retains the complete saved hierarchy");
 
             var orderFile = Path.Combine(folder, "order.json");
@@ -181,34 +175,25 @@ internal static class SettingsConcurrencyTests
             first.ReorderFavorite(first.Favorites[1], -1);
             second.ReorderFavorite(second.Favorites[2], -1);
             first.Save(orderFile);
-            Reject(
-                () => second.Save(orderFile), check,
-                "Conflicting reorder operations are reported instead of silently winning");
+            Reject(() => second.Save(orderFile), check, "Conflicting reorder operations are reported instead of silently winning");
 
             var changedFile = Path.Combine(folder, "changed.json");
             saved = AppSettings.Load(changedFile);
             saved.Save(changedFile);
             File.WriteAllText(changedFile, "unreadable external update");
-            Reject(
-                () => saved.Save(changedFile), check,
-                "A newly unreadable settings file is never replaced by stale settings");
-            check(
-                File.ReadAllText(changedFile) == "unreadable external update",
-                "Unreadable external data survives a rejected save");
+            Reject(() => saved.Save(changedFile), check, "A newly unreadable settings file is never replaced by stale settings");
+            check(File.ReadAllText(changedFile) == "unreadable external update", "Unreadable external data survives a rejected save");
             saved = AppSettings.Load(changedFile);
             File.WriteAllText(changedFile, "a different unreadable update");
             Reject(() => saved.Save(changedFile), check, "Recovery cannot replace a file changed since its load error");
             File.Delete(changedFile);
-            Reject(
-                () => saved.Save(changedFile), check,
-                "A removed settings file requires an explicit reload before saving");
+            Reject(() => saved.Save(changedFile), check, "A removed settings file requires an explicit reload before saving");
 
             var lockFile = Path.Combine(folder, "locked.json");
             saved = AppSettings.Load(lockFile);
             saved.AddFavorite("After waiting", "HKCU", false, null);
             Task writer;
-            using (var lease = File.Open(
-                       lockFile + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            using (var lease = File.Open(lockFile + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
             {
                 writer = Task.Run(() => saved.Save(lockFile));
                 await Task.Delay(100);
@@ -220,9 +205,7 @@ internal static class SettingsConcurrencyTests
                 "Settings saves wait for another writer's lease to be released");
             using (var lease = File.Open(lockFile + ".lock", FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             {
-                Reject(
-                    () => saved.Save(lockFile), check,
-                    "Writer contention has a bounded timeout and leaves the saved file intact");
+                Reject(() => saved.Save(lockFile), check, "Writer contention has a bounded timeout and leaves the saved file intact");
             }
 
             saved.Theme = "Dark";
@@ -239,9 +222,7 @@ internal static class SettingsConcurrencyTests
 
             await CheckProcesses(folder, true, check);
             await CheckProcesses(folder, false, check);
-            check(
-                !Directory.EnumerateFiles(folder, "*.tmp").Any(),
-                "Concurrent and rejected settings saves leave no temporary files");
+            check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "Concurrent and rejected settings saves leave no temporary files");
         }
         finally
         {
@@ -293,15 +274,11 @@ internal static class SettingsConcurrencyTests
                 ? [new SavedTab("HKCU"), new SavedTab(location.Address, true, new BrowserLayout(333))]
                 : [new SavedTab(location.Address, true, new BrowserLayout(444))], name == "main", file,
             new WindowLayout(
-                new WindowPlacement(
-                    new WindowBounds(name == "main" ? 100 : 200, 100, 1000, 700), new WindowBounds(0, 0, 1920, 1040)),
+                new WindowPlacement(new WindowBounds(name == "main" ? 100 : 200, 100, 1000, 700), new WindowBounds(0, 0, 1920, 1040)),
                 name == "main", name == "main", name == "main" ? 400 : 600, name == "main" ? "Journal" : "Watches"));
     }
 
-    internal static async Task CheckElevatedProcessesAsync(
-        string folder,
-        Process elevatedWriter,
-        Action<bool, string> check)
+    internal static async Task CheckElevatedProcessesAsync(string folder, Process elevatedWriter, Action<bool, string> check)
     {
         await CheckProcesses(folder, true, check, elevatedWriter);
         await CheckProcesses(folder, false, check, elevatedWriter);
@@ -336,8 +313,7 @@ internal static class SettingsConcurrencyTests
                 {
                     UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true
                 };
-                if (Path.GetFileNameWithoutExtension(start.FileName)
-                    .Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+                if (Path.GetFileNameWithoutExtension(start.FileName).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
                 {
                     start.ArgumentList.Add(typeof(SettingsConcurrencyTests).Assembly.Location);
                 }
@@ -357,7 +333,8 @@ internal static class SettingsConcurrencyTests
                     if (process.HasExited)
                     {
                         throw new IOException(
-                            "Settings worker exited early: " + (process == elevatedWriter
+                            "Settings worker exited early: "
+                            + (process == elevatedWriter
                                 ? File.ReadAllText(Path.Combine(folder, "worker-error.log"))
                                 : process.StandardError.ReadToEnd()));
                     }
@@ -407,40 +384,40 @@ internal static class SettingsConcurrencyTests
 
             var saved = AppSettings.Load(file);
             check(
-                saved.LoadError is null && saved.Favorites.Count == 2 && saved.FavoriteFolders.Count == 2 &&
-                saved.Notes.Count == 2 && saved.Searches.Count == 2 && saved.Workspaces.Count == 2,
-                "Two processes merge favorites, folders, notes, searches, and workspaces in closing order: " +
-                mainClosesFirst);
+                saved.LoadError is null
+                && saved.Favorites.Count == 2
+                && saved.FavoriteFolders.Count == 2
+                && saved.Notes.Count == 2
+                && saved.Searches.Count == 2
+                && saved.Workspaces.Count == 2,
+                "Two processes merge favorites, folders, notes, searches, and workspaces in closing order: " + mainClosesFirst);
             check(
                 saved.Theme == "Dark" && saved.FontSize == 18 && saved.ToolPanePinned && saved.SelectedTool == "Notes",
                 "Two processes preserve independent appearance and tool preferences: " + mainClosesFirst);
             check(
-                saved.Tabs.Count == 3 && saved.Tabs.Count(tab => tab.Is32Bit) == 2 &&
-                saved.Tabs.Any(tab => tab.Address == "HKCU"),
+                saved.Tabs.Count == 3 && saved.Tabs.Count(tab => tab.Is32Bit) == 2 && saved.Tabs.Any(tab => tab.Address == "HKCU"),
                 "A link window cannot replace the main window's restored tab session: " + mainClosesFirst);
             using (var layouts = JsonDocument.Parse(File.ReadAllText(file)))
             {
                 var sessions = layouts.RootElement.GetProperty("WindowSessions").EnumerateArray().ToArray();
                 check(
-                    sessions.Length == 2 &&
-                    sessions.Any(session => session.GetProperty("Layout").GetProperty("PaneWidth").GetDouble() == 400 &&
-                                            session.GetProperty("Tabs").EnumerateArray().Any(tab =>
-                                                tab.TryGetProperty("Layout", out var layout) &&
-                                                layout.ValueKind == JsonValueKind.Object &&
-                                                layout.GetProperty("NameWidth").GetDouble() == 333)) &&
-                    sessions.Any(session => session.GetProperty("Layout").GetProperty("PaneWidth").GetDouble() == 600 &&
-                                            session.GetProperty("Tabs")[0].GetProperty("Layout")
-                                                .GetProperty("NameWidth").GetDouble() == 444),
+                    sessions.Length == 2
+                    && sessions.Any(session => session.GetProperty("Layout").GetProperty("PaneWidth").GetDouble() == 400
+                                               && session.GetProperty("Tabs").EnumerateArray().Any(tab =>
+                                                   tab.TryGetProperty("Layout", out var layout)
+                                                   && layout.ValueKind == JsonValueKind.Object
+                                                   && layout.GetProperty("NameWidth").GetDouble() == 333))
+                    && sessions.Any(session =>
+                        session.GetProperty("Layout").GetProperty("PaneWidth").GetDouble() == 600
+                        && session.GetProperty("Tabs")[0].GetProperty("Layout").GetProperty("NameWidth").GetDouble() == 444),
                     "Two processes retain separate window and browser layout in closing order: " + mainClosesFirst);
             }
 
             saved.SaveSession(saved.Tabs.ToList(), true, file);
             using var document = JsonDocument.Parse(File.ReadAllText(file));
             check(
-                document.RootElement.GetProperty("WindowSessions").GetArrayLength() == 1 &&
-                AppSettings.Load(file).Tabs.Count == 3,
-                "A restored session replaces consumed session records without duplicating its tabs: " +
-                mainClosesFirst);
+                document.RootElement.GetProperty("WindowSessions").GetArrayLength() == 1 && AppSettings.Load(file).Tabs.Count == 3,
+                "A restored session replaces consumed session records without duplicating its tabs: " + mainClosesFirst);
         }
         finally
         {

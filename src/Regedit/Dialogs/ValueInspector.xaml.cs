@@ -32,14 +32,8 @@ public sealed partial class ValueInspector : UserControl
         {
             this.InterpretationControls.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
             this.InterpretationChevron.Glyph = value ? "\uE70D" : "\uE76C";
-            AutomationProperties.SetName(
-                this.InterpretBytesToggle, value ? "Hide byte interpretation" : "Show byte interpretation");
+            AutomationProperties.SetName(this.InterpretBytesToggle, value ? "Hide byte interpretation" : "Show byte interpretation");
         }
-    }
-
-    private void ToggleByteInterpretation_Click(object sender, RoutedEventArgs args)
-    {
-        this.IsInterpretationExpanded = !this.IsInterpretationExpanded;
     }
 
     internal ValueInspector(
@@ -56,6 +50,11 @@ public sealed partial class ValueInspector : UserControl
         this.RawBytesView.Width = HexView.DialogWidth;
         this.Loaded += (_, _) => viewModel.PropertyChanged += this.ViewModel_PropertyChanged;
         this.Unloaded += (_, _) => viewModel.PropertyChanged -= this.ViewModel_PropertyChanged;
+    }
+
+    private void ToggleByteInterpretation_Click(object sender, RoutedEventArgs args)
+    {
+        this.IsInterpretationExpanded = !this.IsInterpretationExpanded;
     }
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)

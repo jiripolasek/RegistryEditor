@@ -37,10 +37,7 @@ internal sealed class RegistryAddressSuggestions(Func<RegistryLocation, string[]
     /// Completes the last segment of typed text. Roots match by name or alias; remote paths get no
     /// suggestions so typing never opens network connections.
     /// </summary>
-    internal async Task<IReadOnlyList<OmniboxItem>> SuggestAsync(
-        string text,
-        RegistryView view,
-        CancellationToken cancellationToken)
+    internal async Task<IReadOnlyList<OmniboxItem>> SuggestAsync(string text, RegistryView view, CancellationToken cancellationToken)
     {
         text = text.TrimStart();
         if (text.StartsWith("Computer\\", StringComparison.OrdinalIgnoreCase))
@@ -52,9 +49,10 @@ internal sealed class RegistryAddressSuggestions(Func<RegistryLocation, string[]
         if (slash < 0)
         {
             return RegistryLocation.Roots.Where(root =>
-                    root.Name.StartsWith(text, StringComparison.OrdinalIgnoreCase) ||
-                    root.Alias.StartsWith(text, StringComparison.OrdinalIgnoreCase))
-                .Select(root => new OmniboxItem(root.Name, root.Name)).ToArray();
+                    root.Name.StartsWith(text, StringComparison.OrdinalIgnoreCase)
+                    || root.Alias.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+                .Select(root => new OmniboxItem(root.Name, root.Name))
+                .ToArray();
         }
 
         var parent = RegistryLocation.Parse(text[..slash], view);

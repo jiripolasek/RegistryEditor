@@ -33,31 +33,27 @@ internal static class ColumnLayoutSettingsTests
             secondPreferences.SaveColumnLayout("SearchResults", search);
             var reloaded = AppSettings.Load(path);
             check(
-                reloaded.ColumnLayouts.TryGetValue("Tool.Journal", out var savedJournal) &&
-                savedJournal.IsEquivalentTo(journal) &&
-                reloaded.ColumnLayouts.TryGetValue("SearchResults", out var savedSearch) &&
-                savedSearch.IsEquivalentTo(search), "Windows saving different lists keep both layouts");
+                reloaded.ColumnLayouts.TryGetValue("Tool.Journal", out var savedJournal)
+                && savedJournal.IsEquivalentTo(journal)
+                && reloaded.ColumnLayouts.TryGetValue("SearchResults", out var savedSearch)
+                && savedSearch.IsEquivalentTo(search), "Windows saving different lists keep both layouts");
 
-            var narrower = journal with
-            {
-                Columns = [journal.Columns[0] with { Width = 120 }, .. journal.Columns.Skip(1)]
-            };
+            var narrower = journal with { Columns = [journal.Columns[0] with { Width = 120 }, .. journal.Columns.Skip(1)] };
             secondPreferences.SaveColumnLayout("Tool.Journal", narrower);
-            firstPreferences.SaveColumnLayout(
-                "Tool.Journal", journal with { Columns = journal.Columns.Reverse().ToArray() });
+            firstPreferences.SaveColumnLayout("Tool.Journal", journal with { Columns = journal.Columns.Reverse().ToArray() });
             check(
-                !firstPreferences.IsSaveErrorOpen && !secondPreferences.IsSaveErrorOpen &&
-                AppSettings.Load(path).ColumnLayouts["Tool.Journal"].Columns[0].Id == "Summary" &&
-                AppSettings.Load(path).ColumnLayouts.ContainsKey("SearchResults"),
+                !firstPreferences.IsSaveErrorOpen
+                && !secondPreferences.IsSaveErrorOpen
+                && AppSettings.Load(path).ColumnLayouts["Tool.Journal"].Columns[0].Id == "Summary"
+                && AppSettings.Load(path).ColumnLayouts.ContainsKey("SearchResults"),
                 "Concurrent changes to one list resolve to the latest save without a conflict");
 
-            File.WriteAllText(
-                path,
-                """{"ColumnLayouts":{"Tool.Notes":{"Columns":[{"Id":"Path","Width":200,"Visible":true}]},"":null}}""");
+            File.WriteAllText(path, """{"ColumnLayouts":{"Tool.Notes":{"Columns":[{"Id":"Path","Width":200,"Visible":true}]},"":null}}""");
             var legacy = AppSettings.Load(path);
             check(
-                legacy.LoadError is null && legacy.ColumnLayouts.Count == 1 &&
-                legacy.ColumnLayouts["Tool.Notes"].Columns.Single().Width == 200,
+                legacy.LoadError is null
+                && legacy.ColumnLayouts.Count == 1
+                && legacy.ColumnLayouts["Tool.Notes"].Columns.Single().Width == 200,
                 "Saved layouts load and incomplete entries are skipped");
         }
         finally

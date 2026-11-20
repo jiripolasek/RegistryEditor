@@ -13,8 +13,7 @@ namespace JPSoftworks.Regedit.Models.Tools;
 
 internal static class ToolPresentation
 {
-    internal const string FluentSystemIconsFontFamily
-        = "/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular";
+    internal const string FluentSystemIconsFontFamily = "/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular";
 
     internal static readonly ToolChoice[] Tools =
     [
@@ -38,32 +37,31 @@ internal static class ToolPresentation
 
     internal static string SearchOptionsText(SearchOptions options)
     {
-        var fields = new[]
-        {
-            options.Keys ? "Key names" : null, options.Values ? "Value names" : null,
-            options.Data ? "Value data" : null
-        };
+        var fields = new[] { options.Keys ? "Key names" : null, options.Values ? "Value names" : null, options.Data ? "Value data" : null };
         var types = options.Types is { Length: > 0 }
             ? string.Join(", ", options.Types.Select(type => new RegistryValue(string.Empty, type, []).TypeName))
             : "All";
-        return "Search in: " + string.Join(", ", fields.Where(field => field is not null)) + "\nMatch: " +
-               (options.MatchCase ? "Case sensitive" : "Ignore case") + " · " +
-               (options.Whole ? "Whole text" : "Substring") + "\nValue types: " + types;
+        return "Search in: "
+               + string.Join(", ", fields.Where(field => field is not null))
+               + "\nMatch: "
+               + (options.MatchCase ? "Case sensitive" : "Ignore case")
+               + " · "
+               + (options.Whole ? "Whole text" : "Substring")
+               + "\nValue types: "
+               + types;
     }
 
     internal static IEnumerable<ToolComparison> WorkspaceComparisons(RegistryWorkspace workspace)
     {
         if (workspace.Tabs.Length > 0)
         {
-            yield return new ToolComparison(
-                string.Empty, string.Join("\n", workspace.Tabs.Select(Address)), string.Empty, "Tabs");
+            yield return new ToolComparison(string.Empty, string.Join("\n", workspace.Tabs.Select(Address)), string.Empty, "Tabs");
         }
 
         if (workspace.Searches.Length > 0)
         {
             yield return new ToolComparison(
-                string.Empty, string.Join("\n", workspace.Searches.Select(search => search.Name)), string.Empty,
-                "Saved searches");
+                string.Empty, string.Join("\n", workspace.Searches.Select(search => search.Name)), string.Empty, "Saved searches");
         }
 
         if (workspace.Watches.Length > 0)
@@ -72,9 +70,10 @@ internal static class ToolPresentation
                 string.Empty,
                 string.Join(
                     "\n",
-                    workspace.Watches.Select(watch => Address(watch.Location) + (watch.ValueName is { } name
-                        ? " · Value: " + (name.Length == 0 ? "(Default)" : name)
-                        : " · Branch"))), string.Empty, "Watches");
+                    workspace.Watches.Select(watch =>
+                        Address(watch.Location)
+                        + (watch.ValueName is { } name ? " · Value: " + (name.Length == 0 ? "(Default)" : name) : " · Branch"))),
+                string.Empty, "Watches");
         }
     }
 
@@ -141,8 +140,8 @@ internal static class ToolPresentation
 
     internal static string JournalTarget(JournalEntry entry)
     {
-        var names = entry.Before.SelectMany(state => state.Scope.ValueNames ?? [])
-            .Select(name => name.Length == 0 ? "(Default)" : name).ToArray();
+        var names = entry.Before.SelectMany(state => state.Scope.ValueNames ?? []).Select(name => name.Length == 0 ? "(Default)" : name)
+            .ToArray();
         return entry.Path + (names.Length == 0 ? string.Empty : " · " + string.Join(", ", names));
     }
 
@@ -160,8 +159,7 @@ internal static class ToolPresentation
     public static ToolComparison Compare(RegistryDifference change)
     {
         return new ToolComparison(
-            change.Location.Address +
-            (change.Before is not null || change.After is not null ? "\n" + change.Name : string.Empty),
+            change.Location.Address + (change.Before is not null || change.After is not null ? "\n" + change.Name : string.Empty),
             ValuePreview(
                 change.Before,
                 change.Kind == RegistryChangeKind.KeyRemoved ? "Key exists" :
@@ -169,14 +167,12 @@ internal static class ToolPresentation
             ValuePreview(
                 change.After,
                 change.Kind == RegistryChangeKind.KeyAdded ? "Key exists" :
-                change.Kind == RegistryChangeKind.KeyRemoved ? "Key absent" : "Value absent"),
-            BeforeValue: change.Before, AfterValue: change.After);
+                change.Kind == RegistryChangeKind.KeyRemoved ? "Key absent" : "Value absent"), BeforeValue: change.Before,
+            AfterValue: change.After);
     }
 
     public static string ValuePreview(RegistryValue? value, string fallback = "Value absent")
     {
-        return value is null
-            ? fallback
-            : $"{value.DisplayName}\n{value.TypeName} · {value.Data.Length:N0} bytes\n{value.DisplayPreview}";
+        return value is null ? fallback : $"{value.DisplayName}\n{value.TypeName} · {value.Data.Length:N0} bytes\n{value.DisplayPreview}";
     }
 }

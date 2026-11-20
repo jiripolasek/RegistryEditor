@@ -18,6 +18,10 @@ namespace JPSoftworks.Regedit.Controls.Lists;
 // text box over the cell; Enter or leaving the box commits, Escape cancels. The host validates in EditCommitting.
 public sealed partial class ColumnListView
 {
+    public event EventHandler<ColumnEditCommittingEventArgs>? EditCommitting;
+
+    public event EventHandler<ColumnEditEndedEventArgs>? EditEnded;
+
     /// <summary>Matches the default Windows double-click time; a second click sooner than this is a double-click.</summary>
     internal static readonly TimeSpan SlowClickDelay = TimeSpan.FromMilliseconds(500);
 
@@ -25,10 +29,6 @@ public sealed partial class ColumnListView
     private DispatcherQueueTimer? _slowClickTimer;
     private DateTime _lastSelectionChange = DateTime.MinValue;
     private ScrollViewer? _itemsScroll;
-
-    public event EventHandler<ColumnEditCommittingEventArgs>? EditCommitting;
-
-    public event EventHandler<ColumnEditEndedEventArgs>? EditEnded;
 
     public bool EditOnF2 { get; set; } = true;
 
@@ -61,8 +61,10 @@ public sealed partial class ColumnListView
         var column = columnId is null
             ? this.Columns.FirstOrDefault(candidate => candidate.IsEditable && this.IsColumnVisible(candidate.Id))
             : this.FindColumn(columnId);
-        if (!this.ShowColumns || column is not { IsEditable: true } || !this.IsColumnVisible(column.Id) ||
-            this.CanEditItem?.Invoke(item, column.Id) == false)
+        if (!this.ShowColumns
+            || column is not { IsEditable: true }
+            || !this.IsColumnVisible(column.Id)
+            || this.CanEditItem?.Invoke(item, column.Id) == false)
         {
             return false;
         }
@@ -257,16 +259,21 @@ public sealed partial class ColumnListView
     private void ItemsTapped(object sender, TappedRoutedEventArgs args)
     {
         this.StopSlowClick();
-        if (!this.EditOnSlowClick || this._edit is not null || this.Items.SelectedItems.Count != 1 ||
-            DateTime.UtcNow - this._lastSelectionChange < SlowClickDelay || ModifierDown())
+        if (!this.EditOnSlowClick
+            || this._edit is not null
+            || this.Items.SelectedItems.Count != 1
+            || DateTime.UtcNow - this._lastSelectionChange < SlowClickDelay
+            || ModifierDown())
         {
             return;
         }
 
         var row = FindRow(args.OriginalSource as DependencyObject);
         var item = row?.DataContext;
-        if (row is null || item is null || !Equals(this.Items.SelectedItem, item) ||
-            row.ColumnAt(args.GetPosition(row).X) is not { IsEditable: true } column)
+        if (row is null
+            || item is null
+            || !Equals(this.Items.SelectedItem, item)
+            || row.ColumnAt(args.GetPosition(row).X) is not { IsEditable: true } column)
         {
             return;
         }
@@ -342,9 +349,7 @@ public sealed partial class ColumnListView
 
     private static ColumnRow? FindRow(DependencyObject? element)
     {
-        for (;
-             element is not null and not Microsoft.UI.Xaml.Controls.ListView;
-             element = VisualTreeHelper.GetParent(element))
+        for (; element is not null and not Microsoft.UI.Xaml.Controls.ListView; element = VisualTreeHelper.GetParent(element))
         {
             if (element is ColumnRow row)
             {
@@ -377,10 +382,7 @@ public sealed partial class ColumnListView
             return;
         }
 
-        var tip = new ToolTip
-        {
-            Content = error, Placement = Microsoft.UI.Xaml.Controls.Primitives.PlacementMode.Bottom
-        };
+        var tip = new ToolTip { Content = error, Placement = Microsoft.UI.Xaml.Controls.Primitives.PlacementMode.Bottom };
         ToolTipService.SetToolTip(box, tip);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(box, error);
         tip.IsOpen = true;

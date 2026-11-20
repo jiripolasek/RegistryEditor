@@ -242,8 +242,7 @@ public sealed partial class ColumnListView : UserControl
             ? KeyboardNavigationMode.Local
             : KeyboardNavigationMode.Once;
         this.Items.ItemTemplate = this.RowTemplate;
-        this.Items.RegisterPropertyChangedCallback(
-            ListView.ItemContainerStyleProperty, (_, _) => this.InvalidateChrome());
+        this.Items.RegisterPropertyChangedCallback(ListView.ItemContainerStyleProperty, (_, _) => this.InvalidateChrome());
         this.Loaded += (_, _) => this.InvalidateChrome();
         this.InitializeEditing();
         this.RebuildColumns();
@@ -453,8 +452,7 @@ public sealed partial class ColumnListView : UserControl
 
         this._specs = this.Columns.Select(column => column.ToSpec()).ToArray();
         this.Header.Rebuild(
-            this, this.Columns, (Style)this.Resources["ColumnHeaderButtonStyle"],
-            (Style)this.Resources["ColumnHeaderSortIconStyle"]);
+            this, this.Columns, (Style)this.Resources["ColumnHeaderButtonStyle"], (Style)this.Resources["ColumnHeaderSortIconStyle"]);
         this._layout = (this.Layout as ColumnLayout ?? ColumnLayout.Default(this._specs)).Normalize(this._specs);
         this.Arrange();
     }
@@ -493,8 +491,7 @@ public sealed partial class ColumnListView : UserControl
             widths.Add(computed[index]);
         }
 
-        this._arrangement = new ColumnArrangement(
-            this._columnsVersion, this._declared.ToArray(), slots, widths, spacing);
+        this._arrangement = new ColumnArrangement(this._columnsVersion, this._declared.ToArray(), slots, widths, spacing);
         this.AbandonEditIf(edit => this._arrangement.SlotOf(edit.Column) < 0);
         this.Header.Apply(this._arrangement, this.SortColumnId, this.SortDescending);
         foreach (var row in this._rows)
@@ -524,8 +521,10 @@ public sealed partial class ColumnListView : UserControl
             return null;
         }
 
-        var inside = origin.Y + row.ActualHeight > 0 && origin.Y < this.Items.ActualHeight &&
-                     origin.X + row.ActualWidth > 0 && origin.X < this.Items.ActualWidth;
+        var inside = origin.Y + row.ActualHeight > 0
+                     && origin.Y < this.Items.ActualHeight
+                     && origin.X + row.ActualWidth > 0
+                     && origin.X < this.Items.ActualWidth;
         return inside ? origin.Y : null;
     }
 
@@ -549,8 +548,7 @@ public sealed partial class ColumnListView : UserControl
         }
 
         this.Header.Visibility = columns ? Visibility.Visible : Visibility.Collapsed;
-        this.Items.ItemTemplate
-            = columns || this.CompactItemTemplate is null ? this.RowTemplate : this.CompactItemTemplate;
+        this.Items.ItemTemplate = columns || this.CompactItemTemplate is null ? this.RowTemplate : this.CompactItemTemplate;
         this.Arrange();
         this.InvalidateChrome();
     }
@@ -758,8 +756,7 @@ public sealed partial class ColumnListView : UserControl
 
     private void ItemsGettingFocus(UIElement sender, GettingFocusEventArgs args)
     {
-        if (args.NewFocusedElement != this.Items || args.FocusState != FocusState.Keyboard ||
-            this.Items.Items.Count == 0)
+        if (args.NewFocusedElement != this.Items || args.FocusState != FocusState.Keyboard || this.Items.Items.Count == 0)
         {
             return;
         }
@@ -779,8 +776,9 @@ public sealed partial class ColumnListView : UserControl
 
             void FocusRow()
             {
-                if (this.Items.IsLoaded && this.Items.Items.Contains(item) && ReferenceEquals(
-                        FocusManager.GetFocusedElement(this.XamlRoot), previous))
+                if (this.Items.IsLoaded
+                    && this.Items.Items.Contains(item)
+                    && ReferenceEquals(FocusManager.GetFocusedElement(this.XamlRoot), previous))
                 {
                     this.Items.UpdateLayout();
                     if (this.Items.ContainerFromItem(item) is ListViewItem realized)

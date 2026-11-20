@@ -4,14 +4,14 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using JPSoftworks.Notifications;
-using JPSoftworks.Regedit.Services;
-using JPSoftworks.Regedit.Models.Tools;
 using System.Windows.Input;
+using JPSoftworks.Notifications;
 using JPSoftworks.Regedit.Controls.Lists;
 using JPSoftworks.Regedit.Core.Import;
 using JPSoftworks.Regedit.Models.Files;
 using JPSoftworks.Regedit.Models.Settings;
+using JPSoftworks.Regedit.Models.Tools;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels.Files;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -34,6 +34,7 @@ public sealed partial class RegistryFilePreview : UserControl
 
     private readonly NotificationSession _notifications = new(
         TimeSpan.FromSeconds(new Windows.UI.ViewManagement.UISettings().MessageDuration));
+
     private RegistryFont? _editorFont;
     private bool _loadingSource, _synchronizingSource;
     private Control? _previousFocus;
@@ -44,6 +45,8 @@ public sealed partial class RegistryFilePreview : UserControl
 
     // The XAML enum parser only accepts named keys, and VirtualKey does not name comma.
     private VirtualKey CommaKey => (VirtualKey)188;
+
+    internal JPSoftworks.Notifications.WinUI.NotificationHost NotificationHost => this.NotificationOverlay;
 
     public RegistryFilePreview()
     {
@@ -70,40 +73,20 @@ public sealed partial class RegistryFilePreview : UserControl
         this.Values.Columns.Add(
             new ListColumn
             {
-                Id = "operation",
-                Header = "Operation",
-                DefaultWidth = 110,
-                CellText = row => (row as RegistryFilePreviewRow)?.Operation
+                Id = "operation", Header = "Operation", DefaultWidth = 110, CellText = row => (row as RegistryFilePreviewRow)?.Operation
             });
+        this.Values.Columns.Add(
+            new ListColumn { Id = "type", Header = "Type", DefaultWidth = 100, CellText = row => (row as RegistryFilePreviewRow)?.Type });
+        this.Values.Columns.Add(
+            new ListColumn { Id = "data", Header = "Data", MinWidth = 120, CellText = row => (row as RegistryFilePreviewRow)?.Data });
         this.Values.Columns.Add(
             new ListColumn
             {
-                Id = "type",
-                Header = "Type",
-                DefaultWidth = 100,
-                CellText = row => (row as RegistryFilePreviewRow)?.Type
-            });
-        this.Values.Columns.Add(
-            new ListColumn
-            {
-                Id = "data",
-                Header = "Data",
-                MinWidth = 120,
-                CellText = row => (row as RegistryFilePreviewRow)?.Data
-            });
-        this.Values.Columns.Add(
-            new ListColumn
-            {
-                Id = "line",
-                Header = "Line",
-                DefaultWidth = 48,
-                CellText = row => (row as RegistryFilePreviewRow)?.Line.ToString()
+                Id = "line", Header = "Line", DefaultWidth = 48, CellText = row => (row as RegistryFilePreviewRow)?.Line.ToString()
             });
         this.Loaded += (_, _) => this.DispatcherQueue.TryEnqueue(this.ApplyEditorSurface);
-        this.SourceEditor.SyntaxHighlightingApplied
-            += (_, _) => this.DispatcherQueue.TryEnqueue(this.ApplyEditorSurface);
-        this.Workspace.SizeChanged += (_, _) =>
-            this.MetadataContent.MaxHeight = Math.Clamp(this.Workspace.ActualHeight - 336, 48, 180);
+        this.SourceEditor.SyntaxHighlightingApplied += (_, _) => this.DispatcherQueue.TryEnqueue(this.ApplyEditorSurface);
+        this.Workspace.SizeChanged += (_, _) => this.MetadataContent.MaxHeight = Math.Clamp(this.Workspace.ActualHeight - 336, 48, 180);
         this.Values.SelectedItems = this._selectedValues;
         this._selectedValues.CollectionChanged += (_, _) =>
         {
@@ -113,8 +96,6 @@ public sealed partial class RegistryFilePreview : UserControl
             }
         };
     }
-
-    internal JPSoftworks.Notifications.WinUI.NotificationHost NotificationHost => this.NotificationOverlay;
 
     internal void Initialize(RegistryFilePreviewViewModel model, RegistryFont font)
     {
@@ -179,9 +160,7 @@ public sealed partial class RegistryFilePreview : UserControl
                 if (this.ViewModel.IsBusy)
                 {
                     AccessKeyManager.ExitDisplayMode();
-                    this._previousFocus = this.XamlRoot is { } root
-                        ? FocusManager.GetFocusedElement(root) as Control
-                        : null;
+                    this._previousFocus = this.XamlRoot is { } root ? FocusManager.GetFocusedElement(root) as Control : null;
                 }
 
                 this.UpdateInteraction();
@@ -207,8 +186,8 @@ public sealed partial class RegistryFilePreview : UserControl
 
     private void RestoreOperationFocus()
     {
-        if (this.ViewModel.CanInteract && (this._previousFocus is not { IsLoaded: true } ||
-                                           !this._previousFocus.Focus(FocusState.Programmatic)))
+        if (this.ViewModel.CanInteract
+            && (this._previousFocus is not { IsLoaded: true } || !this._previousFocus.Focus(FocusState.Programmatic)))
         {
             this.FileButton.Focus(FocusState.Programmatic);
         }
@@ -356,8 +335,9 @@ public sealed partial class RegistryFilePreview : UserControl
 
     private void Keys_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
     {
-        if (sender.SelectedNode is not { } node || ReferenceEquals(node, this._synchronizedNode) ||
-            !this._paths.TryGetValue(node, out var path))
+        if (sender.SelectedNode is not { } node
+            || ReferenceEquals(node, this._synchronizedNode)
+            || !this._paths.TryGetValue(node, out var path))
         {
             return;
         }
@@ -404,19 +384,16 @@ public sealed partial class RegistryFilePreview : UserControl
 
     private void Preview_KeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (this.ViewModel?.CanInteract != true ||
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) == 0 ||
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0 ||
-            args.Key is not (VirtualKey.S or VirtualKey.O or VirtualKey.Z or VirtualKey.Y or VirtualKey.W
-                or (VirtualKey)188))
+        if (this.ViewModel?.CanInteract != true
+            || (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) == 0
+            || (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0
+            || args.Key is not (VirtualKey.S or VirtualKey.O or VirtualKey.Z or VirtualKey.Y or VirtualKey.W or (VirtualKey)188))
         {
             return;
         }
 
         args.Handled = true;
-        this.InvokeShortcut(
-            args.Key,
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0);
+        this.InvokeShortcut(args.Key, (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0);
     }
 
     private void Shortcut_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -488,8 +465,7 @@ public sealed partial class RegistryFilePreview : UserControl
         this.SourceDivider.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
         this.SourceColumn.MinWidth = editor ? 320 : 0;
         this.PreviewColumn.MinWidth = preview ? 320 : 0;
-        this.SourceColumn.Width
-            = editor ? both ? this._splitSourceWidth : new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        this.SourceColumn.Width = editor ? both ? this._splitSourceWidth : new GridLength(1, GridUnitType.Star) : new GridLength(0);
         this.PreviewColumn.Width = preview ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         this.SplitColumn.Width = new GridLength(both ? 8 : 0);
     }
@@ -524,8 +500,7 @@ public sealed partial class RegistryFilePreview : UserControl
 
     private void ResizeSource(double delta)
     {
-        var width = Math.Clamp(
-            this.SourceColumn.ActualWidth + delta, 320, Math.Max(320, this.Workspace.ActualWidth - 328));
+        var width = Math.Clamp(this.SourceColumn.ActualWidth + delta, 320, Math.Max(320, this.Workspace.ActualWidth - 328));
         this.SourceColumn.Width = new GridLength(width / (this.Workspace.ActualWidth - width - 8), GridUnitType.Star);
         this.PreviewColumn.Width = new GridLength(1, GridUnitType.Star);
     }
@@ -533,9 +508,7 @@ public sealed partial class RegistryFilePreview : UserControl
     private void ResizeValues(double delta)
     {
         this.KeysRow.Height = new GridLength(
-            Math.Clamp(
-                this.KeysRow.ActualHeight + delta, 80,
-                Math.Max(80, this.KeysRow.ActualHeight + this.ValuesRow.ActualHeight - 80)));
+            Math.Clamp(this.KeysRow.ActualHeight + delta, 80, Math.Max(80, this.KeysRow.ActualHeight + this.ValuesRow.ActualHeight - 80)));
     }
 
     private void UpdateMetadata(RegistryFileMetadata metadata)
@@ -550,9 +523,7 @@ public sealed partial class RegistryFilePreview : UserControl
         SetText(this.MetadataTitle, metadata.Title);
         SetText(this.MetadataDescription, metadata.Description);
         SetText(this.MetadataAuthor, metadata.Author.Length == 0 ? "" : "Author: " + metadata.Author);
-        SetText(
-            this.MetadataFollowUp,
-            metadata.FollowUp == RegistryFileFollowUp.None ? "" : "After import: " + metadata.FollowUpText);
+        SetText(this.MetadataFollowUp, metadata.FollowUp == RegistryFileFollowUp.None ? "" : "After import: " + metadata.FollowUpText);
 
         static void SetText(TextBlock block, string text)
         {

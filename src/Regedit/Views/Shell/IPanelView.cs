@@ -32,6 +32,9 @@ public sealed class PanelSearch(
     Func<string> getText,
     Action<string> setText)
 {
+    /// <summary>Raised by the view when its filter text changes from another source.</summary>
+    public event Action? TextChanged;
+
     public string AutomationName { get; } = automationName;
 
     public string? AutomationId { get; } = automationId;
@@ -51,9 +54,6 @@ public sealed class PanelSearch(
             }
         }
     }
-
-    /// <summary>Raised by the view when its filter text changes from another source.</summary>
-    public event Action? TextChanged;
 
     public void NotifyTextChanged()
     {

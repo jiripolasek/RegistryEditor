@@ -20,9 +20,9 @@ internal static class RegistryKeyIdentity
 
     internal static bool IsLocal(string? machine)
     {
-        return machine is null or "." or "127.0.0.1" or "::1" ||
-               string.Equals(machine, "localhost", StringComparison.OrdinalIgnoreCase) || string.Equals(
-                   machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+        return machine is null or "." or "127.0.0.1" or "::1"
+               || string.Equals(machine, "localhost", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string[] Paths(RegistryLocation location)
@@ -31,9 +31,7 @@ internal static class RegistryKeyIdentity
         {
             return
             [
-                location.Hive == RegistryHive.Users
-                    ? ExpandUserClasses(Join(Users, location.SubKey))
-                    : Join(Machine, location.SubKey)
+                location.Hive == RegistryHive.Users ? ExpandUserClasses(Join(Users, location.SubKey)) : Join(Machine, location.SubKey)
             ];
         }
 
@@ -52,8 +50,7 @@ internal static class RegistryKeyIdentity
         {
             location = location with
             {
-                Hive = RegistryHive.LocalMachine,
-                SubKey = Join(@"SYSTEM\CurrentControlSet\Hardware Profiles\Current", location.SubKey)
+                Hive = RegistryHive.LocalMachine, SubKey = Join(@"SYSTEM\CurrentControlSet\Hardware Profiles\Current", location.SubKey)
             };
         }
 
@@ -101,8 +98,7 @@ internal static class RegistryKeyIdentity
         byte[]? buffer = null;
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var status = RegistryNative.NtQueryKey(
-                key.Handle, keyNameInformation, buffer, buffer?.Length ?? 0, out var length);
+            var status = RegistryNative.NtQueryKey(key.Handle, keyNameInformation, buffer, buffer?.Length ?? 0, out var length);
             if (status == 0 && buffer is not null && length >= sizeof(int) && length <= buffer.Length)
             {
                 var bytes = BitConverter.ToInt32(buffer);
@@ -144,8 +140,8 @@ internal static class RegistryKeyIdentity
 
     internal static bool AtOrBelow(string child, string parent)
     {
-        return child.Equals(parent, StringComparison.OrdinalIgnoreCase) ||
-               child.StartsWith(parent + "\\", StringComparison.OrdinalIgnoreCase);
+        return child.Equals(parent, StringComparison.OrdinalIgnoreCase)
+               || child.StartsWith(parent + "\\", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Join(string root, string path)

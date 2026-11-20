@@ -28,10 +28,7 @@ public sealed partial class InvestigationPage
             {
                 Text = "Open in new tab",
                 Command = search.OpenNewTabCommand,
-                Icon = new IconSourceElement
-                {
-                    IconSource = (IconSource)Application.Current.Resources["OpenInNewTabIcon"]
-                }
+                Icon = new IconSourceElement { IconSource = (IconSource)Application.Current.Resources["OpenInNewTabIcon"] }
             });
         ListContextMenu.Add(
             menu, "Show details", () =>
@@ -48,12 +45,7 @@ public sealed partial class InvestigationPage
 
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(
-            new MenuFlyoutItem
-            {
-                Text = "Copy path",
-                Command = this.ViewModel.CopyPathsCommand,
-                Icon = new FontIcon { Glyph = "\uE62F" }
-            });
+            new MenuFlyoutItem { Text = "Copy path", Command = this.ViewModel.CopyPathsCommand, Icon = new FontIcon { Glyph = "\uE62F" } });
         menu.Items.Add(
             new MenuFlyoutItem
             {
@@ -63,8 +55,8 @@ public sealed partial class InvestigationPage
             });
         menu.Items.Add(new MenuFlyoutSeparator());
         ListContextMenu.Add(
-            menu, "Select all", () => this.Results.SelectAll(), this.ViewModel.DisplayRows.Count > 0,
-            icon: Symbol.SelectAll, shortcut: "Ctrl+A");
+            menu, "Select all", () => this.Results.SelectAll(), this.ViewModel.DisplayRows.Count > 0, icon: Symbol.SelectAll,
+            shortcut: "Ctrl+A");
         return menu;
     }
 }

@@ -58,20 +58,23 @@ public sealed partial class NotificationHost
         return brush;
     }
 
-    private void ScrollFade_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs args) =>
+    private void ScrollFade_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs args)
+    {
         this.UpdateScrollFade();
+    }
 
-    private void ScrollFade_SizeChanged(object sender, SizeChangedEventArgs args) => this.UpdateScrollFade();
+    private void ScrollFade_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        this.UpdateScrollFade();
+    }
 
     private void UpdateScrollFade()
     {
-        VisualStateManager.GoToState(
-            this, this._cardsViewport.VerticalOffset > 1 ? "ScrollTopOverflow" : "ScrollTopClear", false);
+        VisualStateManager.GoToState(this, this._cardsViewport.VerticalOffset > 1 ? "ScrollTopOverflow" : "ScrollTopClear", false);
         VisualStateManager.GoToState(
             this,
-            this._cardsViewport.ScrollableHeight - this._cardsViewport.VerticalOffset > 1
-                ? "ScrollBottomOverflow"
-                : "ScrollBottomClear", false);
+            this._cardsViewport.ScrollableHeight - this._cardsViewport.VerticalOffset > 1 ? "ScrollBottomOverflow" : "ScrollBottomClear",
+            false);
     }
 
     private void ClearScrollFade()

@@ -10,10 +10,9 @@ namespace JPSoftworks.Regedit.ViewModels.Tools;
 
 internal sealed class JournalDifferenceCache
 {
-    private HashSet<JournalEntry> _selected = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JournalEntry, IReadOnlyList<RegistryDifference>> _differences = new(ReferenceEqualityComparer.Instance);
 
-    private readonly Dictionary<JournalEntry, IReadOnlyList<RegistryDifference>> _differences
-        = new(ReferenceEqualityComparer.Instance);
+    private HashSet<JournalEntry> _selected = new(ReferenceEqualityComparer.Instance);
 
     internal int Count => this._differences.Count;
 

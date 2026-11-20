@@ -12,12 +12,6 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> location) : ObservableObject
 {
-    private SavedSearch? _search;
-    private bool _closed;
-
-    [ObservableProperty]
-    public partial string Query { get; set; } = string.Empty;
-
     internal event Func<FindOptionsViewModel, Task<SavedSearch?>>? FindRequested;
 
     internal event Action<SavedSearch>? ResultsRequested;
@@ -25,6 +19,12 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
     internal event Action<string, string, NoticeKind>? Notice;
 
     internal event Action<string>? StatusChanged;
+
+    private SavedSearch? _search;
+    private bool _closed;
+
+    [ObservableProperty]
+    public partial string Query { get; set; } = string.Empty;
 
     private void StartSearch(SavedSearch search)
     {
@@ -45,8 +45,7 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
         var target = location();
         this.StartSearch(
             new SavedSearch(
-                this.Query, target.GetScopeRoots(target.IsComputer),
-                new SearchOptions(this.Query, true, true, true, false, false)));
+                this.Query, target.GetScopeRoots(target.IsComputer), new SearchOptions(this.Query, true, true, true, false, false)));
     }
 
     [RelayCommand]

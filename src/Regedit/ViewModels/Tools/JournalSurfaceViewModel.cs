@@ -60,8 +60,9 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
         ? "Unarchive edit"
         : "Archive edit";
 
-    internal string FilterSummary => (this.ArchiveFilter ?? this.ArchiveChoices[0]).Label + " · " +
-                                     (this.OperationFilter ?? this.OperationChoices[0]).Label;
+    internal string FilterSummary => (this.ArchiveFilter ?? this.ArchiveChoices[0]).Label
+                                     + " · "
+                                     + (this.OperationFilter ?? this.OperationChoices[0]).Label;
 
     internal bool IsRevealing { get; private set; }
 
@@ -90,9 +91,8 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
     /// <summary>Describes which history is shown: its owner, scope and any non-default filters.</summary>
     internal string Context(bool administratorOnly)
     {
-        var text = (administratorOnly ? "Administrator-only history" : "User-profile history") + (this.ScopeIndex == 1
-            ? " · " + ToolPresentation.Address(this._currentLocation())
-            : " · All locations");
+        var text = (administratorOnly ? "Administrator-only history" : "User-profile history")
+                   + (this.ScopeIndex == 1 ? " · " + ToolPresentation.Address(this._currentLocation()) : " · All locations");
         if (this.ArchiveFilter?.View != JournalArchiveView.Active || this.OperationFilter?.Operation is not null)
         {
             text += " · " + this.FilterSummary;
@@ -103,15 +103,15 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
 
     internal string Status(JournalEntry entry)
     {
-        return ToolPresentation.JournalStatus(entry, this._history.RevertedIds.Contains(entry.Id)) +
-               (this._history.ArchivedIds.Contains(entry.Id) ? " · Archived" : string.Empty);
+        return ToolPresentation.JournalStatus(entry, this._history.RevertedIds.Contains(entry.Id))
+               + (this._history.ArchivedIds.Contains(entry.Id) ? " · Archived" : string.Empty);
     }
 
     private bool Includes(JournalEntry entry)
     {
         var archived = this._history.ArchivedIds.Contains(entry.Id);
-        if ((this.ArchiveFilter?.View ?? JournalArchiveView.Active) is var view &&
-            (view == JournalArchiveView.Active && archived || view == JournalArchiveView.Archived && !archived))
+        if ((this.ArchiveFilter?.View ?? JournalArchiveView.Active) is var view
+            && (view == JournalArchiveView.Active && archived || view == JournalArchiveView.Archived && !archived))
         {
             return false;
         }
@@ -124,27 +124,27 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
 
         if (this.ScopeIndex == 1)
         {
-            if (this._currentLocation() is not { } scope || !entry.Before.Select(state => state.Scope.Location)
-                    .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : [])
-                    .Any(location => location.View == scope.View &&
-                                     string.Equals(
-                                         location.Machine, scope.Machine, StringComparison.OrdinalIgnoreCase) &&
-                                     (scope.IsComputer || location.Hive == scope.Hive &&
-                                         (location.SubKey.Equals(scope.SubKey, StringComparison.OrdinalIgnoreCase) ||
-                                          location.SubKey.StartsWith(
-                                              scope.SubKey + "\\", StringComparison.OrdinalIgnoreCase) ||
-                                          scope.SubKey.Length == 0))))
+            if (this._currentLocation() is not { } scope
+                || !entry.Before.Select(state => state.Scope.Location)
+                    .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : []).Any(location =>
+                        location.View == scope.View
+                        && string.Equals(location.Machine, scope.Machine, StringComparison.OrdinalIgnoreCase)
+                        && (scope.IsComputer
+                            || location.Hive == scope.Hive
+                            && (location.SubKey.Equals(scope.SubKey, StringComparison.OrdinalIgnoreCase)
+                                || location.SubKey.StartsWith(scope.SubKey + "\\", StringComparison.OrdinalIgnoreCase)
+                                || scope.SubKey.Length == 0))))
             {
                 return false;
             }
         }
 
-        return this.Query.Length == 0 || entry.Operation.Contains(this.Query, StringComparison.OrdinalIgnoreCase) ||
-               ToolPresentation.JournalTarget(entry).Contains(this.Query, StringComparison.OrdinalIgnoreCase) ||
-               this.Status(entry).Contains(this.Query, StringComparison.OrdinalIgnoreCase) || entry.Before
-                   .SelectMany(state => state.Scope.ValueNames ?? []).Any(name =>
-                       (name.Length == 0 ? "(Default)" : name).Contains(
-                           this.Query, StringComparison.OrdinalIgnoreCase));
+        return this.Query.Length == 0
+               || entry.Operation.Contains(this.Query, StringComparison.OrdinalIgnoreCase)
+               || ToolPresentation.JournalTarget(entry).Contains(this.Query, StringComparison.OrdinalIgnoreCase)
+               || this.Status(entry).Contains(this.Query, StringComparison.OrdinalIgnoreCase)
+               || entry.Before.SelectMany(state => state.Scope.ValueNames ?? []).Any(name =>
+                   (name.Length == 0 ? "(Default)" : name).Contains(this.Query, StringComparison.OrdinalIgnoreCase));
     }
 
     partial void OnSelectedEntryChanged(JournalEntry? value)
@@ -210,8 +210,7 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
             links.Add(
                 new JournalLink(
                     label + (this._history.ArchivedIds.Contains(target.Id) ? " · Archived" : string.Empty),
-                    $"{target.Operation} · {target.Time.ToLocalTime():G} · {target.Path}", target,
-                    this.NavigateCommand));
+                    $"{target.Operation} · {target.Time.ToLocalTime():G} · {target.Path}", target, this.NavigateCommand));
         }
     }
 
@@ -251,9 +250,7 @@ internal sealed partial class JournalSurfaceViewModel : ObservableObject
     {
         this.Query = source.Query;
         this.ScopeIndex = source.ScopeIndex;
-        this.ArchiveFilter = this.ArchiveChoices.Single(choice =>
-            choice.View == (source.ArchiveFilter?.View ?? JournalArchiveView.Active));
-        this.OperationFilter
-            = this.OperationChoices.Single(choice => choice.Operation == source.OperationFilter?.Operation);
+        this.ArchiveFilter = this.ArchiveChoices.Single(choice => choice.View == (source.ArchiveFilter?.View ?? JournalArchiveView.Active));
+        this.OperationFilter = this.OperationChoices.Single(choice => choice.Operation == source.OperationFilter?.Operation);
     }
 }

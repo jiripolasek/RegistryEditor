@@ -33,10 +33,23 @@ namespace JPSoftworks.Notifications.WinUI;
 [TemplatePart(Name = "PART_Surface", Type = typeof(UIElement))]
 public sealed partial class NotificationCard : Control
 {
+    /// <summary>Occurs when a dismissal control or a middle-click anywhere on the card requests closure.</summary>
+    /// <remarks>
+    /// Raised on the UI thread. The host dismisses the entry; dismissal does not cancel a running action.
+    /// </remarks>
+    public event Action? DismissRequested;
+
+    /// <summary>Occurs when the user invokes a current notification action.</summary>
+    /// <remarks>
+    /// The argument is the action instance supplied by the notification. Raised on the UI thread for action controls
+    /// and Enter on a focused card with a default action. The host executes the action through the session; the card itself does not
+    /// run it.
+    /// </remarks>
+    public event Action<NotificationAction>? ActionRequested;
+
     /// <summary>Identifies the <see cref="Strings"/> dependency property.</summary>
     public static readonly DependencyProperty StringsProperty = DependencyProperty.Register(
-        nameof(Strings), typeof(ResourceDictionary), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(Strings), typeof(ResourceDictionary), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="DismissNotificationText"/> dependency property.</summary>
     public static readonly DependencyProperty DismissNotificationTextProperty = DependencyProperty.Register(
@@ -45,13 +58,11 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="ProgressText"/> dependency property.</summary>
     public static readonly DependencyProperty ProgressTextProperty = DependencyProperty.Register(
-        nameof(ProgressText), typeof(string), typeof(NotificationCard),
-        new PropertyMetadata(NotificationText.Get(null, "Progress")));
+        nameof(ProgressText), typeof(string), typeof(NotificationCard), new PropertyMetadata(NotificationText.Get(null, "Progress")));
 
     /// <summary>Identifies the <see cref="BusyText"/> dependency property.</summary>
     public static readonly DependencyProperty BusyTextProperty = DependencyProperty.Register(
-        nameof(BusyText), typeof(string), typeof(NotificationCard),
-        new PropertyMetadata(NotificationText.Get(null, "Busy")));
+        nameof(BusyText), typeof(string), typeof(NotificationCard), new PropertyMetadata(NotificationText.Get(null, "Busy")));
 
     /// <summary>Identifies the <see cref="Material"/> dependency property.</summary>
     public static readonly DependencyProperty MaterialProperty = DependencyProperty.Register(
@@ -70,18 +81,15 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="IsActionRunning"/> dependency property.</summary>
     public static readonly DependencyProperty IsActionRunningProperty = DependencyProperty.Register(
-        nameof(IsActionRunning), typeof(bool), typeof(NotificationCard),
-        new PropertyMetadata(false, Presentation_Changed));
+        nameof(IsActionRunning), typeof(bool), typeof(NotificationCard), new PropertyMetadata(false, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="IconForeground"/> dependency property.</summary>
     public static readonly DependencyProperty IconForegroundProperty = DependencyProperty.Register(
-        nameof(IconForeground), typeof(Brush), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(IconForeground), typeof(Brush), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="DetailSpacing"/> dependency property.</summary>
     public static readonly DependencyProperty DetailSpacingProperty = DependencyProperty.Register(
-        nameof(DetailSpacing), typeof(double), typeof(NotificationCard),
-        new PropertyMetadata(8d, Presentation_Changed));
+        nameof(DetailSpacing), typeof(double), typeof(NotificationCard), new PropertyMetadata(8d, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="ShadowDepth"/> dependency property.</summary>
     public static readonly DependencyProperty ShadowDepthProperty = DependencyProperty.Register(
@@ -89,33 +97,27 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="ActionSpacing"/> dependency property.</summary>
     public static readonly DependencyProperty ActionSpacingProperty = DependencyProperty.Register(
-        nameof(ActionSpacing), typeof(double), typeof(NotificationCard),
-        new PropertyMetadata(12d, Presentation_Changed));
+        nameof(ActionSpacing), typeof(double), typeof(NotificationCard), new PropertyMetadata(12d, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="ActionPanelStyle"/> dependency property.</summary>
     public static readonly DependencyProperty ActionPanelStyleProperty = DependencyProperty.Register(
-        nameof(ActionPanelStyle), typeof(Style), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(ActionPanelStyle), typeof(Style), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="ActionLinkStyle"/> dependency property.</summary>
     public static readonly DependencyProperty ActionLinkStyleProperty = DependencyProperty.Register(
-        nameof(ActionLinkStyle), typeof(Style), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(ActionLinkStyle), typeof(Style), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="ActionButtonStyle"/> dependency property.</summary>
     public static readonly DependencyProperty ActionButtonStyleProperty = DependencyProperty.Register(
-        nameof(ActionButtonStyle), typeof(Style), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(ActionButtonStyle), typeof(Style), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="DefaultActionLinkStyle"/> dependency property.</summary>
     public static readonly DependencyProperty DefaultActionLinkStyleProperty = DependencyProperty.Register(
-        nameof(DefaultActionLinkStyle), typeof(Style), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(DefaultActionLinkStyle), typeof(Style), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="DefaultActionButtonStyle"/> dependency property.</summary>
     public static readonly DependencyProperty DefaultActionButtonStyleProperty = DependencyProperty.Register(
-        nameof(DefaultActionButtonStyle), typeof(Style), typeof(NotificationCard),
-        new PropertyMetadata(null, Presentation_Changed));
+        nameof(DefaultActionButtonStyle), typeof(Style), typeof(NotificationCard), new PropertyMetadata(null, Presentation_Changed));
 
     /// <summary>Identifies the <see cref="Title"/> dependency property.</summary>
     public static readonly DependencyProperty TitleProperty = DependencyProperty.Register(
@@ -131,8 +133,7 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="DismissLabel"/> dependency property.</summary>
     public static readonly DependencyProperty DismissLabelProperty = DependencyProperty.Register(
-        nameof(DismissLabel), typeof(string), typeof(NotificationCard),
-        new PropertyMetadata(NotificationText.Get(null, "Dismiss")));
+        nameof(DismissLabel), typeof(string), typeof(NotificationCard), new PropertyMetadata(NotificationText.Get(null, "Dismiss")));
 
     /// <summary>Identifies the <see cref="ProgressValue"/> dependency property.</summary>
     public static readonly DependencyProperty ProgressValueProperty = DependencyProperty.Register(
@@ -140,8 +141,7 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="Severity"/> dependency property.</summary>
     public static readonly DependencyProperty SeverityProperty = DependencyProperty.Register(
-        nameof(Severity), typeof(NotificationSeverity), typeof(NotificationCard),
-        new PropertyMetadata(NotificationSeverity.Neutral));
+        nameof(Severity), typeof(NotificationSeverity), typeof(NotificationCard), new PropertyMetadata(NotificationSeverity.Neutral));
 
     /// <summary>Identifies the <see cref="IconSource"/> dependency property.</summary>
     public static readonly DependencyProperty IconSourceProperty = DependencyProperty.Register(
@@ -149,68 +149,55 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="BodyVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty BodyVisibilityProperty = DependencyProperty.Register(
-        nameof(BodyVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(BodyVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="DetailsVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty DetailsVisibilityProperty = DependencyProperty.Register(
-        nameof(DetailsVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(DetailsVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="ActionsVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty ActionsVisibilityProperty = DependencyProperty.Register(
-        nameof(ActionsVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(ActionsVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="StatusVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty StatusVisibilityProperty = DependencyProperty.Register(
-        nameof(StatusVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(StatusVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="SeverityIconVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty SeverityIconVisibilityProperty = DependencyProperty.Register(
-        nameof(SeverityIconVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(SeverityIconVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="CustomIconVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty CustomIconVisibilityProperty = DependencyProperty.Register(
-        nameof(CustomIconVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(CustomIconVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="BusyVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty BusyVisibilityProperty = DependencyProperty.Register(
-        nameof(BusyVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(BusyVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="ProgressVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty ProgressVisibilityProperty = DependencyProperty.Register(
-        nameof(ProgressVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(ProgressVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="DeterminateProgressVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty DeterminateProgressVisibilityProperty = DependencyProperty.Register(
-        nameof(DeterminateProgressVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(DeterminateProgressVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="ProgressLabelVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty ProgressLabelVisibilityProperty = DependencyProperty.Register(
-        nameof(ProgressLabelVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(ProgressLabelVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="DismissIconVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty DismissIconVisibilityProperty = DependencyProperty.Register(
-        nameof(DismissIconVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(DismissIconVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="DismissLinkVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty DismissLinkVisibilityProperty = DependencyProperty.Register(
-        nameof(DismissLinkVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(DismissLinkVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="SeverityIndicatorVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty SeverityIndicatorVisibilityProperty = DependencyProperty.Register(
-        nameof(SeverityIndicatorVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(SeverityIndicatorVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
     /// <summary>Identifies the <see cref="IsIndeterminate"/> dependency property.</summary>
     public static readonly DependencyProperty IsIndeterminateProperty = DependencyProperty.Register(
@@ -230,11 +217,9 @@ public sealed partial class NotificationCard : Control
 
     /// <summary>Identifies the <see cref="ActionItemsVisibility"/> dependency property.</summary>
     public static readonly DependencyProperty ActionItemsVisibilityProperty = DependencyProperty.Register(
-        nameof(ActionItemsVisibility), typeof(Visibility), typeof(NotificationCard),
-        new PropertyMetadata(Visibility.Collapsed));
+        nameof(ActionItemsVisibility), typeof(Visibility), typeof(NotificationCard), new PropertyMetadata(Visibility.Collapsed));
 
-    private static readonly Notification EmptyNotification
-        = new() { Title = string.Empty, Severity = NotificationSeverity.Neutral };
+    private static readonly Notification EmptyNotification = new() { Title = string.Empty, Severity = NotificationSeverity.Neutral };
 
     private readonly ThemeShadow _shadow = new();
     private readonly StackPanel _actionButtons = new();
@@ -253,16 +238,6 @@ public sealed partial class NotificationCard : Control
     private bool _updating;
     private Control? _pendingFocus;
     private RoutedEventHandler? _focusLoaded;
-
-    /// <summary>Initializes a notification card on the current UI thread.</summary>
-    public NotificationCard()
-    {
-        this.DefaultStyleKey = typeof(NotificationCard);
-        this.KeyDown += this.Card_KeyDown;
-        this.AddHandler(PointerPressedEvent, new PointerEventHandler(this.Card_PointerPressed), true);
-        this.ActualThemeChanged += (_, _) => this.UpdatePresentation(forceIcon: true);
-        this.Unloaded += (_, _) => this.ClearPendingFocus();
-    }
 
     /// <summary>Gets or sets localized card text and automation labels.</summary>
     /// <remarks>
@@ -591,19 +566,15 @@ public sealed partial class NotificationCard : Control
 
     internal Notification? ContentModel { get; private set; }
 
-    /// <summary>Occurs when a dismissal control or a middle-click anywhere on the card requests closure.</summary>
-    /// <remarks>
-    /// Raised on the UI thread. The host dismisses the entry; dismissal does not cancel a running action.
-    /// </remarks>
-    public event Action? DismissRequested;
-
-    /// <summary>Occurs when the user invokes a current notification action.</summary>
-    /// <remarks>
-    /// The argument is the action instance supplied by the notification. Raised on the UI thread for action controls
-    /// and Enter on a focused card with a default action. The host executes the action through the session; the card itself does not
-    /// run it.
-    /// </remarks>
-    public event Action<NotificationAction>? ActionRequested;
+    /// <summary>Initializes a notification card on the current UI thread.</summary>
+    public NotificationCard()
+    {
+        this.DefaultStyleKey = typeof(NotificationCard);
+        this.KeyDown += this.Card_KeyDown;
+        this.AddHandler(PointerPressedEvent, new PointerEventHandler(this.Card_PointerPressed), true);
+        this.ActualThemeChanged += (_, _) => this.UpdatePresentation(forceIcon: true);
+        this.Unloaded += (_, _) => this.ClearPendingFocus();
+    }
 
     /// <inheritdoc/>
     protected override void OnApplyTemplate()
@@ -630,8 +601,10 @@ public sealed partial class NotificationCard : Control
         this.UpdatePresentation(forceIcon: true);
     }
 
-    private IEnumerable<ButtonBase> DismissButtons() =>
-        new[] { this._closeButton, this._dismissAction }.OfType<ButtonBase>();
+    private IEnumerable<ButtonBase> DismissButtons()
+    {
+        return new[] { this._closeButton, this._dismissAction }.OfType<ButtonBase>();
+    }
 
     private void UnhookTemplate()
     {
@@ -649,7 +622,10 @@ public sealed partial class NotificationCard : Control
         this._surface?.Shadow = null;
     }
 
-    private void NativeNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args) => this.DismissRequested?.Invoke();
+    private void NativeNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        this.DismissRequested?.Invoke();
+    }
 
     private static void Presentation_Changed(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
@@ -668,9 +644,7 @@ public sealed partial class NotificationCard : Control
 
     internal void ApplyCardStyle(Style? style)
     {
-        if (style is null
-                ? this.ReadLocalValue(StyleProperty) == DependencyProperty.UnsetValue
-                : ReferenceEquals(this.Style, style))
+        if (style is null ? this.ReadLocalValue(StyleProperty) == DependencyProperty.UnsetValue : ReferenceEquals(this.Style, style))
         {
             return;
         }
@@ -698,9 +672,11 @@ public sealed partial class NotificationCard : Control
 
         void Restore()
         {
-            if (this.IsLoaded && ReferenceEquals(this.Template, template) && focused!.IsLoaded &&
-                this._actionButtons.Children.Contains(focused) && ReferenceEquals(
-                    FocusManager.GetFocusedElement(this.XamlRoot), fallback))
+            if (this.IsLoaded
+                && ReferenceEquals(this.Template, template)
+                && focused!.IsLoaded
+                && this._actionButtons.Children.Contains(focused)
+                && ReferenceEquals(FocusManager.GetFocusedElement(this.XamlRoot), fallback))
             {
                 focused.Focus(FocusState.Programmatic);
             }
@@ -760,17 +736,19 @@ public sealed partial class NotificationCard : Control
 
         this.UpdatePresentation(factoryChanged || previous?.IconKey != snapshot.Content.IconKey);
         var content = snapshot.Content;
-        if (announce && (previous is null || previous.Title != content.Title || previous.Severity != content.Severity ||
-                         content.Progress is null && previous.Message != content.Message))
+        if (announce
+            && (previous is null
+                || previous.Title != content.Title
+                || previous.Severity != content.Severity
+                || content.Progress is null && previous.Message != content.Message))
         {
-            var peer = FrameworkElementAutomationPeer.FromElement(this) ??
-                       FrameworkElementAutomationPeer.CreatePeerForElement(this);
+            var peer = FrameworkElementAutomationPeer.FromElement(this) ?? FrameworkElementAutomationPeer.CreatePeerForElement(this);
             peer?.RaiseNotificationEvent(
                 AutomationNotificationKind.Other,
                 content.Severity is NotificationSeverity.Error or NotificationSeverity.Warning
                     ? AutomationNotificationProcessing.ImportantMostRecent
-                    : AutomationNotificationProcessing.CurrentThenMostRecent,
-                content.Title + Environment.NewLine + content.Message, "InAppNotification");
+                    : AutomationNotificationProcessing.CurrentThenMostRecent, content.Title + Environment.NewLine + content.Message,
+                "InAppNotification");
         }
     }
 
@@ -799,19 +777,12 @@ public sealed partial class NotificationCard : Control
             {
                 BindingOperations.SetBinding(
                     source, IconSource.ForegroundProperty,
-                    new Binding
-                    {
-                        Source = this,
-                        Path = new PropertyPath(nameof(this.IconForeground)),
-                        Mode = BindingMode.OneWay
-                    });
+                    new Binding { Source = this, Path = new PropertyPath(nameof(this.IconForeground)), Mode = BindingMode.OneWay });
             }
 
             this.IconSource = this._customIcon;
             // Replace the element because clearing a retained IconSourceElement can fail in WinUI.
-            IconSourceElement? icon = this._customIcon is null
-                ? null
-                : new IconSourceElement { IconSource = this._customIcon };
+            IconSourceElement? icon = this._customIcon is null ? null : new IconSourceElement { IconSource = this._customIcon };
             if (icon is not null)
             {
                 AutomationProperties.SetAccessibilityView(icon, AccessibilityView.Raw);
@@ -821,16 +792,14 @@ public sealed partial class NotificationCard : Control
         }
 
         var custom = this._customIcon is not null;
-        var dismissLink = content.DismissLabel is not null ||
-                          this.DismissPresentation == NotificationDismissPresentation.Link;
+        var dismissLink = content.DismissLabel is not null || this.DismissPresentation == NotificationDismissPresentation.Link;
         this.IsIndeterminate = content.Progress is { Value: null };
         this.HasIcon = custom || content.Severity != NotificationSeverity.Neutral;
         this.IsClosable = !dismissLink;
         this.BodyVisibility = Visible(content.Progress is null && content.Message.Length > 0);
         this.ActionsVisibility = Visible(content.Actions.Count > 0 || dismissLink);
         this.DetailsVisibility = Visible(
-            content.Message.Length > 0 || content.Progress?.Value is not null || content.Actions.Count > 0 ||
-            dismissLink);
+            content.Message.Length > 0 || content.Progress?.Value is not null || content.Actions.Count > 0 || dismissLink);
         this.ContentSpacing = this.DetailsVisibility == Visibility.Visible ? this.DetailSpacing : 0;
         this.ActionItemsVisibility = Visible(content.Actions.Count > 0);
         this.StatusVisibility = Visible(!this.IsIndeterminate && this.HasIcon);
@@ -839,8 +808,7 @@ public sealed partial class NotificationCard : Control
         this.BusyVisibility = Visible(this.IsIndeterminate);
         this.ProgressVisibility = Visible(content.Progress is not null);
         this.DeterminateProgressVisibility = Visible(content.Progress?.Value is not null);
-        this.ProgressLabelVisibility = Visible(
-            content.Progress is not null && (content.Message.Length > 0 || !this.IsIndeterminate));
+        this.ProgressLabelVisibility = Visible(content.Progress is not null && (content.Message.Length > 0 || !this.IsIndeterminate));
         this.DismissIconVisibility = Visible(!dismissLink);
         this.DismissLinkVisibility = Visible(dismissLink);
         this.SeverityIndicatorVisibility = Visible(content.Severity != NotificationSeverity.Neutral);
@@ -861,11 +829,13 @@ public sealed partial class NotificationCard : Control
         VisualStateManager.GoToState(this, this.Material.ToString(), false);
         VisualStateManager.GoToState(this, "Severity" + content.Severity, false);
         this._surface?.Shadow = this._shadowReceiver is null ? null : this._shadow;
-        this._surface?.Translation
-            = this._shadowReceiver is null ? Vector3.Zero : new Vector3(0, 0, (float)this.ShadowDepth);
+        this._surface?.Translation = this._shadowReceiver is null ? Vector3.Zero : new Vector3(0, 0, (float)this.ShadowDepth);
     }
 
-    private static Visibility Visible(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
+    private static Visibility Visible(bool value)
+    {
+        return value ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private void UpdateActions(Notification content, string suffix)
     {
@@ -875,9 +845,7 @@ public sealed partial class NotificationCard : Control
         {
             var action = content.Actions[index];
             var link = this.ActionPresentation == NotificationActionPresentation.Link;
-            var existing = index < this._actionButtons.Children.Count
-                ? this._actionButtons.Children[index] as ButtonBase
-                : null;
+            var existing = index < this._actionButtons.Children.Count ? this._actionButtons.Children[index] as ButtonBase : null;
             if (existing is null || link != (existing is HyperlinkButton))
             {
                 ButtonBase button = link ? new HyperlinkButton() : new Button();
@@ -909,8 +877,9 @@ public sealed partial class NotificationCard : Control
 
     private void Card_KeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key != VirtualKey.Enter || this.IsActionRunning ||
-            this.ContentModel?.Actions.FirstOrDefault(action => action.IsDefault) is not { } action)
+        if (args.Key != VirtualKey.Enter
+            || this.IsActionRunning
+            || this.ContentModel?.Actions.FirstOrDefault(action => action.IsDefault) is not { } action)
         {
             return;
         }
@@ -940,10 +909,16 @@ public sealed partial class NotificationCard : Control
         this.DismissRequested?.Invoke();
     }
 
-    private void Dismiss_Click(object sender, RoutedEventArgs args) => this.DismissRequested?.Invoke();
+    private void Dismiss_Click(object sender, RoutedEventArgs args)
+    {
+        this.DismissRequested?.Invoke();
+    }
 
     /// <inheritdoc/>
-    protected override AutomationPeer OnCreateAutomationPeer() => new NotificationCardAutomationPeer(this);
+    protected override AutomationPeer OnCreateAutomationPeer()
+    {
+        return new NotificationCardAutomationPeer(this);
+    }
 
     private sealed partial class NotificationCardAutomationPeer : FrameworkElementAutomationPeer
     {
@@ -955,12 +930,19 @@ public sealed partial class NotificationCard : Control
             this._owner = owner;
         }
 
-        protected override string GetClassNameCore() => nameof(NotificationCard);
+        protected override string GetClassNameCore()
+        {
+            return nameof(NotificationCard);
+        }
 
-        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
+        protected override AutomationControlType GetAutomationControlTypeCore()
+        {
+            return AutomationControlType.Group;
+        }
 
-        protected override string GetNameCore() => this._owner.ContentModel is { } content
-            ? NotificationText.Name(this._owner.Strings, content)
-            : string.Empty;
+        protected override string GetNameCore()
+        {
+            return this._owner.ContentModel is { } content ? NotificationText.Name(this._owner.Strings, content) : string.Empty;
+        }
     }
 }

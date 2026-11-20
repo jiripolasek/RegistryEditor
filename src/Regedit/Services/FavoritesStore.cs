@@ -11,20 +11,20 @@ namespace JPSoftworks.Regedit.Services;
 
 internal sealed class FavoritesStore
 {
+    internal event EventHandler? Changed;
+
     private readonly AppSettings _settings;
     private readonly Action _save;
+
+    internal IReadOnlyList<Favorite> Favorites => this._settings.Favorites;
+
+    internal IReadOnlyList<FavoriteFolder> Folders => this._settings.FavoriteFolders;
 
     internal FavoritesStore(AppSettings settings, Action save)
     {
         this._settings = settings;
         this._save = save;
     }
-
-    internal IReadOnlyList<Favorite> Favorites => this._settings.Favorites;
-
-    internal IReadOnlyList<FavoriteFolder> Folders => this._settings.FavoriteFolders;
-
-    internal event EventHandler? Changed;
 
     internal string FolderPath(string? id)
     {
@@ -48,8 +48,7 @@ internal sealed class FavoritesStore
 
     internal Favorite Bookmark(string id)
     {
-        return this.Favorites.FirstOrDefault(item => item.Id == id) ??
-               throw new ArgumentException("This favorite no longer exists.");
+        return this.Favorites.FirstOrDefault(item => item.Id == id) ?? throw new ArgumentException("This favorite no longer exists.");
     }
 
     internal void Add(string name, string address, bool is32Bit, string? folderId)
@@ -96,8 +95,7 @@ internal sealed class FavoritesStore
 
     internal void RemoveLocation(RegistryLocation location)
     {
-        this.Change(() => this._settings.RemoveFavoriteItems(
-            this.Favorites.Where(item => item.Matches(location)).ToArray(), []));
+        this.Change(() => this._settings.RemoveFavoriteItems(this.Favorites.Where(item => item.Matches(location)).ToArray(), []));
     }
 
     internal void Reorder(FavoriteItemId item, int offset)

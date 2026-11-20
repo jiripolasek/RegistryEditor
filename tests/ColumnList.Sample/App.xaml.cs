@@ -11,17 +11,17 @@ public partial class App : Application
 {
     private Window? _window;
 
+    internal static Window? MainWindow { get; private set; }
+
+    /// <summary>Set by <c>--input-test</c>: the self-test also drives the real mouse and keyboard.</summary>
+    internal static bool InputTests { get; private set; }
+
     public App()
     {
         this.InitializeComponent();
         this.UnhandledException += (_, args) => File.WriteAllText(
             Path.Combine(Path.GetTempPath(), "ColumnList.Sample.crash.txt"), args.Exception.ToString());
     }
-
-    internal static Window? MainWindow { get; private set; }
-
-    /// <summary>Set by <c>--input-test</c>: the self-test also drives the real mouse and keyboard.</summary>
-    internal static bool InputTests { get; private set; }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {

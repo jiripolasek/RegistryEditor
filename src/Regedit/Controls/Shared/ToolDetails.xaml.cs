@@ -18,6 +18,16 @@ public sealed partial class ToolDetails : UserControl
 
     internal event Action<RegistryValue>? CopyBytesRequested;
 
+    public UIElement? RelatedContent
+    {
+        get => this.Related.Content as UIElement;
+        set
+        {
+            this.Related.Content = value;
+            this.Related.Visibility = value is null ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
     public ToolDetails()
     {
         this.InitializeComponent();
@@ -83,16 +93,6 @@ public sealed partial class ToolDetails : UserControl
         if ((sender as MenuFlyoutItem)?.Tag is RegistryValue value)
         {
             this.CopyBytesRequested?.Invoke(value);
-        }
-    }
-
-    public UIElement? RelatedContent
-    {
-        get => this.Related.Content as UIElement;
-        set
-        {
-            this.Related.Content = value;
-            this.Related.Visibility = value is null ? Visibility.Collapsed : Visibility.Visible;
         }
     }
 

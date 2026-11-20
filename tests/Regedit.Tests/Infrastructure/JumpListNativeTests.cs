@@ -46,8 +46,7 @@ internal static partial class JumpListNativeTests
                 ]).ToArray();
                 try
                 {
-                    JumpListNative.Update(
-                        Environment.ProcessPath!, entries, _ => throw new IOException("Abort probe"), appId);
+                    JumpListNative.Update(Environment.ProcessPath!, entries, _ => throw new IOException("Abort probe"), appId);
                     check(false, "Native Jump List reports removal persistence failures");
                 }
                 catch (IOException)
@@ -58,9 +57,7 @@ internal static partial class JumpListNativeTests
                 JumpListNative.Update(
                     Environment.ProcessPath!, entries,
                     removed => check(removed.Count == 0, "A fresh isolated Jump List has no removed favorites"), appId);
-                check(
-                    true,
-                    "Native shell accepts tasks, Unicode titles, and quoted favorite links after an aborted update");
+                check(true, "Native shell accepts tasks, Unicode titles, and quoted favorite links after an aborted update");
                 if (apartment == ApartmentState.MTA)
                 {
                     check(true, "The native updater initializes COM on a worker without caller setup");
@@ -125,8 +122,8 @@ internal static partial class JumpListNativeTests
                     try
                     {
                         Marshal.ThrowExceptionForHR(
-                            ((delegate* unmanaged[Stdcall]<nint, PropertyKey*, JumpListNative.PropVariant*, int>)
-                                (*(nint**)store)[5])(store, &key, &value));
+                            ((delegate* unmanaged[Stdcall]<nint, PropertyKey*, JumpListNative.PropVariant*, int>)(*(nint**)store)[5])(
+                                store, &key, &value));
                         return value.Type == 0 ? null : Marshal.PtrToStringUni(value.Text);
                     }
                     finally
@@ -136,14 +133,10 @@ internal static partial class JumpListNativeTests
                 }
 
                 check(Read(4) == "Modern Registry Editor", "Taskbar uses the friendly app name");
-                check(
-                    Read(2) == $"\"{executable}\"",
-                    "Taskbar relaunch preserves Unicode and quotes executable paths with spaces");
+                check(Read(2) == $"\"{executable}\"", "Taskbar relaunch preserves Unicode and quotes executable paths with spaces");
                 check(Read(5) == JumpListNative.AppId, "Window and Jump List share the explicit app identity");
                 JumpListNative.SetWindowIdentity(window, null);
-                check(
-                    Read(2) is null && Read(4) is null && Read(5) is null,
-                    "Taskbar properties are cleared before window destruction");
+                check(Read(2) is null && Read(4) is null && Read(5) is null, "Taskbar properties are cleared before window destruction");
             }
             finally
             {
@@ -157,15 +150,7 @@ internal static partial class JumpListNativeTests
         }
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PropertyKey
-    {
-        internal Guid FormatId;
-        internal uint Id;
-    }
-
-    [LibraryImport(
-        "user32.dll", EntryPoint = "CreateWindowExW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    [LibraryImport("user32.dll", EntryPoint = "CreateWindowExW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     private static partial nint CreateWindowEx(
         uint extendedStyle,
         string className,
@@ -194,4 +179,11 @@ internal static partial class JumpListNativeTests
 
     [LibraryImport("ole32.dll")]
     private static partial void CoUninitialize();
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PropertyKey
+    {
+        internal Guid FormatId;
+        internal uint Id;
+    }
 }

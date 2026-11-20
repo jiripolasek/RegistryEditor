@@ -13,12 +13,20 @@ namespace JPSoftworks.Regedit.Services;
 
 internal sealed class NotesStore : IDisposable
 {
+    internal event EventHandler? Changed;
+
+    internal event Action<NoteDraft, Exception>? SaveFailed;
+
     private readonly AppSettings _settings;
     private readonly Action _save;
     private readonly Func<CancellationToken, Task> _delay;
     private readonly ObservableCollection<NoteDraft> _drafts = [];
     private readonly Dictionary<NoteDraft, CancellationTokenSource> _pending = [];
     private bool _paused, _disposed;
+
+    internal ReadOnlyObservableCollection<NoteDraft> Notes { get; }
+
+    internal bool IsPaused => this._paused || this._disposed;
 
     internal NotesStore(AppSettings settings, Action save, Func<CancellationToken, Task>? delay = null)
     {
@@ -35,13 +43,20 @@ internal sealed class NotesStore : IDisposable
         }
     }
 
-    internal ReadOnlyObservableCollection<NoteDraft> Notes { get; }
+    public void Dispose()
+    {
+        if (this._disposed)
+        {
+            return;
+        }
 
-    internal bool IsPaused => this._paused || this._disposed;
-
-    internal event EventHandler? Changed;
-
-    internal event Action<NoteDraft, Exception>? SaveFailed;
+        this._disposed = true;
+        this.Pause();
+        foreach (var note in this._drafts)
+        {
+            note.PropertyChanged -= this.DraftChanged;
+        }
+    }
 
     internal NoteDraft Get(RegistryLocation location)
     {
@@ -121,8 +136,7 @@ internal sealed class NotesStore : IDisposable
         }
         finally
         {
-            if (!pending.IsCancellationRequested && this._pending.TryGetValue(note, out var current) &&
-                current == pending)
+            if (!pending.IsCancellationRequested && this._pending.TryGetValue(note, out var current) && current == pending)
             {
                 this._pending.Remove(note);
             }
@@ -248,21 +262,6 @@ internal sealed class NotesStore : IDisposable
         foreach (var note in this._drafts)
         {
             this.Schedule(note);
-        }
-    }
-
-    public void Dispose()
-    {
-        if (this._disposed)
-        {
-            return;
-        }
-
-        this._disposed = true;
-        this.Pause();
-        foreach (var note in this._drafts)
-        {
-            note.PropertyChanged -= this.DraftChanged;
         }
     }
 }

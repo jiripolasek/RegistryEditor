@@ -14,17 +14,17 @@ public sealed partial record RegistryFilePreviewKey(string Name, RegistryFileKey
 
     public bool IsRecreated => this.Change == RegistryFileKeyChange.Recreate;
 
-    public string Label => this.Name + (this.Change switch
-    {
-        RegistryFileKeyChange.Delete => " (Delete)",
-        RegistryFileKeyChange.Recreate => " (Delete, then recreate)",
-        _ => ""
-    });
+    public string Label => this.Name
+                           + (this.Change switch
+                           {
+                               RegistryFileKeyChange.Delete => " (Delete)",
+                               RegistryFileKeyChange.Recreate => " (Delete, then recreate)",
+                               _ => ""
+                           });
 
     public string Help => this.Change switch
     {
-        RegistryFileKeyChange.Delete =>
-            "This file deletes the key, directly or through an ancestor, without recreating it.",
+        RegistryFileKeyChange.Delete => "This file deletes the key, directly or through an ancestor, without recreating it.",
         RegistryFileKeyChange.Recreate =>
             "This file deletes the existing subtree, then recreates this key. Only later instructions restore its contents.",
         _ => this.Name

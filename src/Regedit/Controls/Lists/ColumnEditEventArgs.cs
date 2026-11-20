@@ -8,8 +8,7 @@ namespace JPSoftworks.Regedit.Controls.Lists;
 ///     Raised when the user confirms an inline edit with changed text. The host applies the change (for example a
 ///     rename) or sets <see cref="Cancel" /> with an optional <see cref="Error" /> to keep the editor open.
 /// </summary>
-public sealed class ColumnEditCommittingEventArgs(object item, string columnId, string oldText, string newText)
-    : EventArgs
+public sealed class ColumnEditCommittingEventArgs(object item, string columnId, string oldText, string newText) : EventArgs
 {
     public object Item { get; } = item;
 

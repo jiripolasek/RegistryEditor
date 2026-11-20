@@ -58,9 +58,10 @@ internal static class ComponentChecks
             registry.ListView.SelectionChanged += SelectionChanged;
             liveEntry.Name = "Updated in place";
             Check(
-                AutomationProperties.GetName(liveRow) == liveEntry.Name && selectionChanges == 0 &&
-                ReferenceEquals(registry.ListView.SelectedItem, liveEntry) &&
-                registry.RealizedRows.Any(row => ReferenceEquals(row, liveRow)),
+                AutomationProperties.GetName(liveRow) == liveEntry.Name
+                && selectionChanges == 0
+                && ReferenceEquals(registry.ListView.SelectedItem, liveEntry)
+                && registry.RealizedRows.Any(row => ReferenceEquals(row, liveRow)),
                 "An in-place row update changes its accessible name without replacing the row or changing selection");
             var liveSource = (System.Collections.ObjectModel.ObservableCollection<SampleEntry>)registry.ItemsSource!;
             liveSource.Move(0, 3);
@@ -88,42 +89,40 @@ internal static class ComponentChecks
             registry.ListView.Focus(FocusState.Keyboard);
             await Task.Delay(50);
             Check(
-                !focusedList && FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem initialRow &&
-                ReferenceEquals(initialRow.Content, page.Entries[0]),
+                !focusedList
+                && FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem initialRow
+                && ReferenceEquals(initialRow.Content, page.Entries[0]),
                 "Keyboard focus enters the first row without focusing the list container");
-            Check(
-                registry.ListView.SelectedItems.Count == 0,
-                "Entering an unselected extended list preserves its selection");
+            Check(registry.ListView.SelectedItems.Count == 0, "Entering an unselected extended list preserves its selection");
             var focusedRow = (ListViewItem)FocusManager.GetFocusedElement(page.XamlRoot);
             Check(
-                focusedRow.FocusVisualPrimaryThickness == new Thickness(1) &&
-                focusedRow.FocusVisualSecondaryThickness == new Thickness(0),
+                focusedRow.FocusVisualPrimaryThickness == new Thickness(1) && focusedRow.FocusVisualSecondaryThickness == new Thickness(0),
                 "List rows have one logical pixel of focus border");
             Check(
-                (await FocusManager.TryMoveFocusAsync(
-                    FocusNavigationDirection.Next, new FindNextElementOptions { SearchRoot = page })).Succeeded &&
-                FocusManager.GetFocusedElement(page.XamlRoot) is not ListViewItem &&
-                !ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), registry.ListView),
+                (await FocusManager.TryMoveFocusAsync(FocusNavigationDirection.Next, new FindNextElementOptions { SearchRoot = page }))
+                .Succeeded
+                && FocusManager.GetFocusedElement(page.XamlRoot) is not ListViewItem
+                && !ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), registry.ListView),
                 "Tab leaves the populated list without an extra container stop");
             Check(
-                (await FocusManager.TryMoveFocusAsync(
-                    FocusNavigationDirection.Previous, new FindNextElementOptions { SearchRoot = page })).Succeeded &&
-                FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem,
-                "Shift+Tab returns to a populated list row");
+                (await FocusManager.TryMoveFocusAsync(FocusNavigationDirection.Previous, new FindNextElementOptions { SearchRoot = page }))
+                .Succeeded
+                && FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem, "Shift+Tab returns to a populated list row");
 
             focusHeader.Focus(FocusState.Keyboard);
             registry.ListView.SelectedItem = page.Entries[^1];
             focusedList = false;
             registry.ListView.Focus(FocusState.Keyboard);
             await WaitAsync(
-                () => FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem row && ReferenceEquals(
-                    registry.ListView.ItemFromContainer(row), page.Entries[^1]),
-                () => $"focus={FocusManager.GetFocusedElement(page.XamlRoot)} " +
-                      $"index={registry.ListView.IndexFromContainer(FocusManager.GetFocusedElement(page.XamlRoot) as DependencyObject)} " +
-                      $"selection={registry.ListView.SelectedIndex} listFocused={focusedList}");
+                () => FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem row
+                      && ReferenceEquals(registry.ListView.ItemFromContainer(row), page.Entries[^1]),
+                () => $"focus={FocusManager.GetFocusedElement(page.XamlRoot)} "
+                      + $"index={registry.ListView.IndexFromContainer(FocusManager.GetFocusedElement(page.XamlRoot) as DependencyObject)} "
+                      + $"selection={registry.ListView.SelectedIndex} listFocused={focusedList}");
             Check(
-                !focusedList && FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem selected &&
-                ReferenceEquals(registry.ListView.ItemFromContainer(selected), page.Entries[^1]),
+                !focusedList
+                && FocusManager.GetFocusedElement(page.XamlRoot) is ListViewItem selected
+                && ReferenceEquals(registry.ListView.ItemFromContainer(selected), page.Entries[^1]),
                 "Keyboard entry realizes and focuses an off-screen selected row without a container flash");
 
             registry.ListView.GotFocus -= ListGotFocus;
@@ -132,17 +131,16 @@ internal static class ComponentChecks
             registry.ItemsSource = Array.Empty<SampleEntry>();
             registry.UpdateLayout();
             Check(
-                registry.ListView.Focus(FocusState.Keyboard) && ReferenceEquals(
-                    FocusManager.GetFocusedElement(page.XamlRoot), registry.ListView) && registry.ListView.IsTabStop,
-                "An empty list remains keyboard focusable");
+                registry.ListView.Focus(FocusState.Keyboard)
+                && ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), registry.ListView)
+                && registry.ListView.IsTabStop, "An empty list remains keyboard focusable");
             Check(
-                (await FocusManager.TryMoveFocusAsync(
-                    FocusNavigationDirection.Previous, new FindNextElementOptions { SearchRoot = page })).Succeeded,
-                "Shift+Tab can leave the empty list for its column headers");
+                (await FocusManager.TryMoveFocusAsync(FocusNavigationDirection.Previous, new FindNextElementOptions { SearchRoot = page }))
+                .Succeeded, "Shift+Tab can leave the empty list for its column headers");
             Check(
-                (await FocusManager.TryMoveFocusAsync(
-                    FocusNavigationDirection.Next, new FindNextElementOptions { SearchRoot = page })).Succeeded &&
-                ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), registry.ListView),
+                (await FocusManager.TryMoveFocusAsync(FocusNavigationDirection.Next, new FindNextElementOptions { SearchRoot = page }))
+                .Succeeded
+                && ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), registry.ListView),
                 "Tab reaches the empty list after its column headers");
             focusHeader.Focus(FocusState.Programmatic);
             registry.ItemsSource = originalSource;
@@ -151,17 +149,15 @@ internal static class ComponentChecks
 
             // Alignment and sizing.
             Check(
-                registry.HeaderRow.LabelFor(registry.FindColumn("Size")!)!.Visibility == Visibility.Collapsed &&
-                registry.EffectiveLayout.Columns.Count == 5,
-                "Columns declared in XAML load with their default visibility");
+                registry.HeaderRow.LabelFor(registry.FindColumn("Size")!)!.Visibility == Visibility.Collapsed
+                && registry.EffectiveLayout.Columns.Count == 5, "Columns declared in XAML load with their default visibility");
             await WaitAsync(() => Aligned(registry), () => Misalignment(registry));
             Check(Aligned(registry), "Header labels line up with row cells");
             var originalStyle = registry.ListView.ItemContainerStyle;
             var originalPadding = registry.HeaderRow.Padding.Left;
             registry.ListView.ItemContainerStyle = new Style(typeof(ListViewItem))
             {
-                BasedOn = originalStyle,
-                Setters = { new Setter(Control.PaddingProperty, new Thickness(24, 0, 32, 0)) }
+                BasedOn = originalStyle, Setters = { new Setter(Control.PaddingProperty, new Thickness(24, 0, 32, 0)) }
             };
             await WaitAsync(() => registry.HeaderRow.Padding.Left > originalPadding + 10 && Aligned(registry));
             Check(!Overflows(registry), "Changing container padding remeasures header alignment and fill widths");
@@ -170,8 +166,7 @@ internal static class ComponentChecks
             Check(
                 Math.Abs(SurfaceWidth(registry) - ViewportWidth(registry)) < 1 && !Overflows(registry),
                 "Fill columns use the viewport without horizontal overflow");
-            var toolWidths = Enumerable.Range(0, 3)
-                .Select(index => tools.HeaderRow.ColumnDefinitions[index].Width.Value).ToArray();
+            var toolWidths = Enumerable.Range(0, 3).Select(index => tools.HeaderRow.ColumnDefinitions[index].Width.Value).ToArray();
             Check(
                 Math.Abs(toolWidths[1] / toolWidths[0] - 3) < 0.1 && Math.Abs(toolWidths[2] - toolWidths[0]) < 1.5,
                 "Fill weights split the tool list 2:6:2");
@@ -181,9 +176,10 @@ internal static class ComponentChecks
             registry.ResizeColumn("Type", 250);
             await WaitAsync(() => RowWidth(registry, "Type") == 250);
             Check(
-                registry.CurrentWidth("Type") == 250 && page.LayoutChanges == changes + 1 &&
-                registry.Layout is ColumnLayout bound && bound.Find("Type")!.Width == 250,
-                "Resizing updates header, rows, the bound layout and raises LayoutChanged once");
+                registry.CurrentWidth("Type") == 250
+                && page.LayoutChanges == changes + 1
+                && registry.Layout is ColumnLayout bound
+                && bound.Find("Type")!.Width == 250, "Resizing updates header, rows, the bound layout and raises LayoutChanged once");
             registry.ResizeColumn("Type", 1);
             Check(registry.CurrentWidth("Type") == 60, "Resizing stops at the column minimum");
             registry.ResizeColumn("Type", 140);
@@ -205,20 +201,19 @@ internal static class ComponentChecks
             registry.MoveColumn("Data", "Name");
             await WaitAsync(() => Grid.GetColumn(Cell(registry, "Data")) == 1);
             Check(
-                Grid.GetColumn(registry.HeaderRow.LabelFor(registry.FindColumn("Data")!)!) == 1 &&
-                Grid.GetColumn(Cell(registry, "Name")) == 2 && Grid.GetColumn(Cell(registry, "Icon")) == 0,
-                "Moving a column reorders header and cells after the leading column");
+                Grid.GetColumn(registry.HeaderRow.LabelFor(registry.FindColumn("Data")!)!) == 1
+                && Grid.GetColumn(Cell(registry, "Name")) == 2
+                && Grid.GetColumn(Cell(registry, "Icon")) == 0, "Moving a column reorders header and cells after the leading column");
             await WaitAsync(() => Aligned(registry), () => Misalignment(registry));
             var typeLabel = registry.HeaderRow.LabelFor(registry.FindColumn("Type")!)!;
-            var dropX = typeLabel.TransformToVisual(registry.HeaderRow).TransformPoint(default).X +
-                        typeLabel.ActualWidth / 2;
+            var dropX = typeLabel.TransformToVisual(registry.HeaderRow).TransformPoint(default).X + typeLabel.ActualWidth / 2;
             Check(
                 registry.HeaderRow.ColumnAt(dropX)?.Id == "Type" && registry.HeaderRow.ColumnAt(-50) is null,
                 "Header hit-testing finds the drop target under the pointer");
             registry.MoveColumnBy("Data", 1);
             Check(
-                registry.EffectiveLayout.Columns.Select(column => column.Id).Take(2)
-                    .SequenceEqual((string[])["Name", "Data"]), "Move right swaps with the next visible column");
+                registry.EffectiveLayout.Columns.Select(column => column.Id).Take(2).SequenceEqual((string[])["Name", "Data"]),
+                "Move right swaps with the next visible column");
 
             // Drag feedback, driven through the same pipeline the pointer handlers use.
             await WaitAsync(() => Aligned(registry), () => Misalignment(registry));
@@ -241,22 +236,24 @@ internal static class ComponentChecks
             header.StartColumnDrag(dataColumn, LeftOf(dataLabel) + 10);
             await Task.Delay(50);
             Check(
-                header.IsDragging && header.DragGhost.Visibility == Visibility.Visible && dataLabel.Opacity < 1 &&
-                Math.Abs(LeftOf(header.DragGhost) - LeftOf(dataLabel)) < 1,
-                $"Starting a drag shows a ghost under the pointer and dims the original header " +
-                $"(dragging={header.IsDragging} ghost={header.DragGhost.Visibility} opacity={dataLabel.Opacity} " +
-                $"ghostX={LeftOf(header.DragGhost):F1} labelX={LeftOf(dataLabel):F1} " +
-                $"canvasLeft={Canvas.GetLeft(header.DragGhost):F1} " +
-                $"overlayX={LeftOf((FrameworkElement)Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(header.DragGhost)):F1} " +
-                $"ghostW={header.DragGhost.ActualWidth:F1})");
+                header.IsDragging
+                && header.DragGhost.Visibility == Visibility.Visible
+                && dataLabel.Opacity < 1
+                && Math.Abs(LeftOf(header.DragGhost) - LeftOf(dataLabel)) < 1,
+                $"Starting a drag shows a ghost under the pointer and dims the original header "
+                + $"(dragging={header.IsDragging} ghost={header.DragGhost.Visibility} opacity={dataLabel.Opacity} "
+                + $"ghostX={LeftOf(header.DragGhost):F1} labelX={LeftOf(dataLabel):F1} "
+                + $"canvasLeft={Canvas.GetLeft(header.DragGhost):F1} "
+                + $"overlayX={LeftOf((FrameworkElement)Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(header.DragGhost)):F1} "
+                + $"ghostW={header.DragGhost.ActualWidth:F1})");
             var endX = LeftOf(lastWriteLabel) + lastWriteLabel.ActualWidth - 5;
             header.MoveColumnDrag(endX, middle);
             await Task.Delay(50);
             Check(
-                header.DragTarget == (true, null) && header.InsertionMarker.Visibility == Visibility.Visible &&
-                Math.Abs(
-                    MarkerX() - (LeftOf(lastWriteLabel) + lastWriteLabel.ActualWidth + registry.ColumnSpacing / 2)) <
-                2 && Math.Abs(LeftOf(header.DragGhost) - (endX - 10)) < 1,
+                header.DragTarget == (true, null)
+                && header.InsertionMarker.Visibility == Visibility.Visible
+                && Math.Abs(MarkerX() - (LeftOf(lastWriteLabel) + lastWriteLabel.ActualWidth + registry.ColumnSpacing / 2)) < 2
+                && Math.Abs(LeftOf(header.DragGhost) - (endX - 10)) < 1,
                 "Past the last header's midpoint the marker shows the end gap and the ghost follows");
             header.MoveColumnDrag(LeftOf(dataLabel) + 5, middle);
             Check(
@@ -268,9 +265,9 @@ internal static class ComponentChecks
             Check(header.DropColumnDrag(), "Dropping in a valid gap moves the column");
             await WaitAsync(() => header.DragGhost.Visibility == Visibility.Collapsed);
             Check(
-                registry.EffectiveLayout.Visible.Select(column => column.Id)
-                    .SequenceEqual((string[])["Name", "Type", "LastWrite", "Data"]) && dataLabel.Opacity == 1 &&
-                header.InsertionMarker.Visibility == Visibility.Collapsed,
+                registry.EffectiveLayout.Visible.Select(column => column.Id).SequenceEqual((string[])["Name", "Type", "LastWrite", "Data"])
+                && dataLabel.Opacity == 1
+                && header.InsertionMarker.Visibility == Visibility.Collapsed,
                 "The drop lands in the marked gap and clears the drag visuals");
             var beforeCancel = registry.EffectiveLayout;
             header.StartColumnDrag(dataColumn, LeftOf(dataLabel) + 10);
@@ -278,28 +275,28 @@ internal static class ComponentChecks
             Check(header.DragTarget == (true, "Name"), "The marker tracks the gap before the hovered header");
             header.CancelColumnDrag();
             Check(
-                !header.IsDragging && !header.DropColumnDrag() &&
-                ReferenceEquals(registry.EffectiveLayout, beforeCancel) &&
-                header.DragGhost.Visibility == Visibility.Collapsed,
-                "Escape cancels the drag without moving the column");
+                !header.IsDragging
+                && !header.DropColumnDrag()
+                && ReferenceEquals(registry.EffectiveLayout, beforeCancel)
+                && header.DragGhost.Visibility == Visibility.Collapsed, "Escape cancels the drag without moving the column");
             Check(
-                header.MoveByKeyboard(dataColumn, -1) &&
-                registry.EffectiveLayout.Visible.Select(column => column.Id)
-                    .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite"]) &&
-                !header.MoveByKeyboard(registry.FindColumn("Name")!, -1),
+                header.MoveByKeyboard(dataColumn, -1)
+                && registry.EffectiveLayout.Visible.Select(column => column.Id)
+                    .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite"])
+                && !header.MoveByKeyboard(registry.FindColumn("Name")!, -1),
                 "The reorder shortcut moves the focused header's column and stops at the edge");
             Check(
-                registry.KeyboardReorderModifiers == (Windows.System.VirtualKeyModifiers.Control |
-                                                      Windows.System.VirtualKeyModifiers.Shift),
+                registry.KeyboardReorderModifiers
+                == (Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift),
                 "The reorder shortcut defaults to Ctrl+Shift, leaving Alt+arrows to host navigation");
 
             // Visibility through the header menu.
             var menu = registry.HeaderRow.Menu;
             await OpenAsync(menu, typeLabel);
             Check(
-                MenuItem(menu, "ToggleColumnName") is { IsEnabled: false } &&
-                MenuItem(menu, "ToggleColumnSize") is ToggleMenuFlyoutItem { IsChecked: false, IsEnabled: true } &&
-                MenuItem(menu, "MoveColumnLeft") is { IsEnabled: true },
+                MenuItem(menu, "ToggleColumnName") is { IsEnabled: false }
+                && MenuItem(menu, "ToggleColumnSize") is ToggleMenuFlyoutItem { IsChecked: false, IsEnabled: true }
+                && MenuItem(menu, "MoveColumnLeft") is { IsEnabled: true },
                 "The header menu reflects visibility, hide guards and move availability");
             Invoke(MenuItem(menu, "ToggleColumnType")!);
             await WaitAsync(() => !menu.IsOpen && Cell(registry, "Type").Visibility == Visibility.Collapsed);
@@ -313,9 +310,7 @@ internal static class ComponentChecks
                 "Showing a column creates its cells lazily from CellText");
             tools.ToggleColumn("Subject");
             tools.ToggleColumn("Summary");
-            Check(
-                !tools.CanToggleColumn("Path") && tools.EffectiveLayout.Visible.Count() == 1,
-                "The last visible column cannot be hidden");
+            Check(!tools.CanToggleColumn("Path") && tools.EffectiveLayout.Visible.Count() == 1, "The last visible column cannot be hidden");
             tools.ResetLayout();
 
             // Auto-fit.
@@ -330,8 +325,9 @@ internal static class ComponentChecks
             registry.AutoFitColumn("Name");
             await WaitAsync(() => RowWidth(registry, "Name") > 80);
             Check(
-                registry.CurrentWidth("Name") >= needed && registry.CurrentWidth("Name") <= needed + 40 &&
-                registry.EffectiveLayout.Find("Name")!.Width == registry.CurrentWidth("Name"),
+                registry.CurrentWidth("Name") >= needed
+                && registry.CurrentWidth("Name") <= needed + 40
+                && registry.EffectiveLayout.Find("Name")!.Width == registry.CurrentWidth("Name"),
                 "Auto-fit sizes a column to its widest realized cell");
 
             // Sorting.
@@ -341,21 +337,20 @@ internal static class ComponentChecks
             var nameSortIcon = registry.HeaderRow.SortIconFor(registry.FindColumn("Name")!)!;
             var typeSortIcon = registry.HeaderRow.SortIconFor(registry.FindColumn("Type")!)!;
             Check(
-                page.LastSortRequest == "Name" &&
-                nameSortIcon is { Visibility: Visibility.Visible, Glyph: ColumnHeaderRow.SortAscendingGlyph } &&
-                typeSortIcon.Visibility == Visibility.Collapsed &&
-                AutomationProperties.GetItemStatus(nameLabel) == "Sorted ascending" &&
-                AutomationProperties.GetItemStatus(typeLabel) == "Not sorted",
+                page.LastSortRequest == "Name"
+                && nameSortIcon is { Visibility: Visibility.Visible, Glyph: ColumnHeaderRow.SortAscendingGlyph }
+                && typeSortIcon.Visibility == Visibility.Collapsed
+                && AutomationProperties.GetItemStatus(nameLabel) == "Sorted ascending"
+                && AutomationProperties.GetItemStatus(typeLabel) == "Not sorted",
                 "Clicking a sortable header requests sorting and shows the ascending chevron");
             Invoke(Button(registry, "NameSortButton"));
             await WaitAsync(() => registry.SortDescending);
             Check(
-                nameSortIcon is { Visibility: Visibility.Visible, Glyph: ColumnHeaderRow.SortDescendingGlyph } &&
-                page.Entries[0].Name == page.Entries.Max(entry => entry.Name),
-                "Clicking again sorts descending and flips the chevron");
+                nameSortIcon is { Visibility: Visibility.Visible, Glyph: ColumnHeaderRow.SortDescendingGlyph }
+                && page.Entries[0].Name == page.Entries.Max(entry => entry.Name), "Clicking again sorts descending and flips the chevron");
             Check(
-                Button(tools, "SubjectHeader") is { IsTabStop: true } &&
-                AutomationProperties.GetItemStatus(Button(tools, "SubjectHeader")) == string.Empty,
+                Button(tools, "SubjectHeader") is { IsTabStop: true }
+                && AutomationProperties.GetItemStatus(Button(tools, "SubjectHeader")) == string.Empty,
                 "Non-sortable headers expose no sort state but stay focusable for keyboard reordering");
 
             // Multiselect.
@@ -388,8 +383,10 @@ internal static class ComponentChecks
             registry.RestoreSelection(page.Entries.Take(5000));
             restoreTimer.Stop();
             Check(
-                registry.ListView.SelectedItems.Count == 5000 && registry.ListView.SelectedRanges.Count == 1 &&
-                listNotifications <= 1 && page.RegistrySelection.Count == 0,
+                registry.ListView.SelectedItems.Count == 5000
+                && registry.ListView.SelectedRanges.Count == 1
+                && listNotifications <= 1
+                && page.RegistrySelection.Count == 0,
                 $"Restoring 5,000 selected rows uses one range without changing the host selection ({restoreTimer.ElapsedMilliseconds} ms)");
             listNotifications = 0;
             registry.RestoreSelection(page.Entries);
@@ -412,8 +409,7 @@ internal static class ComponentChecks
             page.RegistrySelection.ReplaceAll(page.Entries.Where((_, index) => index % 2 == 0));
             await WaitAsync(() => registry.ListView.SelectedItems.Count == MainPage.EntryCount / 2);
             Check(
-                registry.ListView.SelectedItems.Contains(page.Entries[0]) &&
-                !registry.ListView.SelectedItems.Contains(page.Entries[1]),
+                registry.ListView.SelectedItems.Contains(page.Entries[0]) && !registry.ListView.SelectedItems.Contains(page.Entries[1]),
                 "Scattered host selections select exactly the requested rows");
             hostNotifications = 0;
             registry.ListView.SelectAll();
@@ -430,14 +426,10 @@ internal static class ComponentChecks
             }
 
             await WaitAsync(() => registry.ListView.SelectedItems.Count == 3);
-            Check(
-                page.Entries.Take(3).All(registry.ListView.SelectedItems.Contains),
-                "Host selection changes select the matching rows");
+            Check(page.Entries.Take(3).All(registry.ListView.SelectedItems.Contains), "Host selection changes select the matching rows");
             Invoke(Button(registry, "TypeSortButton"));
             await WaitAsync(() => registry.SortColumnId == "Type");
-            Check(
-                registry.ListView.SelectedItems.Count == 3 && page.RegistrySelection.Count == 3,
-                "Selection survives a host re-sort");
+            Check(registry.ListView.SelectedItems.Count == 3 && page.RegistrySelection.Count == 3, "Selection survives a host re-sort");
             registry.ListView.SelectedItems.Remove(registry.ListView.SelectedItems[0]);
             await WaitAsync(() => page.RegistrySelection.Count == 2);
             Check(true, "Deselecting a row updates the host selection");
@@ -451,34 +443,35 @@ internal static class ComponentChecks
             registry.EditEnded += (_, args) => ended.Add(args);
             Check(!registry.BeginEdit(target, "Type"), "Columns that are not editable do not open an editor");
             registry.CanEditItem = (item, _) => !ReferenceEquals(item, target);
-            Check(
-                !registry.BeginEdit(target) && !registry.IsEditing,
-                "CanEditItem keeps read-only rows from opening an editor");
+            Check(!registry.BeginEdit(target) && !registry.IsEditing, "CanEditItem keeps read-only rows from opening an editor");
             registry.CanEditItem = null;
             Check(registry.BeginEdit(target), "BeginEdit opens the first editable column");
             await WaitAsync(
-                () => registry.Editor is { FocusState: not FocusState.Unfocused } box &&
-                      box.SelectionLength == original.Length,
+                () => registry.Editor is { FocusState: not FocusState.Unfocused } box && box.SelectionLength == original.Length,
                 () => $"focus={registry.Editor?.FocusState} selection={registry.Editor?.SelectionLength}");
             var editor = registry.Editor!;
             var editedRow = RowOf(registry, target);
             Check(
-                editor.Text == original && ReferenceEquals(registry.EditingItem, target) &&
-                Grid.GetColumn(editor) == Grid.GetColumn(editedRow.CellFor(nameColumn)!) &&
-                editedRow.CellFor(nameColumn)!.Opacity == 0,
-                "The editor covers the cell with the current name selected and focused");
+                editor.Text == original
+                && ReferenceEquals(registry.EditingItem, target)
+                && Grid.GetColumn(editor) == Grid.GetColumn(editedRow.CellFor(nameColumn)!)
+                && editedRow.CellFor(nameColumn)!.Opacity == 0, "The editor covers the cell with the current name selected and focused");
             editor.Text = "  ";
             Check(
-                !registry.CommitEdit() && registry.IsEditing && editor.FocusState != FocusState.Unfocused &&
-                AutomationProperties.GetHelpText(editor) == "A name cannot be empty.",
+                !registry.CommitEdit()
+                && registry.IsEditing
+                && editor.FocusState != FocusState.Unfocused
+                && AutomationProperties.GetHelpText(editor) == "A name cannot be empty.",
                 "Rejected text keeps the editor open with the host's error");
             editor.Text = page.Entries[6].Name;
             Check(!registry.CommitEdit() && registry.IsEditing, "The host can reject duplicate names");
             editor.Text = "Renamed value";
             Check(
-                registry.CommitEdit() && !registry.IsEditing && target.Name == "Renamed value" &&
-                ended[^1] is { Committed: true, ColumnId: "Name" } && !editedRow.Children.Contains(editor),
-                "Committing applies the host rename and removes the editor");
+                registry.CommitEdit()
+                && !registry.IsEditing
+                && target.Name == "Renamed value"
+                && ended[^1] is { Committed: true, ColumnId: "Name" }
+                && !editedRow.Children.Contains(editor), "Committing applies the host rename and removes the editor");
             await WaitAsync(() => ((TextBlock)RowOf(registry, target).CellFor(nameColumn)!).Text == "Renamed value");
             Check(RowOf(registry, target).CellFor(nameColumn)!.Opacity == 1, "The row shows the renamed value");
             registry.BeginEdit(target);
@@ -489,9 +482,9 @@ internal static class ComponentChecks
                 "Cancelling leaves the item unchanged");
             registry.BeginEdit(target);
             Check(
-                registry.BeginEdit(page.Entries[7]) && ended[^1] is { Committed: false } &&
-                ReferenceEquals(registry.EditingItem, page.Entries[7]),
-                "Starting another edit closes the unchanged one");
+                registry.BeginEdit(page.Entries[7])
+                && ended[^1] is { Committed: false }
+                && ReferenceEquals(registry.EditingItem, page.Entries[7]), "Starting another edit closes the unchanged one");
             registry.CancelEdit();
             registry.BeginEdit(target);
             await WaitAsync(() => registry.Editor is { FocusState: not FocusState.Unfocused });
@@ -501,8 +494,7 @@ internal static class ComponentChecks
             Check(target.Name == "Committed on focus loss", "Moving focus away commits the edit");
             foreach (var focusTarget in new Control[]
                      {
-                         (TextBox)page.FindName("LayoutText"),
-                         tools.HeaderRow.LabelFor(tools.FindColumn("Subject")!)!
+                         (TextBox)page.FindName("LayoutText"), tools.HeaderRow.LabelFor(tools.FindColumn("Subject")!)!
                      })
             {
                 registry.BeginEdit(target);
@@ -512,9 +504,10 @@ internal static class ComponentChecks
                 Check(focusTarget.Focus(FocusState.Programmatic), "The control outside the editor accepts focus");
                 await WaitAsync(() => !registry.IsEditing);
                 Check(
-                    ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), focusTarget) &&
-                    target.Name == "Committed on focus loss" && !ended[^1].Committed &&
-                    !string.IsNullOrEmpty(AutomationProperties.GetHelpText(rejectedEditor)),
+                    ReferenceEquals(FocusManager.GetFocusedElement(page.XamlRoot), focusTarget)
+                    && target.Name == "Committed on focus loss"
+                    && !ended[^1].Committed
+                    && !string.IsNullOrEmpty(AutomationProperties.GetHelpText(rejectedEditor)),
                     "A duplicate name rejected on blur leaves focus outside the list and preserves the original name");
             }
 
@@ -544,8 +537,7 @@ internal static class ComponentChecks
             Check(tools.BeginEdit(toolEvent, "Summary"), "Text columns can be edited");
             tools.Editor!.Text = "Edited summary";
             tools.CommitEdit();
-            await WaitAsync(() => ((TextBlock)RowOf(tools, toolEvent).CellFor(tools.FindColumn("Summary")!)!).Text ==
-                                  "Edited summary");
+            await WaitAsync(() => ((TextBlock)RowOf(tools, toolEvent).CellFor(tools.FindColumn("Summary")!)!).Text == "Edited summary");
             Check(toolEvent.Summary == "Edited summary", "Committed text cells refresh from CellText");
             tools.BeginEdit(toolEvent, "Summary");
             tools.ToggleColumn("Summary");
@@ -583,15 +575,15 @@ internal static class ComponentChecks
             var visible = registry.VisibleItems;
             var lastIndex = MainPage.EntryCount - 1;
             Check(
-                visible.Count > 0 && visible.Count < registry.RealizedRows.Count &&
-                ReferenceEquals(visible[^1], page.Entries[lastIndex]) &&
-                visible.All(item => registry.ListView.ContainerFromItem(item) is ListViewItem container &&
-                                    InViewport(registry.ListView, container)),
+                visible.Count > 0
+                && visible.Count < registry.RealizedRows.Count
+                && ReferenceEquals(visible[^1], page.Entries[lastIndex])
+                && visible.All(item =>
+                    registry.ListView.ContainerFromItem(item) is ListViewItem container && InViewport(registry.ListView, container)),
                 $"VisibleItems lists only on-screen rows ({visible.Count} of {registry.RealizedRows.Count} realized)");
             Check(
                 visible.Select(item => registry.ListView.Items.IndexOf(item)).SequenceEqual(
-                    Enumerable.Range(lastIndex - visible.Count + 1, visible.Count)),
-                "VisibleItems are ordered top to bottom");
+                    Enumerable.Range(lastIndex - visible.Count + 1, visible.Count)), "VisibleItems are ordered top to bottom");
             Check(visibleChanges > 0, "Scrolling raises VisibleItemsChanged");
 
             // Density from the shared helper.
@@ -616,14 +608,12 @@ internal static class ComponentChecks
 
             // Compact presentation.
             tools.ShowColumns = false;
-            await WaitAsync(() =>
-                tools.ListView.ContainerFromIndex(0) is ListViewItem { ContentTemplateRoot: StackPanel });
+            await WaitAsync(() => tools.ListView.ContainerFromIndex(0) is ListViewItem { ContentTemplateRoot: StackPanel });
             Check(
                 tools.HeaderRow.Visibility == Visibility.Collapsed && tools.RealizedRows.Count == 0,
                 "Hiding columns swaps to the compact template and hides the header");
             tools.ShowColumns = true;
-            await WaitAsync(() =>
-                tools.ListView.ContainerFromIndex(0) is ListViewItem { ContentTemplateRoot: ColumnRow });
+            await WaitAsync(() => tools.ListView.ContainerFromIndex(0) is ListViewItem { ContentTemplateRoot: ColumnRow });
             await WaitAsync(() => Aligned(tools), () => Misalignment(tools));
             Check(tools.HeaderRow.Visibility == Visibility.Visible, "Showing columns restores aligned column rows");
 
@@ -658,15 +648,16 @@ internal static class ComponentChecks
             second.ToggleColumn("Data");
             var late = NewList("Shared");
             Check(
-                saves == 0 &&
-                new[] { first, second, late }.All(list =>
-                    list.CurrentWidth("Name") == 222 && !list.IsColumnVisible("Data")) && other.IsColumnVisible("Data"),
-                "Lists sharing an id see pending widths and visibility before the debounced save");
+                saves == 0
+                && new[] { first, second, late }.All(list => list.CurrentWidth("Name") == 222 && !list.IsColumnVisible("Data"))
+                && other.IsColumnVisible("Data"), "Lists sharing an id see pending widths and visibility before the debounced save");
             other.ResizeColumn("Name", 333);
             persistence.Flush();
             Check(
-                saves == 2 && stored["Shared"].Find("Name")!.Width == 222 && !stored["Shared"].Find("Data")!.Visible &&
-                stored["Other"].Find("Name")!.Width == 333,
+                saves == 2
+                && stored["Shared"].Find("Name")!.Width == 222
+                && !stored["Shared"].Find("Data")!.Visible
+                && stored["Other"].Find("Name")!.Width == 333,
                 "Closing before the debounce expires flushes the latest layout for each list id");
             persistence.Flush();
             await Task.Delay(450);
@@ -675,31 +666,25 @@ internal static class ComponentChecks
                 "Flushing stops the timer and later lists restore the saved layout without duplicate writes");
             first.ResizeColumn("Name", 244);
             await WaitAsync(() => saves == 3);
-            Check(
-                stored["Shared"].Find("Name")!.Width == 244,
-                "Settling a column drag saves its latest shared layout after the debounce");
+            Check(stored["Shared"].Find("Name")!.Width == 244, "Settling a column drag saves its latest shared layout after the debounce");
             registry.ResizeColumn("Type", 222);
             registry.MoveColumn("LastWrite", "Name");
             registry.ToggleColumn("Data");
             var saved = registry.EffectiveLayout;
             page.SaveLayout();
             registry.Layout = null;
-            Check(
-                registry.EffectiveLayout.IsEquivalentTo(ColumnLayout.Default(registry.Specs)),
-                "Clearing the layout restores defaults");
+            Check(registry.EffectiveLayout.IsEquivalentTo(ColumnLayout.Default(registry.Specs)), "Clearing the layout restores defaults");
             page.ReloadLayout();
             await WaitAsync(() => !registry.IsColumnVisible("Data"));
             Check(
-                registry.EffectiveLayout.IsEquivalentTo(saved) &&
-                Grid.GetColumn(registry.HeaderRow.LabelFor(registry.FindColumn("LastWrite")!)!) == 1 &&
-                registry.CurrentWidth("Type") == 222, "A saved layout survives a JSON round trip");
-            registry.Layout = new ColumnLayout(
-                (ColumnState[])[new ColumnState("Bogus", 10, true), new ColumnState("Type", -5, true)]);
+                registry.EffectiveLayout.IsEquivalentTo(saved)
+                && Grid.GetColumn(registry.HeaderRow.LabelFor(registry.FindColumn("LastWrite")!)!) == 1
+                && registry.CurrentWidth("Type") == 222, "A saved layout survives a JSON round trip");
+            registry.Layout = new ColumnLayout((ColumnState[])[new ColumnState("Bogus", 10, true), new ColumnState("Type", -5, true)]);
             Check(
                 registry.EffectiveLayout.Columns.Select(column => column.Id)
-                    .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite", "Size"]) &&
-                registry.CurrentWidth("Type") == 140,
-                "Stale saved layouts are normalized against the declared columns");
+                    .SequenceEqual((string[])["Name", "Type", "Data", "LastWrite", "Size"])
+                && registry.CurrentWidth("Type") == 140, "Stale saved layouts are normalized against the declared columns");
             File.Delete(page.LayoutFile);
             registry.ResetLayout();
             await CommandIconChecks.RunAsync(window, Check);
@@ -718,9 +703,7 @@ internal static class ComponentChecks
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         File.WriteAllText(
-            output,
-            JsonSerializer.Serialize(
-                new { passed, largeList, failure }, new JsonSerializerOptions { WriteIndented = true }));
+            output, JsonSerializer.Serialize(new { passed, largeList, failure }, new JsonSerializerOptions { WriteIndented = true }));
         Environment.ExitCode = failure is null ? 0 : 1;
     }
 
@@ -729,8 +712,10 @@ internal static class ComponentChecks
         // Recycled containers stay in the tree, parked far outside the viewport; only consider visible rows.
         return list.RealizedRows.Where(row => row.ActualHeight > 0)
             .Select(row => (Row: row, Position: row.TransformToVisual(list).TransformPoint(default))).Where(entry =>
-                entry.Position.X > -list.ActualWidth && entry.Position.X < list.ActualWidth && entry.Position.Y >= 0 &&
-                entry.Position.Y < list.ActualHeight).OrderBy(entry => entry.Position.Y).First().Row;
+                entry.Position.X > -list.ActualWidth
+                && entry.Position.X < list.ActualWidth
+                && entry.Position.Y >= 0
+                && entry.Position.Y < list.ActualHeight).OrderBy(entry => entry.Position.Y).First().Row;
     }
 
     // Real cursor and button input: pointer capture, Click suppression and routing exactly as a user produces them.
@@ -749,8 +734,7 @@ internal static class ComponentChecks
         (int X, int Y) At(string id, double fraction)
         {
             var label = header.LabelFor(registry.FindColumn(id)!)!;
-            return MouseInput.ToScreen(
-                window, label, new Windows.Foundation.Point(label.ActualWidth * fraction, label.ActualHeight / 2));
+            return MouseInput.ToScreen(window, label, new Windows.Foundation.Point(label.ActualWidth * fraction, label.ActualHeight / 2));
         }
 
         var sortBefore = (registry.SortColumnId, registry.SortDescending);
@@ -761,16 +745,16 @@ internal static class ComponentChecks
         await MouseInput.GlideAsync(start, end);
         await Task.Delay(100);
         check(
-            header.IsDragging && header.DragGhost.Visibility == Visibility.Visible &&
-            header.InsertionMarker.Visibility == Visibility.Visible && header.DragTarget == (true, null),
-            "Mouse: dragging a header shows the ghost and the end-gap marker");
+            header.IsDragging
+            && header.DragGhost.Visibility == Visibility.Visible
+            && header.InsertionMarker.Visibility == Visibility.Visible
+            && header.DragTarget == (true, null), "Mouse: dragging a header shows the ghost and the end-gap marker");
         await MouseInput.UpAsync();
         await WaitAsync(() => !header.IsDragging);
         check(
-            registry.EffectiveLayout.Visible.Select(column => column.Id)
-                .SequenceEqual((string[])["Name", "Data", "LastWrite", "Type"]) &&
-            (registry.SortColumnId, registry.SortDescending) == sortBefore &&
-            header.DragGhost.Visibility == Visibility.Collapsed, "Mouse: releasing drops the column without sorting");
+            registry.EffectiveLayout.Visible.Select(column => column.Id).SequenceEqual((string[])["Name", "Data", "LastWrite", "Type"])
+            && (registry.SortColumnId, registry.SortDescending) == sortBefore
+            && header.DragGhost.Visibility == Visibility.Collapsed, "Mouse: releasing drops the column without sorting");
 
         var name = At("Name", 0.5);
         await MouseInput.MoveAsync(name);
@@ -779,8 +763,7 @@ internal static class ComponentChecks
         await MouseInput.GlideAsync((name.X + 60, name.Y), name, 6);
         await MouseInput.UpAsync();
         check(
-            (registry.SortColumnId, registry.SortDescending) == sortBefore &&
-            registry.EffectiveLayout.Visible.First().Id == "Name",
+            (registry.SortColumnId, registry.SortDescending) == sortBefore && registry.EffectiveLayout.Visible.First().Id == "Name",
             "Mouse: a drag released over its own header neither moves nor sorts");
 
         var layout = registry.EffectiveLayout;
@@ -792,8 +775,7 @@ internal static class ComponentChecks
         check(!header.IsDragging && header.DragGhost.Visibility == Visibility.Collapsed, "Mouse: Escape ends the drag");
         await MouseInput.UpAsync();
         check(
-            registry.EffectiveLayout.IsEquivalentTo(layout) &&
-            (registry.SortColumnId, registry.SortDescending) == sortBefore,
+            registry.EffectiveLayout.IsEquivalentTo(layout) && (registry.SortColumnId, registry.SortDescending) == sortBefore,
             "Mouse: releasing after Escape changes nothing");
 
         var type = At("Type", 0.5);
@@ -808,8 +790,10 @@ internal static class ComponentChecks
     private static bool InViewport(FrameworkElement list, FrameworkElement element)
     {
         var origin = element.TransformToVisual(list).TransformPoint(default);
-        return origin.Y + element.ActualHeight > 0 && origin.Y < list.ActualHeight && origin.X > -element.ActualWidth &&
-               origin.X < list.ActualWidth;
+        return origin.Y + element.ActualHeight > 0
+               && origin.Y < list.ActualHeight
+               && origin.X > -element.ActualWidth
+               && origin.X < list.ActualWidth;
     }
 
     private static ColumnRow RowOf(ColumnListView list, object item)
@@ -820,21 +804,16 @@ internal static class ComponentChecks
     private static FrameworkElement Cell(ColumnListView list, string id, int? index = null)
     {
         var column = list.LeadingColumn?.Id == id ? list.LeadingColumn : list.FindColumn(id)!;
-        var row = index is { } at
-            ? (ColumnRow)((ListViewItem)list.ListView.ContainerFromIndex(at)).ContentTemplateRoot
-            : FirstRow(list);
+        var row = index is { } at ? (ColumnRow)((ListViewItem)list.ListView.ContainerFromIndex(at)).ContentTemplateRoot : FirstRow(list);
         return row.CellFor(column) ?? throw new InvalidOperationException($"No {id} cell.");
     }
 
     private static double RowWidth(ColumnListView list, string id)
     {
         var column = list.FindColumn(id)!;
-        var slot = list.EffectiveLayout.Visible.Select(state => state.Id).ToList().IndexOf(id) +
-                   (list.LeadingColumn is null ? 0 : 1);
+        var slot = list.EffectiveLayout.Visible.Select(state => state.Id).ToList().IndexOf(id) + (list.LeadingColumn is null ? 0 : 1);
         var row = FirstRow(list);
-        return row.CellFor(column) is null || slot >= row.ColumnDefinitions.Count
-            ? -1
-            : row.ColumnDefinitions[slot].Width.Value;
+        return row.CellFor(column) is null || slot >= row.ColumnDefinitions.Count ? -1 : row.ColumnDefinitions[slot].Width.Value;
     }
 
     private static double SurfaceWidth(ColumnListView list)
@@ -850,8 +829,7 @@ internal static class ComponentChecks
     private static bool Overflows(ColumnListView list)
     {
         var row = FirstRow(list);
-        var last = row.Children.OfType<FrameworkElement>().Where(cell => cell.Visibility == Visibility.Visible)
-            .MaxBy(Grid.GetColumn)!;
+        var last = row.Children.OfType<FrameworkElement>().Where(cell => cell.Visibility == Visibility.Visible).MaxBy(Grid.GetColumn)!;
         return last.TransformToVisual(row).TransformPoint(default).X + last.ActualWidth > row.ActualWidth + 1;
     }
 
@@ -873,13 +851,12 @@ internal static class ComponentChecks
             }
 
             var labelX = label.TransformToVisual(surface).TransformPoint(default).X;
-            var cellSlotX = row.TransformToVisual(surface).TransformPoint(default).X +
-                            SlotLeft(row, Grid.GetColumn(cell));
-            if (Math.Abs(labelX - cellSlotX) > 1 ||
-                Math.Abs(label.ActualWidth - row.ColumnDefinitions[Grid.GetColumn(cell)].ActualWidth) > 1)
+            var cellSlotX = row.TransformToVisual(surface).TransformPoint(default).X + SlotLeft(row, Grid.GetColumn(cell));
+            if (Math.Abs(labelX - cellSlotX) > 1
+                || Math.Abs(label.ActualWidth - row.ColumnDefinitions[Grid.GetColumn(cell)].ActualWidth) > 1)
             {
-                return $"{column.Id}: header x={labelX:F1} w={label.ActualWidth:F1}, cell x={cellSlotX:F1} " +
-                       $"w={row.ColumnDefinitions[Grid.GetColumn(cell)].ActualWidth:F1}";
+                return $"{column.Id}: header x={labelX:F1} w={label.ActualWidth:F1}, cell x={cellSlotX:F1} "
+                       + $"w={row.ColumnDefinitions[Grid.GetColumn(cell)].ActualWidth:F1}";
             }
         }
 

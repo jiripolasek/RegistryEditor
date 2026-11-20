@@ -18,29 +18,26 @@ internal static class MainWindowViewModelTests
 {
     internal static async Task RunAsync(Action<bool, string> check)
     {
-        var settings = new AppSettings
-        {
-            Tabs = [new SavedTab("HKCU"), new SavedTab("InvalidHive"), new SavedTab("HKLM", true)]
-        };
+        var settings = new AppSettings { Tabs = [new SavedTab("HKCU"), new SavedTab("InvalidHive"), new SavedTab("HKLM", true)] };
         var registry = new RegistryService();
         var shell = new MainWindowViewModel(
-            settings, new InvestigationStore(settings, () => { }), registry,
-            location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
+            settings, new InvestigationStore(settings, () => { }), registry, location => new BrowserViewModel(registry, location),
+            NullLogger<MainWindowViewModel>.Instance,
             NotesStoreTests.CreateStore(settings, () => throw new IOException("Test note save failure")));
         shell.Initialize(null);
         var first = (BrowserTab)shell.Tabs[0];
         var second = (BrowserTab)shell.Tabs[1];
         check(
-            shell.Tabs.Count == 2 && shell.ActiveTab == second &&
-            second.Browser.Location.View == RegistryView.Registry32,
+            shell.Tabs.Count == 2 && shell.ActiveTab == second && second.Browser.Location.View == RegistryView.Registry32,
             "Restore skips an invalid address, preserves registry views and selects the last restored tab");
         shell.OpenSettingsCommand.Execute(null);
         var settingsTab = shell.ActiveTab;
         shell.OpenShortcutsCommand.Execute(null);
         check(
-            shell.ActiveTab == settingsTab && shell.Tabs.Count == 3 && shell.VisibleBrowser is null &&
-            shell.ContextBrowser == second.Browser,
-            "Settings and keyboard shortcuts reuse one tab and retain the last browser context");
+            shell.ActiveTab == settingsTab
+            && shell.Tabs.Count == 3
+            && shell.VisibleBrowser is null
+            && shell.ContextBrowser == second.Browser, "Settings and keyboard shortcuts reuse one tab and retain the last browser context");
 
         shell.OpenInBackground(RegistryLocation.Parse("HKCR"));
         var background = (BrowserTab)shell.Tabs[^1];
@@ -53,9 +50,7 @@ internal static class MainWindowViewModelTests
                 new[] { background.Browser.Location, first.Browser.Location, second.Browser.Location }),
             "Workspace capture follows the reordered tab strip");
         shell.NextTabCommand.Execute(null);
-        check(
-            shell.ActiveTab == background && shell.VisibleBrowser == background.Browser,
-            "Next tab wraps in display order");
+        check(shell.ActiveTab == background && shell.VisibleBrowser == background.Browser, "Next tab wraps in display order");
         shell.PreviousTabCommand.Execute(null);
         check(shell.ActiveTab == settingsTab, "Previous tab wraps back to Settings");
         List<WindowTab> closed = [];
@@ -68,9 +63,11 @@ internal static class MainWindowViewModelTests
         shell.CloseTab(first);
 
         check(
-            closed.SequenceEqual(new[] { background, second, first }) && shell.Tabs.Count == 1 &&
-            shell.ActiveTab == settingsTab && shell.ContextBrowser is null && shell.VisibleBrowser is null,
-            "Only closed tabs are canceled and closing the final browser clears the tool context");
+            closed.SequenceEqual(new[] { background, second, first })
+            && shell.Tabs.Count == 1
+            && shell.ActiveTab == settingsTab
+            && shell.ContextBrowser is null
+            && shell.VisibleBrowser is null, "Only closed tabs are canceled and closing the final browser clears the tool context");
         var eligibilityChanges = 0;
         shell.DisconnectCommand.CanExecuteChanged += (_, _) => eligibilityChanges++;
         shell.OpenBrowser(RegistryLocation.Parse(@"\\server\HKLM"));
@@ -109,9 +106,13 @@ internal static class MainWindowViewModelTests
         var duplicate = await shell.TryCloseAsync(_ => throw new InvalidOperationException("Duplicate close prompt"));
         reply.SetResult(NoteCloseChoice.Cancel);
         check(
-            !duplicate && !await pendingClose && shell.ActiveTab == active && shell.Tabs.Count == 3 && note.IsDirty &&
-            note.Text == "Keep my draft" && !shell.IsClosing,
-            "Repeated close requests and Cancel preserve the active tab and dirty draft");
+            !duplicate
+            && !await pendingClose
+            && shell.ActiveTab == active
+            && shell.Tabs.Count == 3
+            && note.IsDirty
+            && note.Text == "Keep my draft"
+            && !shell.IsClosing, "Repeated close requests and Cancel preserve the active tab and dirty draft");
         var beginPrompt = new TaskCompletionSource();
         var promptShown = new TaskCompletionSource();
         var dismiss = new TaskCompletionSource();
@@ -135,9 +136,8 @@ internal static class MainWindowViewModelTests
             "An unrelated prompt is rejected while close is pending before any dialog opens");
         var otherSettings = new AppSettings();
         var otherWindow = new MainWindowViewModel(
-            otherSettings, new InvestigationStore(otherSettings, () => { }), registry,
-            location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(otherSettings));
+            otherSettings, new InvestigationStore(otherSettings, () => { }), registry, location => new BrowserViewModel(registry, location),
+            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(otherSettings));
         check(
             otherWindow.TryBeginDialog() && otherWindow.IsDialogOpen && !shell.IsDialogOpen,
             "A second window owns an independent dialog gate while the first window closes");
@@ -157,8 +157,8 @@ internal static class MainWindowViewModelTests
 
         var tabSettings = new AppSettings();
         var tabShell = new MainWindowViewModel(
-            tabSettings, new InvestigationStore(tabSettings, () => { }), registry,
-            location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
+            tabSettings, new InvestigationStore(tabSettings, () => { }), registry, location => new BrowserViewModel(registry, location),
+            NullLogger<MainWindowViewModel>.Instance,
             NotesStoreTests.CreateStore(tabSettings, () => throw new IOException("Test note save failure")));
         var source = tabShell.OpenBrowser(RegistryLocation.Parse(@"\\server\HKLM\Software", RegistryView.Registry32));
         tabShell.OpenSettingsCommand.Execute(null);
@@ -166,8 +166,11 @@ internal static class MainWindowViewModelTests
         tabShell.DuplicateTab(source);
         var copied = (BrowserTab)tabShell.Tabs[1];
         check(
-            tabShell.Tabs.Count == 4 && tabShell.ActiveTab == copied && copied != source &&
-            copied.Browser != source.Browser && copied.Browser.Location == source.Browser.Location,
+            tabShell.Tabs.Count == 4
+            && tabShell.ActiveTab == copied
+            && copied != source
+            && copied.Browser != source.Browser
+            && copied.Browser.Location == source.Browser.Location,
             "Duplicating a background tab inserts an independent browser beside its source with the same machine and registry view");
         tabShell.OpenBottomTool(ToolKind.Journal);
         var panelTab = tabShell.ActiveBottomTab;
@@ -181,8 +184,10 @@ internal static class MainWindowViewModelTests
         var toRight = tabShell.Tabs.Skip(2).ToArray();
         tabShell.CloseTabsToRight(source);
         check(
-            tabShell.Tabs.SequenceEqual(new[] { tail, source }) && tabCloses.SequenceEqual(toRight) &&
-            tabShell.ActiveTab == source && tabShell.BottomTabs.SequenceEqual(new[] { panelTab! }),
+            tabShell.Tabs.SequenceEqual(new[] { tail, source })
+            && tabCloses.SequenceEqual(toRight)
+            && tabShell.ActiveTab == source
+            && tabShell.BottomTabs.SequenceEqual(new[] { panelTab! }),
             "Close tabs to the right follows the reordered strip, releases each closed tab and preserves the bottom panel");
         tabShell.CloseTabsToRight(source);
         tabShell.DuplicateTab(copied);
@@ -205,8 +210,12 @@ internal static class MainWindowViewModelTests
         tabShell.CloseOtherTabs(tail);
         tabShell.CloseOtherTabs(tail);
         check(
-            tabShell.Tabs.SequenceEqual(new[] { tail }) && tabShell.ActiveTab == tail && tabCloseRequests == 0 &&
-            draft.IsDirty && draft.Text == "Keep this draft after closing tabs" && tabShell.ActiveBottomTab == panelTab,
+            tabShell.Tabs.SequenceEqual(new[] { tail })
+            && tabShell.ActiveTab == tail
+            && tabCloseRequests == 0
+            && draft.IsDirty
+            && draft.Text == "Keep this draft after closing tabs"
+            && tabShell.ActiveBottomTab == panelTab,
             "Close other tabs retains its background target, dirty note drafts and panel tabs without requesting window close");
         tabShell.WindowClosed();
     }

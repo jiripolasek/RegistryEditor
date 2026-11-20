@@ -16,11 +16,7 @@ internal sealed class FavoriteDialogs : IFavoriteDialogs
         this._dialogs = dialogs;
     }
 
-    public async Task<Favorite?> EditFavoriteAsync(
-        Favorite draft,
-        bool fixedLocation,
-        FavoriteFolder[] folders,
-        string? error)
+    public async Task<Favorite?> EditFavoriteAsync(Favorite draft, bool fixedLocation, FavoriteFolder[] folders, string? error)
     {
         var form = new FavoriteForm(FavoriteFormKind.Add, folders, draft.FolderId, draft, fixedLocation);
         var dialog = new AppDialog("Add favorite", form, "Add");
@@ -35,13 +31,7 @@ internal sealed class FavoriteDialogs : IFavoriteDialogs
             return null;
         }
 
-        return draft with
-        {
-            Name = form.FavoriteName,
-            Address = form.Address,
-            Is32Bit = form.ViewIndex == 1,
-            FolderId = form.FolderId
-        };
+        return draft with { Name = form.FavoriteName, Address = form.Address, Is32Bit = form.ViewIndex == 1, FolderId = form.FolderId };
     }
 
     public async Task<(string Name, string? ParentId)?> NewFolderAsync(FavoriteFolder[] folders, string? parentId)
@@ -49,9 +39,7 @@ internal sealed class FavoriteDialogs : IFavoriteDialogs
         var form = new FavoriteForm(FavoriteFormKind.NewFolder, folders, parentId);
         var dialog = new AppDialog("New favorites folder", form, "Create");
         dialog.FocusOnOpen(form.InitialFocus);
-        return await this._dialogs.ShowAsync(dialog) == ContentDialogResult.Primary
-            ? (form.FavoriteName, form.FolderId)
-            : null;
+        return await this._dialogs.ShowAsync(dialog) == ContentDialogResult.Primary ? (form.FavoriteName, form.FolderId) : null;
     }
 
     public async Task<string?> RenameAsync(string name, bool isFolder)
@@ -75,7 +63,7 @@ internal sealed class FavoriteDialogs : IFavoriteDialogs
         var message
             = $"Remove {favorites:N0} favorites and {folders:N0} folders, including their contents? Registry keys will remain unchanged.";
         return await this._dialogs.ShowAsync(
-                   new AppDialog("Remove favorites?", message, "Remove", defaultButton: ContentDialogButton.Close)) ==
-               ContentDialogResult.Primary;
+                   new AppDialog("Remove favorites?", message, "Remove", defaultButton: ContentDialogButton.Close))
+               == ContentDialogResult.Primary;
     }
 }

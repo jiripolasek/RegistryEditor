@@ -42,8 +42,7 @@ internal static class ResultListViewport
 
         UIElement? FindContainer(InvestigationRow item)
         {
-            return list.ItemsPanelRoot?.Children.FirstOrDefault(child => ReferenceEquals(
-                list.ItemFromContainer(child), item));
+            return list.ItemsPanelRoot?.Children.FirstOrDefault(child => ReferenceEquals(list.ItemFromContainer(child), item));
         }
 
         return () =>
@@ -62,8 +61,7 @@ internal static class ResultListViewport
 
                 if (container is not null)
                 {
-                    target = scroll.VerticalOffset + container.TransformToVisual(scroll).TransformPoint(default).Y -
-                             top;
+                    target = scroll.VerticalOffset + container.TransformToVisual(scroll).TransformPoint(default).Y - top;
                 }
             }
 

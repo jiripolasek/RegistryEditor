@@ -44,9 +44,9 @@ internal static class RegistryFileReveal
 
     private static (string Path, bool Quoted)? Parse(RegistryLocation location, RegistryValue? value)
     {
-        if (location.Machine is not null ||
-            value is not { Type: RegistryValueType.String or RegistryValueType.ExpandString } ||
-            value.Data.Length % 2 != 0)
+        if (location.Machine is not null
+            || value is not { Type: RegistryValueType.String or RegistryValueType.ExpandString }
+            || value.Data.Length % 2 != 0)
         {
             return null;
         }
@@ -71,8 +71,12 @@ internal static class RegistryFileReveal
                 path = Environment.ExpandEnvironmentVariables(path);
             }
 
-            if (path.Length < 3 || !char.IsAsciiLetter(path[0]) || path[1] != ':' || path[2] != '\\' ||
-                path.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || path.Contains('"'))
+            if (path.Length < 3
+                || !char.IsAsciiLetter(path[0])
+                || path[1] != ':'
+                || path[2] != '\\'
+                || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0
+                || path.Contains('"'))
             {
                 return null;
             }
@@ -93,8 +97,7 @@ internal static class RegistryFileReveal
             throw new FileNotFoundException("The file or folder no longer exists.", path);
         }
 
-        return new ProcessStartInfo(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
+        return new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
         {
             Arguments = directory ? "\"" + path + "\"" : "/select,\"" + path + "\"", UseShellExecute = true
         };

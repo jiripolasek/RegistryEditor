@@ -18,9 +18,8 @@ public sealed record ColumnLayout(IReadOnlyList<ColumnState> Columns)
     public static ColumnLayout Default(IReadOnlyList<ColumnSpec> specs)
     {
         return new ColumnLayout(
-                specs.Select(spec => new ColumnState(
-                    spec.Id, spec.ClampWidth(spec.DefaultWidth), spec.DefaultVisible || !spec.CanHide)).ToArray())
-            .EnsureVisible(specs);
+            specs.Select(spec => new ColumnState(spec.Id, spec.ClampWidth(spec.DefaultWidth), spec.DefaultVisible || !spec.CanHide))
+                .ToArray()).EnsureVisible(specs);
     }
 
     /// <summary>
@@ -83,9 +82,7 @@ public sealed record ColumnLayout(IReadOnlyList<ColumnState> Columns)
         }
 
         var clamped = Math.Clamp(width, spec.MinWidth, Math.Max(spec.MinWidth, spec.MaxWidth));
-        return this.Columns[index].Width == clamped
-            ? this
-            : this.Replace(index, this.Columns[index] with { Width = clamped });
+        return this.Columns[index].Width == clamped ? this : this.Replace(index, this.Columns[index] with { Width = clamped });
     }
 
     /// <summary>Moves <paramref name="id" /> to the slot currently held by <paramref name="targetId" />.</summary>
@@ -170,9 +167,7 @@ public sealed record ColumnLayout(IReadOnlyList<ColumnState> Columns)
             return null;
         }
 
-        for (var next = index + Math.Sign(direction);
-             next >= 0 && next < this.Columns.Count;
-             next += Math.Sign(direction))
+        for (var next = index + Math.Sign(direction); next >= 0 && next < this.Columns.Count; next += Math.Sign(direction))
         {
             if (this.Columns[next].Visible)
             {
@@ -187,8 +182,7 @@ public sealed record ColumnLayout(IReadOnlyList<ColumnState> Columns)
     {
         var column = this.Find(id);
         var spec = specs.FirstOrDefault(spec => spec.Id == id);
-        return column is not null && spec is not null &&
-               (!column.Visible || (spec.CanHide && this.Visible.Skip(1).Any()));
+        return column is not null && spec is not null && (!column.Visible || (spec.CanHide && this.Visible.Skip(1).Any()));
     }
 
     /// <summary>Shows a hidden column or hides a visible one, never hiding the last or a non-hideable column.</summary>

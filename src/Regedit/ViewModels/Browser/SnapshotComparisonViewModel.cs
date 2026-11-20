@@ -12,11 +12,11 @@ using Microsoft.Win32;
 
 namespace JPSoftworks.Regedit.ViewModels.Browser;
 
-internal sealed partial class SnapshotComparisonViewModel(
-    RegistryComparison comparison,
-    Func<Task<string?>> saveFile,
-    Action<string> copy) : ObservableObject
+internal sealed partial class SnapshotComparisonViewModel(RegistryComparison comparison, Func<Task<string?>> saveFile, Action<string> copy)
+    : ObservableObject
 {
+    internal event Action<string, string, NoticeKind>? Notice;
+
     public RegistryComparison Comparison { get; } = comparison;
 
     private RegistryBranchSnapshot Before => this.Comparison.Before;
@@ -29,8 +29,6 @@ internal sealed partial class SnapshotComparisonViewModel(
 
     public bool NoDifferences => this.Comparison.Differences.Count == 0;
 
-    internal event Action<string, string, NoticeKind>? Notice;
-
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ExportCommand), nameof(CopyPowerShellCommand), nameof(CopyRegExeCommand))]
     internal partial IReadOnlyList<RegistryDifference> Selected { get; private set; } = [];
@@ -42,21 +40,20 @@ internal sealed partial class SnapshotComparisonViewModel(
     public bool HasTarget => this.Current is not null;
 
     public string Target => this.Current is { } item
-        ? item.Location.Address +
-          (item.Before is not null || item.After is not null ? "\r\n" + item.Name : string.Empty)
+        ? item.Location.Address + (item.Before is not null || item.After is not null ? "\r\n" + item.Name : string.Empty)
         : string.Empty;
 
     public string BeforeDetail => this.Current is { } item ? Detail(item.Before, item.BeforeText) : string.Empty;
 
     public string AfterDetail => this.Current is { } item ? Detail(item.After, item.AfterText) : string.Empty;
 
+    private bool HasSelection => this.Selected.Count > 0;
+
     internal void Select(IReadOnlyList<RegistryDifference> selected, RegistryDifference? current)
     {
         this.Selected = selected;
         this.Current = current ?? selected.LastOrDefault();
     }
-
-    private bool HasSelection => this.Selected.Count > 0;
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task ExportAsync(CancellationToken token)
@@ -103,8 +100,7 @@ internal sealed partial class SnapshotComparisonViewModel(
         {
             var selected = this.Comparison.ValidateSelection(this.Selected);
             copy(format(this.Comparison.Differences.Where(selected.Contains).ToArray()));
-            this.Notice?.Invoke(
-                "Script copied", "Review it before running. Copying does not change the registry.", NoticeKind.Success);
+            this.Notice?.Invoke("Script copied", "Review it before running. Copying does not change the registry.", NoticeKind.Success);
         }
         catch (Exception ex)
         {

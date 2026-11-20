@@ -48,7 +48,8 @@ internal static class ComponentChecks
                 FocusManager.GetFocusedElement(fresh.XamlRoot) is TextBox
                 {
                     SelectionStart: 0
-                } freshInput && freshInput.SelectedText == fresh.Address,
+                } freshInput
+                && freshInput.SelectedText == fresh.Address,
                 "Editing before the first layout focuses the textbox and selects the full address");
             parent.Children.Remove(fresh);
             foreach (var entry in new[] { "shortcut", "button", "context menu" })
@@ -73,14 +74,12 @@ internal static class ComponentChecks
                 }
 
                 await WaitAsync(
-                    () => FocusManager.GetFocusedElement(first.XamlRoot) is TextBox focused &&
-                          focused.SelectedText == first.Address,
-                    () => $"Editing from {entry}: focus={FocusManager.GetFocusedElement(first.XamlRoot)}, " +
-                          $"editor={((AutoSuggestBox)first.FindName("Editor")).Visibility}");
+                    () => FocusManager.GetFocusedElement(first.XamlRoot) is TextBox focused && focused.SelectedText == first.Address,
+                    () => $"Editing from {entry}: focus={FocusManager.GetFocusedElement(first.XamlRoot)}, "
+                          + $"editor={((AutoSuggestBox)first.FindName("Editor")).Visibility}");
                 await Task.Delay(50);
                 Check(
-                    FocusManager.GetFocusedElement(first.XamlRoot) is TextBox inputBox &&
-                    inputBox.SelectedText == first.Address,
+                    FocusManager.GetFocusedElement(first.XamlRoot) is TextBox inputBox && inputBox.SelectedText == first.Address,
                     $"Editing from the {entry} focuses the textbox and selects the full address");
                 first.SetLocation(App.Component.Address, App.Paths[App.Component.Address]);
             }
@@ -93,52 +92,41 @@ internal static class ComponentChecks
             Check(
                 ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), otherButton),
                 "Leaving edit mode before queued focus runs does not steal focus");
-            Check(
-                first.Address == App.Component.Address && second.Address == App.Notes.Address,
-                "Independent opaque addresses");
+            Check(first.Address == App.Component.Address && second.Address == App.Notes.Address, "Independent opaque addresses");
             var locationIcon = (ContentPresenter)first.FindName("LocationIcon");
-            Check(
-                locationIcon.Visibility == Visibility.Collapsed,
-                "An omitted location icon consumes no breadcrumb space");
+            Check(locationIcon.Visibility == Visibility.Collapsed, "An omitted location icon consumes no breadcrumb space");
             first.LocationIconSource = new SymbolIconSource { Symbol = Symbol.Home };
-            await WaitAsync(() => locationIcon.Visibility == Visibility.Visible &&
-                                  locationIcon.Content is IconSourceElement
+            await WaitAsync(() => locationIcon.Visibility == Visibility.Visible
+                                  && locationIcon.Content is IconSourceElement
                                   {
                                       IconSource: SymbolIconSource { Symbol: Symbol.Home }
                                   });
             Check(
-                ((ContentPresenter)second.FindName("LocationIcon")).Visibility == Visibility.Collapsed &&
-                !locationIcon.IsHitTestVisible,
+                ((ContentPresenter)second.FindName("LocationIcon")).Visibility == Visibility.Collapsed && !locationIcon.IsHitTestVisible,
                 "A host-supplied location icon is decorative and belongs to its own instance");
             first.LocationIconSource = new FontIconSource { Glyph = "\uE8B7" };
             await WaitAsync(() => locationIcon.Content is IconSourceElement
             {
                 IconSource: FontIconSource { Glyph: "\uE8B7" }
             });
-            Check(
-                first.Address == App.Component.Address,
-                "Changing the location icon updates the presenter without navigating");
+            Check(first.Address == App.Component.Address, "Changing the location icon updates the presenter without navigating");
             first.LocationIconSource = null;
             await WaitAsync(() => locationIcon.Visibility == Visibility.Collapsed);
             Check(locationIcon.Content is null, "Clearing the location icon removes its content and spacing");
             Check(
-                Button(first, "BreadcrumbChildren2").Visibility == Visibility.Collapsed &&
-                Button(second, "BreadcrumbChildren1").Visibility == Visibility.Collapsed,
-                "Known leaves have no trailing chevron");
+                Button(first, "BreadcrumbChildren2").Visibility == Visibility.Collapsed
+                && Button(second, "BreadcrumbChildren1").Visibility == Visibility.Collapsed, "Known leaves have no trailing chevron");
             Check(
-                Button(first, "BreadcrumbChildren0").Visibility == Visibility.Visible &&
-                Button(first, "BreadcrumbChildren1").Visibility == Visibility.Visible,
-                "Ancestor chevrons remain available");
+                Button(first, "BreadcrumbChildren0").Visibility == Visibility.Visible
+                && Button(first, "BreadcrumbChildren1").Visibility == Visibility.Visible, "Ancestor chevrons remain available");
             first.IsRootSelectorVisible = false;
             Check(
-                Button(first, "RootButton").Visibility == Visibility.Collapsed &&
-                Button(first, "BreadcrumbChildren0").Visibility == Visibility.Visible &&
-                Button(second, "RootButton").Visibility == Visibility.Visible,
+                Button(first, "RootButton").Visibility == Visibility.Collapsed
+                && Button(first, "BreadcrumbChildren0").Visibility == Visibility.Visible
+                && Button(second, "RootButton").Visibility == Visibility.Visible,
                 "Hosts can hide a duplicate root selector without changing child navigation or other instances");
             first.IsRootSelectorVisible = true;
-            Check(
-                Button(first, "RootButton").Visibility == Visibility.Visible,
-                "The standalone root selector can be restored");
+            Check(Button(first, "RootButton").Visibility == Visibility.Visible, "The standalone root selector can be restored");
             var requests = 0;
             first.NavigationRequested += (_, _) => requests++;
             var root = Button(first, "RootButton");
@@ -155,9 +143,7 @@ internal static class ComponentChecks
             Check(requests == 0, "Opening children does not navigate");
             Invoke((ListViewItem)Locations(menu).ContainerFromItem(App.Projects));
             await WaitAsync(() => first.Address == App.Projects.Address);
-            Check(
-                requests == 1 && second.Address == App.Notes.Address,
-                "Selecting a child navigates only its own instance");
+            Check(requests == 1 && second.Address == App.Notes.Address, "Selecting a child navigates only its own instance");
             Check(
                 Button(first, "BreadcrumbChildren1").Visibility == Visibility.Visible,
                 "A current location with children keeps its trailing chevron");
@@ -167,9 +153,7 @@ internal static class ComponentChecks
 
             first.SetLocation(App.Notes.Address, (OmniboxItem[])[App.Workspace, App.Notes with { HasChildren = null }]);
             childButton = Button(first, "BreadcrumbChildren1");
-            Check(
-                childButton.Visibility == Visibility.Visible,
-                "Unknown child availability preserves on-demand discovery");
+            Check(childButton.Visibility == Visibility.Visible, "Unknown child availability preserves on-demand discovery");
             menu = (Flyout)childButton.Flyout;
             menu.ShowAt(childButton);
             await WaitAsync(() => Status(menu).Text == "No child locations");
@@ -183,9 +167,7 @@ internal static class ComponentChecks
             menu = (Flyout)childButton.Flyout;
             menu.ShowAt(childButton);
             await WaitAsync(() => Status(menu).Text == "Could not load locations");
-            Check(
-                AutomationProperties.GetHelpText(Status(menu)) == "Provider unavailable",
-                "Provider failures remain accessible");
+            Check(AutomationProperties.GetHelpText(Status(menu)) == "Provider unavailable", "Provider failures remain accessible");
             await CloseAsync(menu);
 
             var pending = new TaskCompletionSource<IReadOnlyList<OmniboxItem>>();
@@ -199,17 +181,13 @@ internal static class ComponentChecks
             menu = (Flyout)childButton.Flyout;
             menu.ShowAt(childButton);
             await WaitAsync(() => menu.IsOpen);
-            Check(
-                Status(menu).Text == "Loading locations…" && Locations(menu).Items.Count == 0,
-                "Pending providers display loading");
+            Check(Status(menu).Text == "Loading locations…" && Locations(menu).Items.Count == 0, "Pending providers display loading");
             first.BeginEdit();
             await WaitAsync(() => !menu.IsOpen);
             Check(pendingToken.IsCancellationRequested, "Editing cancels an open child request");
             pending.SetResult((OmniboxItem[])[new OmniboxItem("Stale result", "stale:")]);
             await Task.Delay(50);
-            Check(
-                !menu.IsOpen && Locations(menu).Items.Count == 0,
-                "Late results cannot reopen or replace a closed menu");
+            Check(!menu.IsOpen && Locations(menu).Items.Count == 0, "Late results cannot reopen or replace a closed menu");
             first.SetLocation(App.Component.Address, App.Paths[App.Component.Address]);
 
             var older = new TaskCompletionSource<IReadOnlyList<OmniboxItem>>();
@@ -224,13 +202,10 @@ internal static class ComponentChecks
             menu.ShowAt(childButton);
             await WaitAsync(
                 () => Locations(menu).Items.OfType<OmniboxItem>().Any(item => item.Label == "Projects"),
-                () =>
-                    $"Reopen requests: {call}; open: {menu.IsOpen}; items: {string.Join(", ", Locations(menu).Items)}");
+                () => $"Reopen requests: {call}; open: {menu.IsOpen}; items: {string.Join(", ", Locations(menu).Items)}");
             older.SetResult((OmniboxItem[])[new OmniboxItem("Older request", "old:")]);
             await Task.Delay(50);
-            Check(
-                Locations(menu).Items.OfType<OmniboxItem>().Single().Label == "Projects",
-                "Reopening a menu rejects an older completion");
+            Check(Locations(menu).Items.OfType<OmniboxItem>().Single().Label == "Projects", "Reopening a menu rejects an older completion");
             await CloseAsync(menu);
 
             var manyItems = await Task.Run(() => Enumerable.Range(0, 10_000)
@@ -257,21 +232,22 @@ internal static class ComponentChecks
                 var loadMilliseconds = watch.Elapsed.TotalMilliseconds;
                 var firstRealized = list.ItemsPanelRoot.Children.Count;
                 Check(
-                    list.Items.Count == manyItems.Length && firstRealized is > 0 and < 100 &&
-                    list.ContainerFromIndex(manyItems.Length - 1) is null,
+                    list.Items.Count == manyItems.Length
+                    && firstRealized is > 0 and < 100
+                    && list.ContainerFromIndex(manyItems.Length - 1) is null,
                     "Ten thousand children create only viewport containers without truncating results");
                 list.ScrollIntoView(manyItems[^1]);
                 await WaitAsync(() => list.ContainerFromIndex(manyItems.Length - 1) is ListViewItem);
                 var lastRealized = list.ItemsPanelRoot.Children.Count;
                 Check(lastRealized < 100, "Scrolling a large popup keeps container creation bounded");
-                await WaitAsync(() => list.ContainerFromIndex(manyItems.Length - 1) is ListViewItem row &&
-                                      Equals(row.Content, manyItems[^1]) &&
-                                      FrameworkElementAutomationPeer.CreatePeerForElement(row).GetName() ==
-                                      manyItems[^1].Label);
+                await WaitAsync(() =>
+                    list.ContainerFromIndex(manyItems.Length - 1) is ListViewItem row
+                    && Equals(row.Content, manyItems[^1])
+                    && FrameworkElementAutomationPeer.CreatePeerForElement(row).GetName() == manyItems[^1].Label);
                 var lastContainer = (ListViewItem)list.ContainerFromIndex(manyItems.Length - 1);
                 Check(
-                    Equals(lastContainer.Content, manyItems[^1]) &&
-                    FrameworkElementAutomationPeer.CreatePeerForElement(lastContainer).GetName() == manyItems[^1].Label,
+                    Equals(lastContainer.Content, manyItems[^1])
+                    && FrameworkElementAutomationPeer.CreatePeerForElement(lastContainer).GetName() == manyItems[^1].Label,
                     "Recycled rows expose the correct accessible label");
                 string? requestedAddress = null;
 
@@ -284,9 +260,7 @@ internal static class ComponentChecks
                 Invoke(lastContainer);
                 await WaitAsync(() => requestedAddress is not null && !menu.IsOpen);
                 first.NavigationRequested -= CaptureRequest;
-                Check(
-                    requestedAddress == manyItems[^1].Address,
-                    "The last child remains reachable and navigates using its opaque address");
+                Check(requestedAddress == manyItems[^1].Address, "The last child remains reachable and navigates using its opaque address");
                 Check(list.ItemsSource is null, "Closing a child popup releases its loaded collection");
                 await Task.Delay(50);
                 largeList = new
@@ -310,18 +284,18 @@ internal static class ComponentChecks
             first.UpdateLayout();
             await Task.Delay(50);
             Check(
-                locationIcon.Visibility == Visibility.Visible && locationIcon.ActualWidth == 16 &&
-                Button(first, "OverflowButton").Visibility == Visibility.Visible &&
-                ((FrameworkElement)VisualTreeHelper.GetParent(Button(first, "Breadcrumb2"))).Visibility ==
-                Visibility.Visible,
+                locationIcon.Visibility == Visibility.Visible
+                && locationIcon.ActualWidth == 16
+                && Button(first, "OverflowButton").Visibility == Visibility.Visible
+                && ((FrameworkElement)VisualTreeHelper.GetParent(Button(first, "Breadcrumb2"))).Visibility == Visibility.Visible,
                 "Narrow fields preserve the current breadcrumb beside its icon and expose ancestors");
             var overflow = Button(first, "OverflowButton");
             var overflowMenu = (MenuFlyout)overflow.Flyout;
             overflowMenu.ShowAt(overflow);
             await WaitAsync(() => overflowMenu.IsOpen);
             Check(
-                overflowMenu.Items.OfType<MenuFlyoutItem>().Select(item => item.Text)
-                    .SequenceEqual(new[] { "Workspace", "Projects" }), "Overflow preserves ancestor order");
+                overflowMenu.Items.OfType<MenuFlyoutItem>().Select(item => item.Text).SequenceEqual(new[] { "Workspace", "Projects" }),
+                "Overflow preserves ancestor order");
             Invoke(overflowMenu.Items.OfType<MenuFlyoutItem>().First());
             await WaitAsync(() => first.Address == App.Workspace.Address);
             Check(first.Address == App.Workspace.Address, "Overflow navigation uses the ancestor's opaque address");
@@ -329,14 +303,11 @@ internal static class ComponentChecks
             first.ChildrenProvider = null;
             first.SetLocation(App.Projects.Address, App.Paths[App.Projects.Address]);
             Check(
-                Button(first, "RootButton").Visibility == Visibility.Collapsed &&
-                Button(first, "BreadcrumbChildren0").Visibility == Visibility.Collapsed,
-                "Child providers are optional");
+                Button(first, "RootButton").Visibility == Visibility.Collapsed
+                && Button(first, "BreadcrumbChildren0").Visibility == Visibility.Collapsed, "Child providers are optional");
             foreach (var trailingHeight in new[] { 36d, 52d, 0d })
             {
-                first.TrailingContent = trailingHeight == 0
-                    ? null
-                    : new Button { Height = trailingHeight, Content = "Action" };
+                first.TrailingContent = trailingHeight == 0 ? null : new Button { Height = trailingHeight, Content = "Action" };
                 first.UpdateLayout();
                 var height = first.ActualHeight;
                 var parentHeight = parent.DesiredSize.Height;
@@ -344,8 +315,7 @@ internal static class ComponentChecks
                 await Task.Delay(50);
                 first.UpdateLayout();
                 Check(
-                    Math.Abs(first.ActualHeight - height) < 0.1 &&
-                    Math.Abs(parent.DesiredSize.Height - parentHeight) < 0.1,
+                    Math.Abs(first.ActualHeight - height) < 0.1 && Math.Abs(parent.DesiredSize.Height - parentHeight) < 0.1,
                     $"Editing preserves control and parent height with {trailingHeight}px trailing content");
                 Check(
                     FocusManager.GetFocusedElement(first.XamlRoot) is TextBox
@@ -355,23 +325,17 @@ internal static class ComponentChecks
                 first.SetLocation(App.Projects.Address, App.Paths[App.Projects.Address]);
                 first.UpdateLayout();
                 Check(
-                    Math.Abs(first.ActualHeight - height) < 0.1 &&
-                    Math.Abs(parent.DesiredSize.Height - parentHeight) < 0.1,
+                    Math.Abs(first.ActualHeight - height) < 0.1 && Math.Abs(parent.DesiredSize.Height - parentHeight) < 0.1,
                     $"Leaving editing preserves control and parent height with {trailingHeight}px trailing content");
             }
 
             first.BeginEdit();
-            Check(
-                ((AutoSuggestBox)first.FindName("Editor")).Text == App.Projects.Address,
-                "Editing uses the confirmed address");
+            Check(((AutoSuggestBox)first.FindName("Editor")).Text == App.Projects.Address, "Editing uses the confirmed address");
             first.SetLocation(App.Workspace.Address, App.Paths[App.Workspace.Address]);
-            Check(
-                ((AutoSuggestBox)first.FindName("Editor")).Visibility == Visibility.Collapsed,
-                "Confirmation returns to breadcrumb mode");
+            Check(((AutoSuggestBox)first.FindName("Editor")).Visibility == Visibility.Collapsed, "Confirmation returns to breadcrumb mode");
 
             var suggestionRequests
-                = new List<(string Text, CancellationToken Token, TaskCompletionSource<IReadOnlyList<OmniboxItem>>
-                    Result)>();
+                = new List<(string Text, CancellationToken Token, TaskCompletionSource<IReadOnlyList<OmniboxItem>> Result)>();
             var originalProvider = first.SuggestionProvider;
             first.SuggestionProvider = (text, token) =>
             {
@@ -400,8 +364,7 @@ internal static class ComponentChecks
                 "Typing preserves the open suggestion list during debounce and loading");
             input.Text = "pro";
             await WaitAsync(() => suggestionRequests.Count == 3);
-            Check(
-                suggestionRequests[1].Token.IsCancellationRequested, "Typing cancels the previous suggestion request");
+            Check(suggestionRequests[1].Token.IsCancellationRequested, "Typing cancels the previous suggestion request");
             suggestionRequests[2].Result.SetResult((OmniboxItem[])[App.Component]);
             await WaitAsync(() => editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Component]));
             suggestionRequests[1].Result.SetResult((OmniboxItem[])[App.Notes]);
@@ -428,32 +391,33 @@ internal static class ComponentChecks
             suggestionRequests[5].Result.SetResult((OmniboxItem[])[App.Projects]);
             await Task.Delay(50);
             Check(
-                suggestionRequests[5].Token.IsCancellationRequested && !editor.IsSuggestionListOpen &&
-                editor.Items.Count == 0, "Leaving edit mode cancels suggestions and prevents delayed reopening");
+                suggestionRequests[5].Token.IsCancellationRequested && !editor.IsSuggestionListOpen && editor.Items.Count == 0,
+                "Leaving edit mode cancels suggestions and prevents delayed reopening");
             first.SuggestionProvider = originalProvider;
 
             first.IsTextMode = true;
             var addressText = (TextBlock)first.FindName("AddressText");
             var trailViewport = (Grid)first.FindName("TrailViewport");
             Check(
-                addressText.Visibility == Visibility.Visible && addressText.Text == App.Workspace.Address &&
-                trailViewport.Visibility == Visibility.Collapsed &&
-                Button(first, "RootButton").Visibility == Visibility.Collapsed && !second.IsTextMode,
-                "Text mode hides breadcrumb controls and preserves independent instances");
+                addressText.Visibility == Visibility.Visible
+                && addressText.Text == App.Workspace.Address
+                && trailViewport.Visibility == Visibility.Collapsed
+                && Button(first, "RootButton").Visibility == Visibility.Collapsed
+                && !second.IsTextMode, "Text mode hides breadcrumb controls and preserves independent instances");
             first.BeginEdit();
-            Check(
-                ((AutoSuggestBox)first.FindName("Editor")).Text == App.Workspace.Address,
-                "Text mode edits the confirmed address");
+            Check(((AutoSuggestBox)first.FindName("Editor")).Text == App.Workspace.Address, "Text mode edits the confirmed address");
             first.SetLocation(App.Projects.Address, App.Paths[App.Projects.Address]);
             await WaitAsync(() => addressText.Text == App.Projects.Address);
             Check(
-                ((AutoSuggestBox)first.FindName("Editor")).Visibility == Visibility.Collapsed &&
-                addressText.Visibility == Visibility.Visible && trailViewport.Visibility == Visibility.Collapsed,
+                ((AutoSuggestBox)first.FindName("Editor")).Visibility == Visibility.Collapsed
+                && addressText.Visibility == Visibility.Visible
+                && trailViewport.Visibility == Visibility.Collapsed,
                 "Navigation returns to the updated text path without showing breadcrumbs");
             first.IsTextMode = false;
             Check(
-                addressText.Visibility == Visibility.Collapsed && trailViewport.Visibility == Visibility.Visible &&
-                Button(first, "Breadcrumb1") is not null, "Turning text mode off restores the current breadcrumbs");
+                addressText.Visibility == Visibility.Collapsed
+                && trailViewport.Visibility == Visibility.Visible
+                && Button(first, "Breadcrumb1") is not null, "Turning text mode off restores the current breadcrumbs");
 
             pending = new TaskCompletionSource<IReadOnlyList<OmniboxItem>>();
             first.ChildrenProvider = (_, token) =>
@@ -478,9 +442,7 @@ internal static class ComponentChecks
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         File.WriteAllText(
-            output,
-            JsonSerializer.Serialize(
-                new { passed, largeList, failure }, new JsonSerializerOptions { WriteIndented = true }));
+            output, JsonSerializer.Serialize(new { passed, largeList, failure }, new JsonSerializerOptions { WriteIndented = true }));
         Environment.ExitCode = failure is null ? 0 : 1;
     }
 

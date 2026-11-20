@@ -40,14 +40,14 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
     private readonly MainWindow _window;
     private readonly string _watchErrorKey = "watch-error-" + Guid.NewGuid().ToString("N");
     private readonly bool _compact;
+    private readonly List<ToolCommand> _commands = [];
+    private readonly List<(ToolCommand Command, Func<bool> Enabled)> _conditionalCommands = [];
+    private readonly List<RelayCommand> _runCommands = [];
     private bool _loaded, _refreshing, _busy;
     private bool _focusOnLoad, _focusSelection;
     private bool _showingJournalError;
     private bool _detailsExpanded, _detailsCollapsed;
     private bool _docked;
-    private readonly List<ToolCommand> _commands = [];
-    private readonly List<(ToolCommand Command, Func<bool> Enabled)> _conditionalCommands = [];
-    private readonly List<RelayCommand> _runCommands = [];
     private NotificationHandle? _watchErrorNotice;
     private ToolCommand? _inspectCommand, _revertCommand;
     private ToolCommand? _filterCommand;
@@ -60,10 +60,6 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     internal NotesViewModel? Notes { get; }
 
-    public ToolKind Tool { get; }
-
-    public Button MenuButton => this.PageHeader.MenuButton;
-
     internal RegistryLocation? NoteLocation => this.Notes?.Selected?.Location;
 
     private BulkObservableCollection<InvestigationRow> Rows { get; } = [];
@@ -74,15 +70,10 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private InvestigationRow[] Selected => this.Results.SelectedItems.OfType<InvestigationRow>().ToArray();
 
-    public static Visibility TextVisibility(string text)
-    {
-        return string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
-    }
+    // The inner list of the column control; selection, menus, density and scrolling helpers act on it.
+    private ListView Results => this.ResultColumns.ListView;
 
-    public static Visibility ValueVisibility(RegistryValue? value)
-    {
-        return value is null ? Visibility.Collapsed : Visibility.Visible;
-    }
+    private TextBox Search => this.LocalControls.SearchBox;
 
     public ToolView(MainWindow window, ToolKind tool, bool compact = false)
     {
@@ -91,8 +82,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         this._compact = compact;
         if (tool == ToolKind.Journal)
         {
-            this.JournalSurface = new JournalSurfaceViewModel(
-                window.JournalHistory, () => window.ViewModel.ContextLocation);
+            this.JournalSurface = new JournalSurfaceViewModel(window.JournalHistory, () => window.ViewModel.ContextLocation);
             this.JournalSurface.PropertyChanged += this.JournalSurface_Changed;
             this.JournalSurface.EntryRequested += this.JournalEntry_Requested;
         }
@@ -101,8 +91,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         {
             this.WatchSurface = window.CreateWatchSurface();
             this.WatchSurface.TargetRequested += this.RequestWatchAsync;
-            this.WatchSurface.ActionFailed += (operation, error) =>
-                window.Logger.LogFailure(LogLevel.Warning, operation, error);
+            this.WatchSurface.ActionFailed += (operation, error) => window.Logger.LogFailure(LogLevel.Warning, operation, error);
         }
 
         if (tool == ToolKind.Notes)
@@ -111,10 +100,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 window.ViewModel.NoteStore, window.ViewModel.NavigateFromToolsAsync,
                 location => window.ViewModel.OpenBrowser(location, select: false), compact, ClipboardText.Set,
                 note => new RegistryDialogs(window).ConfirmAsync(
-                    "Delete note?", "Delete the note for " + ToolPresentation.Address(note.Location) + "?",
-                    "Delete note"));
-            this.Notes.ActionFailed
-                += (operation, error) => window.Logger.LogFailure(LogLevel.Warning, operation, error);
+                    "Delete note?", "Delete the note for " + ToolPresentation.Address(note.Location) + "?", "Delete note"));
+            this.Notes.ActionFailed += (operation, error) => window.Logger.LogFailure(LogLevel.Warning, operation, error);
             this.Notes.PropertyChanged += this.Notes_Changed;
             this.Notes.TargetRequested += this.RequestNoteAsync;
         }
@@ -127,12 +114,10 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 StatusNotifications.Show(window.Notifications, title, message, kind);
             }
         };
-        this.ResultActions.ActionFailed += (operation, error) =>
-            window.Logger.LogFailure(LogLevel.Warning, operation, error);
+        this.ResultActions.ActionFailed += (operation, error) => window.Logger.LogFailure(LogLevel.Warning, operation, error);
 
         this.InitializeComponent();
-        this.LocalControls.PresentationChanged
-            += (_, _) => this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
+        this.LocalControls.PresentationChanged += (_, _) => this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
         this.InitializeResults(window, "Tool." + tool);
         if (tool is ToolKind.Journal or ToolKind.Watches)
         {
@@ -217,18 +202,15 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             }
 
             this.Count.Visibility = Visibility.Collapsed;
-            MiddleClick.Attach(
-                this.OpenNoteButton, _ => this.Notes?.Selected,
-                note => this.Notes?.OpenBackgroundCommand.Execute(note));
+            MiddleClick.Attach(this.OpenNoteButton, _ => this.Notes?.Selected, note => this.Notes?.OpenBackgroundCommand.Execute(note));
         }
 
         this.BuildCommands();
         this.PanelSearch = new PanelSearch(
-            "Search tool items", null, this.LocalControls.SearchPlaceholder, null, () => this.Search.Text,
-            text => this.Search.Text = text);
+            "Search tool items", null, this.LocalControls.SearchPlaceholder, null, () => this.Search.Text, text => this.Search.Text = text);
         MiddleClick.Attach(
-            this.Results, args => !this._busy &&
-                                  MiddleClick.Container<ListViewItem>(this.Results, args)?.Content is InvestigationRow
+            this.Results, args => !this._busy
+                                  && MiddleClick.Container<ListViewItem>(this.Results, args)?.Content is InvestigationRow
                                   {
                                       Source: NoteDraft note
                                   }
@@ -236,6 +218,103 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 : null, note => this.Notes?.OpenBackgroundCommand.Execute(note));
 
         this.RefreshCommands();
+    }
+
+    public string PanelCommandsId => "Commands";
+
+    public PanelSearch? PanelSearch { get; private set; }
+
+    public void SetDocked(bool docked)
+    {
+        if (this._docked == docked)
+        {
+            return;
+        }
+
+        this._docked = docked;
+        this.Layout.Style = docked || this._compact ? null : (Style)Application.Current.Resources["ToolPageSurfaceStyle"];
+        this.PageHeader.Visibility = docked || this._compact ? Visibility.Collapsed : Visibility.Visible;
+        this.Count.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
+        this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
+        if (!docked && this.JournalSurface is { } journal)
+        {
+            journal.ScopeIndex = 0;
+        }
+
+        // The panel header renders search, filters and commands; the view's own controls stay in place.
+        this.LocalControls.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
+        this.WatchContext.Visibility = docked || this.Context.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        if (!docked)
+        {
+            this.PanelFilterFlyout.Hide();
+        }
+
+        this.RefreshRows();
+    }
+
+    public ToolKind Tool { get; }
+
+    public Button MenuButton => this.PageHeader.MenuButton;
+
+    public IReadOnlyList<ToolCommand> PanelCommands => this.Tool == ToolKind.Notes && this._compact ? this._commands :
+        this._filterCommand is null ? [.. this._commands, this.LocalControls.ViewCommand] :
+        [this._filterCommand, .. this._commands, this.LocalControls.ViewCommand];
+
+    public void RequestFocus(bool preferSelection = false)
+    {
+        this._focusOnLoad = true;
+        this._focusSelection = preferSelection;
+        if (this._loaded)
+        {
+            this.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    if (this._loaded && this._focusOnLoad)
+                    {
+                        this.FocusPrimary();
+                    }
+                });
+        }
+    }
+
+    void IToolSurface.CopyContextFrom(IToolSurface surface)
+    {
+        var source = (ToolView)surface;
+        this._refreshing = true;
+        this.JournalSurface?.CopyFiltersFrom(source.JournalSurface!);
+        if (!this._docked && this.JournalSurface is { } journal)
+        {
+            journal.ScopeIndex = 0;
+        }
+
+        this.LocalControls.ShowColumns = source.LocalControls.ShowColumns;
+        this.Search.Text = source.Search.Text;
+        this._refreshing = false;
+        if (this.Notes is { } notes)
+        {
+            notes.Selected = source.Notes?.Selected;
+        }
+
+        if (this.WatchSurface is { } watches && source.WatchSurface is { } sourceWatches)
+        {
+            watches.CopyFrom(sourceWatches);
+            this.SelectWatch(watches.Selected);
+        }
+
+        this.RefreshRows();
+        this.RestoreSelection(source.Selected);
+        this.UpdateDetails();
+        this.RefreshCommands();
+    }
+
+    public static Visibility TextVisibility(string text)
+    {
+        return string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    public static Visibility ValueVisibility(RegistryValue? value)
+    {
+        return value is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void BuildCommands()
@@ -254,10 +333,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
         if (this.Tool is ToolKind.Journal or ToolKind.Watches)
         {
-            this._filterCommand = new ToolCommand("Filter and scope", Symbol.Filter)
-            {
-                Flyout = this.PanelFilterFlyout
-            };
+            this._filterCommand = new ToolCommand("Filter and scope", Symbol.Filter) { Flyout = this.PanelFilterFlyout };
         }
 
         switch (this.Tool)
@@ -303,13 +379,11 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             {
                 AutomationId = "JournalArchiveAll",
                 Command = this.JournalHistory.ArchiveAllCommand,
-                ToolTip
-                    = "Archive all active entries across all locations, regardless of filters. Recorded changes are retained."
+                ToolTip = "Archive all active entries across all locations, regardless of filters. Recorded changes are retained."
             });
         this.AddScriptCommand();
         this.AddRunCommand(
-            new ToolCommand("Refresh", Symbol.Refresh, ToolCommandPlacement.Overflow),
-            this._window.JournalHistory.RefreshAsync);
+            new ToolCommand("Refresh", Symbol.Refresh, ToolCommandPlacement.Overflow), this._window.JournalHistory.RefreshAsync);
     }
 
     private void BuildWatchCommands()
@@ -342,11 +416,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 pause.Symbol = watches.IsViewingPaused ? Symbol.Play : Symbol.Pause;
             }
         };
-        this._commands.Add(
-            new ToolCommand("New watch…", Symbol.Add)
-            {
-                AutomationId = "NewWatchButton", Command = watches.NewCommand
-            });
+        this._commands.Add(new ToolCommand("New watch…", Symbol.Add) { AutomationId = "NewWatchButton", Command = watches.NewCommand });
         var stop = new ToolCommand("Stop watching", Symbol.Stop) { Command = watches.StopCommand };
         this._commands.Add(stop);
         this.AddScriptCommand();
@@ -366,22 +436,15 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         watches.PropertyChanged += (_, _) => UpdateCaptureCommands();
         UpdateCaptureCommands();
         this._commands.Add(
-            new ToolCommand("Remove stopped watch", Symbol.Delete, ToolCommandPlacement.Overflow)
-            {
-                Command = watches.RemoveCommand
-            });
+            new ToolCommand("Remove stopped watch", Symbol.Delete, ToolCommandPlacement.Overflow) { Command = watches.RemoveCommand });
         this._commands.Add(
-            new ToolCommand("Clear observations", Symbol.Clear, ToolCommandPlacement.Overflow)
-            {
-                Command = watches.ClearCommand
-            });
+            new ToolCommand("Clear observations", Symbol.Clear, ToolCommandPlacement.Overflow) { Command = watches.ClearCommand });
         this._commands.Add(pause);
         this._commands.Add(
             new ToolCommand("Open key", Symbol.OpenFile, ToolCommandPlacement.Overflow)
             {
                 Command = watches.OpenCommand,
-                Attach = button => MiddleClick.Attach(
-                    button, _ => watches.Selected, _ => watches.OpenBackgroundCommand.Execute(null))
+                Attach = button => MiddleClick.Attach(button, _ => watches.Selected, _ => watches.OpenBackgroundCommand.Execute(null))
             });
     }
 
@@ -396,10 +459,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         var current = new ToolCommand("Note for current key", Symbol.Edit)
         {
             IsVisible = this._compact && notes.ShowUseCurrentKey,
-            IconSource = new FontIconSource
-            {
-                FontFamily = new FontFamily(ToolPresentation.FluentSystemIconsFontFamily), Glyph = "\uF56D"
-            },
+            IconSource = new FontIconSource { FontFamily = new FontFamily(ToolPresentation.FluentSystemIconsFontFamily), Glyph = "\uF56D" },
             Command = notes.UseCurrentKeyCommand,
             ToolTip = notes.CurrentKeyHelp,
             Attach = element =>
@@ -431,19 +491,6 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         this._runCommands.Add(relay);
         this._commands.Add(command);
     }
-
-    public string PanelCommandsId => "Commands";
-
-    public IReadOnlyList<ToolCommand> PanelCommands => this.Tool == ToolKind.Notes && this._compact ? this._commands :
-        this._filterCommand is null ? [.. this._commands, this.LocalControls.ViewCommand] :
-        [this._filterCommand, .. this._commands, this.LocalControls.ViewCommand];
-
-    public PanelSearch? PanelSearch { get; private set; }
-
-    // The inner list of the column control; selection, menus, density and scrolling helpers act on it.
-    private ListView Results => this.ResultColumns.ListView;
-
-    private TextBox Search => this.LocalControls.SearchBox;
 
     private async Task<WatchDefinition?> RequestWatchAsync()
     {
@@ -498,37 +545,6 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         window.ColumnLayouts.Attach(this.ResultColumns, listId);
     }
 
-    public void SetDocked(bool docked)
-    {
-        if (this._docked == docked)
-        {
-            return;
-        }
-
-        this._docked = docked;
-        this.Layout.Style = docked || this._compact
-            ? null
-            : (Style)Application.Current.Resources["ToolPageSurfaceStyle"];
-        this.PageHeader.Visibility = docked || this._compact ? Visibility.Collapsed : Visibility.Visible;
-        this.Count.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
-        this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
-        if (!docked && this.JournalSurface is { } journal)
-        {
-            journal.ScopeIndex = 0;
-        }
-
-        // The panel header renders search, filters and commands; the view's own controls stay in place.
-        this.LocalControls.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
-        this.WatchContext.Visibility
-            = docked || this.Context.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        if (!docked)
-        {
-            this.PanelFilterFlyout.Hide();
-        }
-
-        this.RefreshRows();
-    }
-
     internal void ApplyListSpacing(double spacing)
     {
         ListDensity.SetSpacing(this.Results, spacing);
@@ -558,8 +574,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
             if (!this._window.IsClosed)
             {
-                StatusNotifications.Show(
-                    this._window.Notifications, "Could not complete the action", ex.Message, NoticeKind.Error);
+                StatusNotifications.Show(this._window.Notifications, "Could not complete the action", ex.Message, NoticeKind.Error);
             }
         }
         finally
@@ -580,8 +595,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 : null;
             this.JournalSurface!.SelectedEntry = entry;
             this._revertCommand!.CommandParameter = entry;
-            this._revertCommand.ToolTip
-                = this.JournalHistory.RevertUnavailableReason(entry) ?? "Revert the selected edit";
+            this._revertCommand.ToolTip = this.JournalHistory.RevertUnavailableReason(entry) ?? "Revert the selected edit";
         }
 
         foreach (var (command, enabled) in this._conditionalCommands)
@@ -592,23 +606,6 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         foreach (var relay in this._runCommands)
         {
             relay.NotifyCanExecuteChanged();
-        }
-    }
-
-    public void RequestFocus(bool preferSelection = false)
-    {
-        this._focusOnLoad = true;
-        this._focusSelection = preferSelection;
-        if (this._loaded)
-        {
-            this.DispatcherQueue.TryEnqueue(
-                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-                {
-                    if (this._loaded && this._focusOnLoad)
-                    {
-                        this.FocusPrimary();
-                    }
-                });
         }
     }
 
@@ -751,8 +748,10 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private void JournalSurface_Changed(object? sender, PropertyChangedEventArgs args)
     {
-        if (this._loaded && !this._refreshing && this.JournalSurface is { IsRevealing: false } &&
-            args.PropertyName is nameof(JournalSurfaceViewModel.Query) or nameof(JournalSurfaceViewModel.ScopeIndex)
+        if (this._loaded
+            && !this._refreshing
+            && this.JournalSurface is { IsRevealing: false }
+            && args.PropertyName is nameof(JournalSurfaceViewModel.Query) or nameof(JournalSurfaceViewModel.ScopeIndex)
                 or nameof(JournalSurfaceViewModel.ArchiveFilter) or nameof(JournalSurfaceViewModel.OperationFilter))
         {
             this.RefreshRows();
@@ -765,8 +764,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         this.Search.Text = this.JournalSurface!.Query;
         this._refreshing = false;
         this.RefreshRows();
-        this.Results.SelectedItem
-            = this.Rows.FirstOrDefault(row => row.Source is JournalEntry target && target.Id == entry.Id);
+        this.Results.SelectedItem = this.Rows.FirstOrDefault(row => row.Source is JournalEntry target && target.Id == entry.Id);
         if (this.Results.SelectedItem is { } selected)
         {
             this.Results.ScrollIntoView(selected);
@@ -779,8 +777,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
     {
         var sources = previous.Select(row => row.Source).ToHashSet(ReferenceEqualityComparer.Instance);
         var ids = sources.OfType<JournalEntry>().Select(entry => entry.Id).ToHashSet();
-        var matches = this.Rows.Where(row =>
-            sources.Contains(row.Source) || row.Source is JournalEntry entry && ids.Contains(entry.Id));
+        var matches = this.Rows.Where(row => sources.Contains(row.Source) || row.Source is JournalEntry entry && ids.Contains(entry.Id));
         if (this.Results.SelectionMode == ListViewSelectionMode.Single)
         {
             this.Results.SelectedItem = matches.FirstOrDefault();
@@ -817,10 +814,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
             if (this.Tool == ToolKind.Journal && !this._docked)
             {
-                var groups = this.Rows.GroupBy(row => ((JournalEntry)row.Source).Time.LocalDateTime.Date)
-                    .Select(group => new ToolRowGroup(
-                        ToolPresentation.DayLabel(((JournalEntry)group.First().Source).Time, DateTime.Today), group))
-                    .ToArray();
+                var groups = this.Rows.GroupBy(row => ((JournalEntry)row.Source).Time.LocalDateTime.Date).Select(group => new ToolRowGroup(
+                    ToolPresentation.DayLabel(((JournalEntry)group.First().Source).Time, DateTime.Today), group)).ToArray();
                 this.Results.ItemsSource = new CollectionViewSource { Source = groups, IsSourceGrouped = true }.View;
             }
             else
@@ -835,12 +830,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             {
                 this.EmptyTitle.Text = !watch.HasCapture ? "No watches yet" :
                     watch.IsCapturing ? "Waiting for changes" : "No observations captured";
-                this.EmptyDescription.Text = !watch.HasCapture
-                    ?
-                    "Choose New watch to capture an explicit local registry target."
-                    : watch.IsCapturing
-                        ? "Changes to this target will appear here."
-                        : "This capture ended without observing a change.";
+                this.EmptyDescription.Text = !watch.HasCapture ? "Choose New watch to capture an explicit local registry target." :
+                    watch.IsCapturing ? "Changes to this target will appear here." : "This capture ended without observing a change.";
             }
 
             this.Empty.Visibility = this.Rows.Count == 0 && !(this.Tool == ToolKind.Notes && this._compact)
@@ -861,8 +852,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             else if (this.Tool == ToolKind.Journal && this.JournalHistory.ArchiveError is { } archiveError)
             {
                 this._showingJournalError = true;
-                StatusNotice.Show(
-                    this.Notice, "Journal archive state unavailable", archiveError, InfoBarSeverity.Warning);
+                StatusNotice.Show(this.Notice, "Journal archive state unavailable", archiveError, InfoBarSeverity.Warning);
             }
             else if (this._showingJournalError)
             {
@@ -878,36 +868,6 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         {
             this._refreshing = false;
         }
-    }
-
-    void IToolSurface.CopyContextFrom(IToolSurface surface)
-    {
-        var source = (ToolView)surface;
-        this._refreshing = true;
-        this.JournalSurface?.CopyFiltersFrom(source.JournalSurface!);
-        if (!this._docked && this.JournalSurface is { } journal)
-        {
-            journal.ScopeIndex = 0;
-        }
-
-        this.LocalControls.ShowColumns = source.LocalControls.ShowColumns;
-        this.Search.Text = source.Search.Text;
-        this._refreshing = false;
-        if (this.Notes is { } notes)
-        {
-            notes.Selected = source.Notes?.Selected;
-        }
-
-        if (this.WatchSurface is { } watches && source.WatchSurface is { } sourceWatches)
-        {
-            watches.CopyFrom(sourceWatches);
-            this.SelectWatch(watches.Selected);
-        }
-
-        this.RefreshRows();
-        this.RestoreSelection(source.Selected);
-        this.UpdateDetails();
-        this.RefreshCommands();
     }
 
     public void SelectWatch(WatchSession? watch)
@@ -941,8 +901,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         }
 
         this._watchErrorNotice = StatusNotifications.UpdateError(
-            this._window.Notifications, this._watchErrorNotice, "Could not complete the watch action",
-            this.WatchSurface?.Error, this._watchErrorKey);
+            this._window.Notifications, this._watchErrorNotice, "Could not complete the watch action", this.WatchSurface?.Error,
+            this._watchErrorKey);
     }
 
     private void WatchSurface_Changed(object? sender, PropertyChangedEventArgs args)
@@ -959,8 +919,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
         this.ShowContext(watches.CaptureStatus);
         this.UpdateWatchState();
-        if (args.PropertyName is nameof(WatchSurfaceViewModel.IsFollowing)
-            or nameof(WatchSurfaceViewModel.IsViewingPaused))
+        if (args.PropertyName is nameof(WatchSurfaceViewModel.IsFollowing) or nameof(WatchSurfaceViewModel.IsViewingPaused))
         {
             this.FollowLatestObservation();
         }
@@ -981,10 +940,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         }
 
         this.WatchTarget.Visibility = watches.HasCapture ? Visibility.Visible : Visibility.Collapsed;
-        var showViewing = watches.HasCapture && watches.IsCapturing &&
-                          (watches.IsViewingPaused || !watches.IsFollowing);
-        this.WatchViewing.Visibility = this.PanelWatchViewing.Visibility
-            = showViewing ? Visibility.Visible : Visibility.Collapsed;
+        var showViewing = watches.HasCapture && watches.IsCapturing && (watches.IsViewingPaused || !watches.IsFollowing);
+        this.WatchViewing.Visibility = this.PanelWatchViewing.Visibility = showViewing ? Visibility.Visible : Visibility.Collapsed;
         this.WatchContext.SecondaryContent = showViewing ? this.WatchViewing : null;
         this.CaptureIcon.Visibility = watches.HasCapture ? Visibility.Visible : Visibility.Collapsed;
         this.CaptureIcon.Glyph = watches.IsCapturing ? "\uE768" : "\uE71A";
@@ -1015,8 +972,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private void FollowLatestObservation()
     {
-        if (!this._loaded || this.WatchSurface is not { IsFollowing: true, IsViewingPaused: false } ||
-            this.Rows.Count == 0)
+        if (!this._loaded || this.WatchSurface is not { IsFollowing: true, IsViewingPaused: false } || this.Rows.Count == 0)
         {
             return;
         }
@@ -1030,14 +986,16 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         }
 
         this.Results.ScrollIntoView(this.Rows[^1]);
-        this.DispatcherQueue.TryEnqueue(
-            Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => this._followingWatch = false);
+        this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => this._followingWatch = false);
     }
 
     private void WatchScroll_Changed(object? sender, ScrollViewerViewChangedEventArgs args)
     {
-        if (!this._followingWatch && this._loaded && this._watchScroll is { } scroll &&
-            scroll.VerticalOffset < scroll.ScrollableHeight - 2 && this.WatchSurface is { } watches)
+        if (!this._followingWatch
+            && this._loaded
+            && this._watchScroll is { } scroll
+            && scroll.VerticalOffset < scroll.ScrollableHeight - 2
+            && this.WatchSurface is { } watches)
         {
             watches.IsFollowing = false;
         }
@@ -1054,8 +1012,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         if (this.WatchSurface is { } watches)
         {
             watches.SelectedObservations = this.Selected.Select(row => row.Source).OfType<WatchObservation>().ToArray();
-            if (watches.SelectedObservations.Any(item => !ReferenceEquals(
-                    item, watches.VisibleObservations.LastOrDefault())))
+            if (watches.SelectedObservations.Any(item => !ReferenceEquals(item, watches.VisibleObservations.LastOrDefault())))
             {
                 watches.IsFollowing = false;
             }
@@ -1111,8 +1068,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private void Results_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args)
     {
-        if ((this.Tool is ToolKind.Journal or ToolKind.Watches && this.Selected.Length > 0) ||
-            (this.Tool == ToolKind.Notes && this.Notes?.HasNote == true))
+        if ((this.Tool is ToolKind.Journal or ToolKind.Watches && this.Selected.Length > 0)
+            || (this.Tool == ToolKind.Notes && this.Notes?.HasNote == true))
         {
             this.SetDetailsExpanded(true);
         }
@@ -1163,8 +1120,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private async void InspectValue(RegistryValue value)
     {
-        var dialog = new AppDialog(
-            "Value inspector", new ValueInspector(new ValueInspectorViewModel(value)), "Close", string.Empty);
+        var dialog = new AppDialog("Value inspector", new ValueInspector(new ValueInspectorViewModel(value)), "Close", string.Empty);
         await this._window.Dialogs.ShowAsync(dialog);
     }
 
@@ -1176,8 +1132,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             this._refreshing = true;
             try
             {
-                this.Results.SelectedItem
-                    = this.Rows.FirstOrDefault(row => ReferenceEquals(row.Source, this.Notes?.Selected));
+                this.Results.SelectedItem = this.Rows.FirstOrDefault(row => ReferenceEquals(row.Source, this.Notes?.Selected));
             }
             finally
             {
@@ -1236,10 +1191,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                      ("Copy reg.exe (.cmd)", this.ResultActions.CopyRegExeCommand)
                  })
         {
-            var item = new MenuFlyoutItem
-            {
-                Text = text, Icon = new FontIcon { Glyph = SymbolGlyphs.Get(Symbol.Copy) }
-            };
+            var item = new MenuFlyoutItem { Text = text, Icon = new FontIcon { Glyph = SymbolGlyphs.Get(Symbol.Copy) } };
             item.Click += (_, _) =>
             {
                 this.SyncResultSelection();

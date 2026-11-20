@@ -29,8 +29,8 @@ internal static class AppServices
         services.AddScoped(provider => provider.GetRequiredService<Func<AppSettings>>()());
         services.AddSingleton<IJumpListBackend>(jumpListBackend);
         services.AddSingleton(provider => new JumpListService(
-            provider.GetRequiredService<Func<AppSettings>>(), provider.GetRequiredService<IJumpListBackend>(),
-            settingsPath, provider.GetRequiredService<ILogger<JumpListService>>()));
+            provider.GetRequiredService<Func<AppSettings>>(), provider.GetRequiredService<IJumpListBackend>(), settingsPath,
+            provider.GetRequiredService<ILogger<JumpListService>>()));
         services.AddScoped(provider =>
         {
             var settings = provider.GetRequiredService<AppSettings>();
@@ -54,8 +54,7 @@ internal static class AppServices
         services.AddScoped(_ => CreateJournal());
         services.AddScoped(provider => new JournalViewModel(
             provider.GetRequiredService<RegistryJournal>(), provider.GetRequiredService<ILogger<JournalViewModel>>()));
-        services.AddScoped(provider =>
-            new RegistryService { Journal = provider.GetRequiredService<RegistryJournal>() });
+        services.AddScoped(provider => new RegistryService { Journal = provider.GetRequiredService<RegistryJournal>() });
         services.AddSingleton<RegistryEntryClipboard>();
         services.AddSingleton<RegistryHistoryBroadcaster>();
         services.AddScoped<Func<RegistryLocation, BrowserViewModel>>(provider =>
@@ -71,13 +70,10 @@ internal static class AppServices
         });
         services.AddScoped(provider => new MainWindowViewModel(
             provider.GetRequiredService<AppSettings>(), provider.GetRequiredService<InvestigationStore>(),
-            provider.GetRequiredService<RegistryService>(),
-            provider.GetRequiredService<Func<RegistryLocation, BrowserViewModel>>(),
+            provider.GetRequiredService<RegistryService>(), provider.GetRequiredService<Func<RegistryLocation, BrowserViewModel>>(),
             provider.GetRequiredService<ILogger<MainWindowViewModel>>(), provider.GetRequiredService<NotesStore>(),
-            provider.GetRequiredService<RegistryHistoryBroadcaster>(),
-            provider.GetRequiredService<JournalViewModel>()));
-        services.AddTransient(provider =>
-            new WatchSurfaceViewModel(provider.GetRequiredService<MainWindowViewModel>()));
+            provider.GetRequiredService<RegistryHistoryBroadcaster>(), provider.GetRequiredService<JournalViewModel>()));
+        services.AddTransient(provider => new WatchSurfaceViewModel(provider.GetRequiredService<MainWindowViewModel>()));
         services.AddScoped<Func<WatchSurfaceViewModel>>(provider => provider.GetRequiredService<WatchSurfaceViewModel>);
         return services;
     }
@@ -91,8 +87,8 @@ internal static class AppServices
         if (administrator)
         {
             folder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "RegeditModern.AdministratorJournal", identity.User!.Value);
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RegeditModern.AdministratorJournal",
+                identity.User!.Value);
         }
 #endif
         return new RegistryJournal(folder, administrator);

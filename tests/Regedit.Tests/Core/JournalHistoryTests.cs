@@ -18,8 +18,7 @@ internal static class JournalHistoryTests
     internal static async Task RunAsync(Action<bool, string> check, bool registry)
     {
         check(
-            Marshal.SizeOf<JournalHistoryReader.FileBasicInfo>() == 40 &&
-            Marshal.SizeOf<JournalHistoryReader.FileIdInfo>() == 24,
+            Marshal.SizeOf<JournalHistoryReader.FileBasicInfo>() == 40 && Marshal.SizeOf<JournalHistoryReader.FileIdInfo>() == 24,
             "Journal file generations use the Windows SDK's complete basic and 128-bit identity layouts");
         var folder = Directory.CreateTempSubdirectory("Regedit.JournalHistory.");
         try
@@ -48,8 +47,8 @@ internal static class JournalHistoryTests
             var strict = journal.ReadEntries().Single();
             strict.After![0].Snapshot.Keys[0].Values[0].Data[0] = 99;
             check(
-                journal.ReadHistory().Entries.Single().After![0].Snapshot.Keys[0].Values[0].Data[0] == 1 &&
-                reader.ReadHistory().Entries.Single().After![0].Snapshot.Keys[0].Values[0].Data[0] == 1,
+                journal.ReadHistory().Entries.Single().After![0].Snapshot.Keys[0].Values[0].Data[0] == 1
+                && reader.ReadHistory().Entries.Single().After![0].Snapshot.Keys[0].Values[0].Data[0] == 1,
                 "Public reader mutations cannot contaminate fresh history or the presentation cache");
 
             using (var writer = await HistoryWriter.StartAsync(folder.FullName, path))
@@ -59,19 +58,21 @@ internal static class JournalHistoryTests
                 await writer.CommandAsync("in-place");
                 var changed = reader.ReadHistory().Entries.Single();
                 check(
-                    changed.Operation == "Seed111" && !ReferenceEquals(changed, warm) &&
-                    new FileInfo(path).Length == length && File.GetLastWriteTimeUtc(path) == written,
+                    changed.Operation == "Seed111"
+                    && !ReferenceEquals(changed, warm)
+                    && new FileInfo(path).Length == length
+                    && File.GetLastWriteTimeUtc(path) == written,
                     "A different process invalidates same-size in-place edits even when last-write time is restored");
                 await writer.CommandAsync("replace");
                 var replaced = reader.ReadHistory().Entries.Single();
                 check(
-                    replaced.Operation == "Seed222" && !ReferenceEquals(changed, replaced) &&
-                    new FileInfo(path).Length == length && File.GetLastWriteTimeUtc(path) == written,
+                    replaced.Operation == "Seed222"
+                    && !ReferenceEquals(changed, replaced)
+                    && new FileInfo(path).Length == length
+                    && File.GetLastWriteTimeUtc(path) == written,
                     "A different process invalidates same-size atomic replacement with the original last-write time");
                 await writer.CommandAsync("add");
-                check(
-                    reader.ReadHistory().Entries.Length == 2,
-                    "Display history discovers a second instance's new records");
+                check(reader.ReadHistory().Entries.Length == 2, "Display history discovers a second instance's new records");
                 await writer.CommandAsync("remove-added");
                 check(
                     reader.ReadHistory().Entries.Length == 1 && reader.CachedFileCount <= 1,
@@ -79,12 +80,11 @@ internal static class JournalHistoryTests
                 await writer.CommandAsync("corrupt");
                 var damaged = reader.ReadHistory();
                 check(
-                    damaged.Entries.Length == 0 && damaged.DamagedFiles.SequenceEqual([Path.GetFileName(path)]) &&
-                    reader.CachedFileCount == 0, "A formerly cached record cannot hide another process's corruption");
+                    damaged.Entries.Length == 0
+                    && damaged.DamagedFiles.SequenceEqual([Path.GetFileName(path)])
+                    && reader.CachedFileCount == 0, "A formerly cached record cannot hide another process's corruption");
                 await writer.CommandAsync("repair");
-                check(
-                    reader.ReadHistory().Entries.Single().Operation == "Seed000",
-                    "Repaired history is parsed and displayed again");
+                check(reader.ReadHistory().Entries.Single().Operation == "Seed000", "Repaired history is parsed and displayed again");
                 await writer.CommandAsync("duplicate");
                 damaged = reader.ReadHistory();
                 check(
@@ -129,36 +129,26 @@ internal static class JournalHistoryTests
         check(cache.Count == 1, "Unselected entries cannot keep their computed differences alive");
         cache.SetEntries([]);
         cache.SetEntries([entry]);
-        check(
-            !ReferenceEquals(changes, cache.Get(entry)),
-            "Returning to a released inspection computes a new difference list");
+        check(!ReferenceEquals(changes, cache.Get(entry)), "Returning to a released inspection computes a new difference list");
         var updated = entry with { After = [State(2, 0)] };
         cache.SetEntries([updated]);
         check(
             cache.Get(updated).Single().After!.Data[0] == 2 && cache.Count == 1,
             "An updated record with the same ID replaces its selected difference cache");
 
-        var descriptors = Enumerable.Range(0, 2000)
-            .Select(index => new JournalSecurity("Path" + index, "O:SYG:SYD:(A;;KA;;;SY)")).ToArray();
+        var descriptors = Enumerable.Range(0, 2000).Select(index => new JournalSecurity("Path" + index, "O:SYG:SYD:(A;;KA;;;SY)"))
+            .ToArray();
         var before = State(0, 0) with { Security = descriptors };
         var after = before with
         {
-            Security = descriptors.Reverse().Select(item => item with { Path = item.Path.ToUpperInvariant() })
-                .ToArray()
+            Security = descriptors.Reverse().Select(item => item with { Path = item.Path.ToUpperInvariant() }).ToArray()
         };
-        check(
-            RegistryJournal.Same(before, after),
-            "Linear descriptor matching preserves case-insensitive paths and arbitrary ordering");
+        check(RegistryJournal.Same(before, after), "Linear descriptor matching preserves case-insensitive paths and arbitrary ordering");
         after.Security[0] = after.Security[0] with { Descriptor = "O:SYG:SYD:(A;;KR;;;SY)" };
         check(!RegistryJournal.Same(before, after), "Descriptor matching preserves exact ACL string semantics");
-        var duplicate = before with
-        {
-            Security = [descriptors[0], descriptors[0] with { Path = descriptors[0].Path.ToUpperInvariant() }]
-        };
+        var duplicate = before with { Security = [descriptors[0], descriptors[0] with { Path = descriptors[0].Path.ToUpperInvariant() }] };
         var distinct = before with { Security = [descriptors[0], descriptors[1]] };
-        check(
-            !RegistryJournal.Same(duplicate, distinct),
-            "Duplicate descriptor paths cannot satisfy a different child's access rules");
+        check(!RegistryJournal.Same(duplicate, distinct), "Duplicate descriptor paths cannot satisfy a different child's access rules");
     }
 
     private static void CheckDescriptorValidation(string folder, Action<bool, string> check)
@@ -168,16 +158,14 @@ internal static class JournalHistoryTests
         var descriptor = new JournalSecurity("Child", "O:SYG:SYD:(A;;KA;;;SY)");
         var invalid = entry with
         {
-            Id = Guid.NewGuid(),
-            Before = [entry.Before[0] with { Security = [descriptor, descriptor with { Path = "CHILD" }] }]
+            Id = Guid.NewGuid(), Before = [entry.Before[0] with { Security = [descriptor, descriptor with { Path = "CHILD" }] }]
         };
         var file = Path.Combine(folder, invalid.Id.ToString("N") + ".json");
         Write(file, invalid);
         Write(Path.Combine(folder, entry.Id.ToString("N") + ".json"), entry with { Kind = null });
         var history = new RegistryJournal(folder).ReadHistory();
         check(
-            history.DamagedFiles.SequenceEqual([Path.GetFileName(file)]) &&
-            history.Entries.Single().Before[0].Security.Length == 0,
+            history.DamagedFiles.SequenceEqual([Path.GetFileName(file)]) && history.Entries.Single().Before[0].Security.Length == 0,
             "Journal validation rejects case-insensitive duplicate descriptor paths and accepts descriptor-free legacy states");
     }
 
@@ -185,19 +173,15 @@ internal static class JournalHistoryTests
     {
         var first = Entry("Original", 0);
         var unrelated = Entry("Unrelated", 1);
-        var noChange = Entry("No change", 0) with
-        {
-            Time = first.Time.AddSeconds(2), Before = [State(1, 0)], After = [State(1, 0)]
-        };
-        var later = Entry("Blocking edit", 0) with
-        {
-            Time = first.Time.AddSeconds(3), Before = [State(1, 0)], After = [State(2, 0)]
-        };
+        var noChange = Entry("No change", 0) with { Time = first.Time.AddSeconds(2), Before = [State(1, 0)], After = [State(1, 0)] };
+        var later = Entry("Blocking edit", 0) with { Time = first.Time.AddSeconds(3), Before = [State(1, 0)], After = [State(2, 0)] };
         JournalEntry[] entries = [first, unrelated, noChange, later];
         var conflict = RegistryJournal.FindLaterConflict(entries, first, JournalEntry.GetRevertedIds(entries));
         check(
-            conflict?.Entry.Id == later.Id && conflict.Reason.Contains(later.Operation) &&
-            conflict.Reason.Contains(later.Path) && conflict.Reason.Contains(later.Time.ToLocalTime().ToString("G")),
+            conflict?.Entry.Id == later.Id
+            && conflict.Reason.Contains(later.Operation)
+            && conflict.Reason.Contains(later.Path)
+            && conflict.Reason.Contains(later.Time.ToLocalTime().ToString("G")),
             "The first actual blocking later edit supplies its operation target and time");
         var revert = Entry("Revert", 0) with
         {
@@ -226,8 +210,7 @@ internal static class JournalHistoryTests
         {
             entries = [first, unrelated, barrier];
             check(
-                RegistryJournal.FindLaterConflict(entries, first, JournalEntry.GetRevertedIds(entries))?.Entry.Id ==
-                barrier.Id,
+                RegistryJournal.FindLaterConflict(entries, first, JournalEntry.GetRevertedIds(entries))?.Entry.Id == barrier.Id,
                 "Unknown incomplete and external activity barriers remain blocking: " + barrier.OperationKind);
         }
     }
@@ -269,24 +252,20 @@ internal static class JournalHistoryTests
             check(
                 !oldCheck.IsCompleted && hint!.Contains("Checking") && !model.RevertCommand.CanExecute(original),
                 "Selection and CanExecute remain available while large eligibility work is blocked on its worker");
-            var later = Entry("New blocker", 0) with
-            {
-                Time = original.Time.AddSeconds(1), Before = [State(1, 0)], After = [State(2, 0)]
-            };
+            var later = Entry("New blocker", 0) with { Time = original.Time.AddSeconds(1), Before = [State(1, 0)], After = [State(2, 0)] };
             Write(Path.Combine(folder, later.Id.ToString("N") + ".json"), later);
             await model.RefreshAsync();
             await model.SetSelectionAsync(panel, original);
             await model.SetSelectionAsync(tab, later);
             check(
-                model.BlockingEdit(original)?.Entry.Id == later.Id && !model.RevertCommand.CanExecute(original) &&
-                model.RevertCommand.CanExecute(later),
-                "Panel and tab selections keep independent current-history eligibility results");
+                model.BlockingEdit(original)?.Entry.Id == later.Id
+                && !model.RevertCommand.CanExecute(original)
+                && model.RevertCommand.CanExecute(later), "Panel and tab selections keep independent current-history eligibility results");
             var current = model.Entries.Single(entry => entry.Id == original.Id);
             var completedCalls = calls;
             await model.RefreshAsync();
             check(
-                !ReferenceEquals(current, model.Entries.Single(entry => entry.Id == original.Id)) ||
-                calls == completedCalls,
+                !ReferenceEquals(current, model.Entries.Single(entry => entry.Id == original.Id)) || calls == completedCalls,
                 "Unchanged presentation generations preserve memoized selected-entry eligibility");
             release.Set();
             await oldCheck.WaitAsync(TimeSpan.FromSeconds(5));
@@ -323,25 +302,19 @@ internal static class JournalHistoryTests
         var warmTime = watch.Elapsed;
         var warmBytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
         check(
-            cold.Entries.Length == 1000 && warm.Entries.Length == 1000 && warm.DamagedFiles.Length == 0 &&
-            reader.CachedFileCount <= 1000, "Cold and warm presentation reads preserve all 1000 fixture records");
+            cold.Entries.Length == 1000 && warm.Entries.Length == 1000 && warm.DamagedFiles.Length == 0 && reader.CachedFileCount <= 1000,
+            "Cold and warm presentation reads preserve all 1000 fixture records");
         Console.WriteLine(
-            $"MEASURE journal-history 1000 files: cold {coldTime.TotalMilliseconds:F1} ms / {coldBytes:N0} bytes; " +
-            $"warm {warmTime.TotalMilliseconds:F1} ms / {warmBytes:N0} bytes; cached {reader.CachedFileCount}.");
+            $"MEASURE journal-history 1000 files: cold {coldTime.TotalMilliseconds:F1} ms / {coldBytes:N0} bytes; "
+            + $"warm {warmTime.TotalMilliseconds:F1} ms / {warmBytes:N0} bytes; cached {reader.CachedFileCount}.");
         var before = State(0, 0);
         var after = State(1, 0);
-        var beforeValues = Enumerable.Range(0, 1000)
-            .Select(index => new RegistryValue("value" + index, RegistryValueType.Binary, [0])).ToArray();
+        var beforeValues = Enumerable.Range(0, 1000).Select(index => new RegistryValue("value" + index, RegistryValueType.Binary, [0]))
+            .ToArray();
         var afterValues = beforeValues.Select(value => value with { Data = [1] }).ToArray();
         var scope = before.Scope with { ValueNames = beforeValues.Select(value => value.Name).ToArray() };
-        before = before with
-        {
-            Scope = scope, Snapshot = before.Snapshot with { Keys = [new SnapshotKey(string.Empty, beforeValues)] }
-        };
-        after = after with
-        {
-            Scope = scope, Snapshot = after.Snapshot with { Keys = [new SnapshotKey(string.Empty, afterValues)] }
-        };
+        before = before with { Scope = scope, Snapshot = before.Snapshot with { Keys = [new SnapshotKey(string.Empty, beforeValues)] } };
+        after = after with { Scope = scope, Snapshot = after.Snapshot with { Keys = [new SnapshotKey(string.Empty, afterValues)] } };
         var selected = Entry("Differences", 0) with { Before = [before], After = [after] };
         var differences = new JournalDifferenceCache();
         differences.SetEntries([selected]);
@@ -359,8 +332,8 @@ internal static class JournalHistoryTests
             computed.Count == 1000 && ReferenceEquals(computed, reused),
             "Cold and warm selected inspection retain all 1000 differences without recomputing");
         Console.WriteLine(
-            $"MEASURE journal differences 1000 changes: cold {coldTime.TotalMilliseconds:F1} ms / {coldBytes:N0} bytes; " +
-            $"warm {warmTime.TotalMilliseconds:F1} ms / {warmBytes:N0} bytes.");
+            $"MEASURE journal differences 1000 changes: cold {coldTime.TotalMilliseconds:F1} ms / {coldBytes:N0} bytes; "
+            + $"warm {warmTime.TotalMilliseconds:F1} ms / {warmBytes:N0} bytes.");
     }
 
     private static async Task CheckStrictRevertAsync(string folder, Action<bool, string> check)
@@ -385,11 +358,7 @@ internal static class JournalHistoryTests
             check(
                 model.BlockingEdit(original)?.Entry.Id == entries[1].Id && !model.RevertCommand.CanExecute(original),
                 "Display eligibility identifies the same first blocking edit as strict Revert");
-            foreach (var read in new[]
-                     {
-                         entries, journal.ReadHistory().Entries,
-                         new JournalHistoryReader(journal).ReadHistory().Entries
-                     })
+            foreach (var read in new[] { entries, journal.ReadHistory().Entries, new JournalHistoryReader(journal).ReadHistory().Entries })
             {
                 foreach (var later in read.Skip(1))
                 {
@@ -431,8 +400,7 @@ internal static class JournalHistoryTests
         return new JournalState(
             scope, new RegistryBranchSnapshot(
                 1, root, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, [
-                    new SnapshotKey(
-                        string.Empty, [new RegistryValue("value" + index, RegistryValueType.Binary, [value])])
+                    new SnapshotKey(string.Empty, [new RegistryValue("value" + index, RegistryValueType.Binary, [value])])
                 ], Environment.MachineName), []);
     }
 
@@ -457,8 +425,7 @@ internal static class JournalHistoryTests
                         new RegistryJournal(folder).RecordActivity(
                             "Added", RegistryLocation.Parse("HKCU"), "writer fixture", () => { }); break;
                     case "remove-added":
-                        var added = new RegistryJournal(folder).ReadEntries()
-                            .Single(entry => entry.Operation == "Added");
+                        var added = new RegistryJournal(folder).ReadEntries().Single(entry => entry.Operation == "Added");
                         File.Delete(Path.Combine(folder, added.Id.ToString("N") + ".json"));
                         break;
                     case "corrupt": File.WriteAllText(path, "{"); break;
@@ -501,6 +468,17 @@ internal static class JournalHistoryTests
         private HistoryWriter(Process process)
         {
             this._process = process;
+        }
+
+        public void Dispose()
+        {
+            if (!this._process.HasExited)
+            {
+                this._process.Kill(true);
+                this._process.WaitForExit();
+            }
+
+            this._process.Dispose();
         }
 
         internal static async Task<HistoryWriter> StartAsync(string folder, string path)
@@ -546,20 +524,8 @@ internal static class JournalHistoryTests
             await this._process.StandardInput.FlushAsync();
             if (await this._process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10)) != "ok")
             {
-                throw new IOException(
-                    "Journal fixture writer failed: " + await this._process.StandardError.ReadToEndAsync());
+                throw new IOException("Journal fixture writer failed: " + await this._process.StandardError.ReadToEndAsync());
             }
-        }
-
-        public void Dispose()
-        {
-            if (!this._process.HasExited)
-            {
-                this._process.Kill(true);
-                this._process.WaitForExit();
-            }
-
-            this._process.Dispose();
         }
     }
 }

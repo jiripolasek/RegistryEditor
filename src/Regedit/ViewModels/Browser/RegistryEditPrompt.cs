@@ -18,20 +18,6 @@ public abstract class RegistryEditPrompt : ObservableObject
 
     internal RegistryEditRecovery? Recovery { get; private set; }
 
-    internal void SetFailure(
-        Exception failure,
-        RegistryEditTarget target,
-        bool administrator,
-        Func<RegistryLocation, Task>? elevate)
-    {
-        this.Error = failure.Message;
-        this.Failure = failure;
-        this.Recovery
-            = failure is UnauthorizedAccessException or SecurityException or Win32Exception { NativeErrorCode: 5 }
-                ? new RegistryEditRecovery(target, administrator, elevate)
-                : null;
-    }
-
     public bool HasError => this._error is not null;
 
     public string? Error
@@ -51,12 +37,20 @@ public abstract class RegistryEditPrompt : ObservableObject
             }
         }
     }
+
+    internal void SetFailure(Exception failure, RegistryEditTarget target, bool administrator, Func<RegistryLocation, Task>? elevate)
+    {
+        this.Error = failure.Message;
+        this.Failure = failure;
+        this.Recovery = failure is UnauthorizedAccessException or SecurityException or Win32Exception { NativeErrorCode: 5 }
+            ? new RegistryEditRecovery(target, administrator, elevate)
+            : null;
+    }
 }
 
 internal enum RegistryNameOperation { CreateKey, Rename, Paste, DuplicateValue }
 
-internal sealed class RegistryNamePrompt(RegistryNameOperation operation, string name, string? pasteDestination = null)
-    : RegistryEditPrompt
+internal sealed class RegistryNamePrompt(RegistryNameOperation operation, string name, string? pasteDestination = null) : RegistryEditPrompt
 {
     internal RegistryNameOperation Operation { get; } = operation;
 
@@ -73,9 +67,9 @@ internal sealed class RegistryDeletePrompt(IReadOnlyList<StoredRegistryItem> ite
         this.Items[0] is StoredRegistryItem.Key ? "Delete key and all subkeys?" : "Delete value?";
 
     internal string Message => this.Items.Count > 1
-        ? string.Join("\n", this.Items.Select(item => item.Path)) +
-          "\n\nKeys, their subkeys, and values will be permanently removed."
-        : this.Items[0].Path + "\n\nThis permanently removes the " +
-          (this.Items[0] is StoredRegistryItem.Key ? "key and everything inside it" : "value") +
-          ". Export a backup first if you may need to restore it.";
+        ? string.Join("\n", this.Items.Select(item => item.Path)) + "\n\nKeys, their subkeys, and values will be permanently removed."
+        : this.Items[0].Path
+          + "\n\nThis permanently removes the "
+          + (this.Items[0] is StoredRegistryItem.Key ? "key and everything inside it" : "value")
+          + ". Export a backup first if you may need to restore it.";
 }

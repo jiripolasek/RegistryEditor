@@ -36,8 +36,7 @@ public sealed partial class BrowserPage
         {
             yield return (this.ValueInspectorPane, () =>
             {
-                var field = FocusManager.FindFirstFocusableElement(this.ValueInspectorContent) as UIElement ??
-                            this.ValueInspectorScroll;
+                var field = FocusManager.FindFirstFocusableElement(this.ValueInspectorContent) as UIElement ?? this.ValueInspectorScroll;
                 field.Focus(FocusState.Keyboard);
                 field.StartBringIntoView();
             });
@@ -57,8 +56,7 @@ public sealed partial class BrowserPage
         {
             var item = new MenuFlyoutItem
             {
-                Text
-                    = $"{entry.Location.Address} · {(entry.Location.View == RegistryView.Registry32 ? "32-bit" : "64-bit")}",
+                Text = $"{entry.Location.Address} · {(entry.Location.View == RegistryView.Registry32 ? "32-bit" : "64-bit")}",
                 Icon = new FontIcon { Glyph = RegistryTreePane.TreeGlyph(entry.Location) }
             };
             item.Click += async (_, _) => await this.GuardAsync(
@@ -70,8 +68,9 @@ public sealed partial class BrowserPage
 
     internal bool TryNavigateHistory(bool forward)
     {
-        if (this._window.Dialogs.IsOpen || this.XamlRoot is not { } root || VisualTreeHelper
-                .GetOpenPopupsForXamlRoot(root).Any(popup => popup.Child is ContentDialog))
+        if (this._window.Dialogs.IsOpen
+            || this.XamlRoot is not { } root
+            || VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(popup => popup.Child is ContentDialog))
         {
             return false;
         }
@@ -96,8 +95,7 @@ public sealed partial class BrowserPage
             }
 
             var focused = FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject;
-            if (IsInside(focused, this.EntryList) || IsInside(focused, this.TreePane) ||
-                IsInside(focused, this.Commands))
+            if (IsInside(focused, this.EntryList) || IsInside(focused, this.TreePane) || IsInside(focused, this.Commands))
             {
                 args.Handled = true;
                 var command = args.Key == VirtualKey.Z ? this.ViewModel.UndoCommand : this.ViewModel.RedoCommand;
@@ -125,9 +123,13 @@ public sealed partial class BrowserPage
         var shift = Down(VirtualKey.Shift);
         var copyPath = args.Key == VirtualKey.C && control && shift && !alt;
         var navigate = args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up && alt && !control && !shift;
-        var back = args.Key == VirtualKey.Back && !alt && !control && !shift && !Down(VirtualKey.LeftWindows) &&
-                   !Down(VirtualKey.RightWindows) &&
-                   FocusManager.GetFocusedElement(this.XamlRoot) is not (TextBox or RichEditBox or PasswordBox);
+        var back = args.Key == VirtualKey.Back
+                   && !alt
+                   && !control
+                   && !shift
+                   && !Down(VirtualKey.LeftWindows)
+                   && !Down(VirtualKey.RightWindows)
+                   && FocusManager.GetFocusedElement(this.XamlRoot) is not (TextBox or RichEditBox or PasswordBox);
         if (!copyPath && !navigate && !back)
         {
             return;
@@ -135,8 +137,8 @@ public sealed partial class BrowserPage
 
         // Text editors and tree items can consume these shortcuts before a page accelerator runs.
         args.Handled = true;
-        if (this._window.Dialogs.IsOpen || VisualTreeHelper.GetOpenPopupsForXamlRoot(this.XamlRoot)
-                .Any(popup => popup.Child is ContentDialog))
+        if (this._window.Dialogs.IsOpen
+            || VisualTreeHelper.GetOpenPopupsForXamlRoot(this.XamlRoot).Any(popup => popup.Child is ContentDialog))
         {
             return;
         }
@@ -147,8 +149,7 @@ public sealed partial class BrowserPage
         }
         else if (back && IsInside(FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject, this.TreePane))
         {
-            await this.GuardAsync(
-                "Couldn't open the parent key", "Navigation canceled", this.TreePane.NavigateParentAsync);
+            await this.GuardAsync("Couldn't open the parent key", "Navigation canceled", this.TreePane.NavigateParentAsync);
         }
         else if (args.Key == VirtualKey.Up)
         {
@@ -240,8 +241,9 @@ public sealed partial class BrowserPage
             args.Handled = true;
             var pending = this.ViewModel.PendingFilter;
             await pending;
-            if (pending == this.ViewModel.PendingFilter && this.XamlRoot is { } root && IsInside(
-                    FocusManager.GetFocusedElement(root) as DependencyObject, this.FilterBox))
+            if (pending == this.ViewModel.PendingFilter
+                && this.XamlRoot is { } root
+                && IsInside(FocusManager.GetFocusedElement(root) as DependencyObject, this.FilterBox))
             {
                 this.EntryList.FocusList(FocusState.Keyboard);
             }
@@ -251,8 +253,7 @@ public sealed partial class BrowserPage
     private void ViewMenu_Opening(object sender, object args)
     {
         this.NavigationPaneMenu.IsChecked = this.ListNavigationPaneMenu.IsChecked = !this.ViewModel.Layout.TreeHidden;
-        this.Registry32Menu.IsChecked
-            = this.ListRegistry32Menu.IsChecked = this.ViewModel.Location.View == RegistryView.Registry32;
+        this.Registry32Menu.IsChecked = this.ListRegistry32Menu.IsChecked = this.ViewModel.Location.View == RegistryView.Registry32;
         this.Registry64Menu.IsChecked = this.ListRegistry64Menu.IsChecked = !this.Registry32Menu.IsChecked;
     }
 

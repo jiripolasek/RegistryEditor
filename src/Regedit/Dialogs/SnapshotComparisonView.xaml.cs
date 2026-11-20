@@ -21,12 +21,8 @@ public sealed partial class SnapshotComparisonView : UserControl
     {
         this.ViewModel = viewModel;
         this.InitializeComponent();
-        viewModel.Notice += (title, message, kind) =>
-        {
-            StatusNotice.Show(this.ResultMessage, title, message, (InfoBarSeverity)kind);
-        };
-        this.SizeChanged += (_, _) =>
-            this.BeforeData.MaxHeight = this.AfterData.MaxHeight = Math.Clamp(this.ActualHeight / 4, 80, 170);
+        viewModel.Notice += (title, message, kind) => { StatusNotice.Show(this.ResultMessage, title, message, (InfoBarSeverity)kind); };
+        this.SizeChanged += (_, _) => this.BeforeData.MaxHeight = this.AfterData.MaxHeight = Math.Clamp(this.ActualHeight / 4, 80, 170);
     }
 
     internal async Task ShowAsync(FrameworkElement owner, WindowDialogPresenter dialogs)

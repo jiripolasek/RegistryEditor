@@ -51,8 +51,7 @@ public static class RegistryWatcher
                 int Arm()
                 {
                     return RegistryNative.NotifyChange(
-                        key.Handle, valueName is null ? 1 : 0, valueName is null ? 0x10000005u : 0x10000004u,
-                        signal.SafeWaitHandle, 1);
+                        key.Handle, valueName is null ? 1 : 0, valueName is null ? 0x10000005u : 0x10000004u, signal.SafeWaitHandle, 1);
                 }
 
                 RegistryBranchSnapshot Capture(bool allowMissingRoot = false)
@@ -65,9 +64,8 @@ public static class RegistryWatcher
                             // Path reads can reach a replacement key after this session's native handle was deleted.
                             _ = key.SubKeyCount;
                         }
-                        catch (IOException ex) when (allowMissingRoot &&
-                                                     ex.HResult is RegistryNative.ErrorKeyDeleted
-                                                         or unchecked((int)0x800703FA))
+                        catch (IOException ex) when (allowMissingRoot
+                                                     && ex.HResult is RegistryNative.ErrorKeyDeleted or unchecked((int)0x800703FA))
                         {
                             return captured with { Keys = [] };
                         }
@@ -83,22 +81,19 @@ public static class RegistryWatcher
                         var value = RegistryService.ReadValue(key, valueName);
                         keys = [new SnapshotKey(string.Empty, value is null ? [] : [value])];
                     }
-                    catch (Win32Exception ex) when (allowMissingRoot &&
-                                                    ex.NativeErrorCode == RegistryNative.ErrorKeyDeleted)
+                    catch (Win32Exception ex) when (allowMissingRoot && ex.NativeErrorCode == RegistryNative.ErrorKeyDeleted)
                     {
                         keys = [];
                     }
 
                     return new RegistryBranchSnapshot(
-                        RegistryBranchSnapshot.CurrentVersion, root, started, DateTimeOffset.UtcNow, keys,
-                        Environment.MachineName);
+                        RegistryBranchSnapshot.CurrentVersion, root, started, DateTimeOffset.UtcNow, keys, Environment.MachineName);
                 }
 
                 var pending = Channel.CreateBounded<byte>(
                     new BoundedChannelOptions(1) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
                 var registration = ThreadPool.RegisterWaitForSingleObject(
-                    signal, static (state, _) => ((ChannelWriter<byte>)state!).TryWrite(0), pending.Writer,
-                    Timeout.Infinite, false);
+                    signal, static (state, _) => ((ChannelWriter<byte>)state!).TryWrite(0), pending.Writer, Timeout.Infinite, false);
                 try
                 {
                     await ObserveAsync(pending.Reader, Arm, Capture, observed, ready, token).ConfigureAwait(false);
@@ -147,9 +142,7 @@ public static class RegistryWatcher
             }
 
             var now = DateTimeOffset.UtcNow;
-            var after = error == RegistryNative.ErrorKeyDeleted
-                ? before with { Started = now, Completed = now, Keys = [] }
-                : capture(true);
+            var after = error == RegistryNative.ErrorKeyDeleted ? before with { Started = now, Completed = now, Keys = [] } : capture(true);
             var comparison = new RegistryComparison(before, after, token);
             token.ThrowIfCancellationRequested();
             if (comparison.Differences.Count > 0)
@@ -159,8 +152,7 @@ public static class RegistryWatcher
 
             if (error == RegistryNative.ErrorKeyDeleted || after.Keys.Length == 0)
             {
-                throw new IOException(
-                    "The watched key was deleted. The watch has stopped; start a new watch if it is recreated.");
+                throw new IOException("The watched key was deleted. The watch has stopped; start a new watch if it is recreated.");
             }
 
             before = after;

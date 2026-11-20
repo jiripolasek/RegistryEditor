@@ -56,31 +56,26 @@ internal static class AppServicesTests
                 !ReferenceEquals(firstWatch, secondWatch) && secondWatch.Query.Length == 0,
                 "DI creates independent watch readers in the owning window scope");
             check(
-                ReferenceEquals(registry, first.GetRequiredService<RegistryService>()) &&
-                ReferenceEquals(registry.Journal, first.GetRequiredService<RegistryJournal>()) &&
-                ReferenceEquals(registry.Journal, first.GetRequiredService<JournalViewModel>().Journal) &&
-                !ReferenceEquals(registry.Journal, second.GetRequiredService<RegistryJournal>()),
+                ReferenceEquals(registry, first.GetRequiredService<RegistryService>())
+                && ReferenceEquals(registry.Journal, first.GetRequiredService<RegistryJournal>())
+                && ReferenceEquals(registry.Journal, first.GetRequiredService<JournalViewModel>().Journal)
+                && !ReferenceEquals(registry.Journal, second.GetRequiredService<RegistryJournal>()),
                 "Tabs share their window's registry service and journal");
 
             check(
-                ReferenceEquals(
-                    first.GetRequiredService<MainWindowViewModel>(), first.GetRequiredService<MainWindowViewModel>()) &&
-                !ReferenceEquals(
-                    first.GetRequiredService<MainWindowViewModel>(), second.GetRequiredService<MainWindowViewModel>()),
+                ReferenceEquals(first.GetRequiredService<MainWindowViewModel>(), first.GetRequiredService<MainWindowViewModel>())
+                && !ReferenceEquals(first.GetRequiredService<MainWindowViewModel>(), second.GetRequiredService<MainWindowViewModel>()),
                 "Tab selection and shell state belong to one window scope");
 
             check(
-                ReferenceEquals(
-                    first.GetRequiredService<SettingsViewModel>(), first.GetRequiredService<SettingsViewModel>()) &&
-                !ReferenceEquals(
-                    first.GetRequiredService<SettingsViewModel>(), second.GetRequiredService<SettingsViewModel>()),
+                ReferenceEquals(first.GetRequiredService<SettingsViewModel>(), first.GetRequiredService<SettingsViewModel>())
+                && !ReferenceEquals(first.GetRequiredService<SettingsViewModel>(), second.GetRequiredService<SettingsViewModel>()),
                 "The Settings page and browser View menu share one preferences model per window");
 
             var createTab = first.GetRequiredService<Func<RegistryLocation, BrowserViewModel>>();
             check(
                 ReferenceEquals(
-                    first.GetRequiredService<RegistryHistoryBroadcaster>(),
-                    second.GetRequiredService<RegistryHistoryBroadcaster>()),
+                    first.GetRequiredService<RegistryHistoryBroadcaster>(), second.GetRequiredService<RegistryHistoryBroadcaster>()),
                 "Registry history broadcasts are shared across window scopes");
             var initial = RegistryLocation.Parse("HKCU");
             var left = createTab(initial);
@@ -96,25 +91,21 @@ internal static class AppServicesTests
             var settings = first.GetRequiredService<AppSettings>();
             var otherSettings = second.GetRequiredService<AppSettings>();
             check(
-                ReferenceEquals(
-                    first.GetRequiredService<FavoritesStore>(), first.GetRequiredService<FavoritesStore>()) &&
-                !ReferenceEquals(
-                    first.GetRequiredService<FavoritesStore>(), second.GetRequiredService<FavoritesStore>()),
+                ReferenceEquals(first.GetRequiredService<FavoritesStore>(), first.GetRequiredService<FavoritesStore>())
+                && !ReferenceEquals(first.GetRequiredService<FavoritesStore>(), second.GetRequiredService<FavoritesStore>()),
                 "The Favorites store is shared within one window scope");
             check(
-                ReferenceEquals(
-                    first.GetRequiredService<InvestigationStore>(), first.GetRequiredService<InvestigationStore>()) &&
-                !ReferenceEquals(
-                    first.GetRequiredService<InvestigationStore>(), second.GetRequiredService<InvestigationStore>()),
+                ReferenceEquals(first.GetRequiredService<InvestigationStore>(), first.GetRequiredService<InvestigationStore>())
+                && !ReferenceEquals(first.GetRequiredService<InvestigationStore>(), second.GetRequiredService<InvestigationStore>()),
                 "Saved search and workspace changes share a store within one window");
             check(
-                ReferenceEquals(settings, first.GetRequiredService<AppSettings>()) &&
-                !ReferenceEquals(settings, otherSettings), "Each window scope owns its settings");
+                ReferenceEquals(settings, first.GetRequiredService<AppSettings>()) && !ReferenceEquals(settings, otherSettings),
+                "Each window scope owns its settings");
             var notes = first.GetRequiredService<NotesStore>();
             check(
-                ReferenceEquals(notes, first.GetRequiredService<NotesStore>()) &&
-                ReferenceEquals(notes, first.GetRequiredService<MainWindowViewModel>().NoteStore) &&
-                !ReferenceEquals(notes, second.GetRequiredService<NotesStore>()),
+                ReferenceEquals(notes, first.GetRequiredService<NotesStore>())
+                && ReferenceEquals(notes, first.GetRequiredService<MainWindowViewModel>().NoteStore)
+                && !ReferenceEquals(notes, second.GetRequiredService<NotesStore>()),
                 "DI shares one Notes store and autosave coordinator within each window");
             settings.SaveSession([new SavedTab("HKCU")], false, path);
             otherSettings.SaveSession([new SavedTab("HKLM")], false, path);
@@ -124,8 +115,8 @@ internal static class AppServicesTests
 
             var jumpList = first.GetRequiredService<JumpListService>();
             check(
-                ReferenceEquals(jumpList, second.GetRequiredService<JumpListService>()) && ReferenceEquals(
-                    backend, app.GetRequiredService<IJumpListBackend>()),
+                ReferenceEquals(jumpList, second.GetRequiredService<JumpListService>())
+                && ReferenceEquals(backend, app.GetRequiredService<IJumpListBackend>()),
                 "DI shares one Jump List coordinator across windows and uses the supplied backend");
             first.GetRequiredService<FavoritesStore>().Add("Saved", "HKCU\\Software", false, null);
             settings.Favorites.Add(new Favorite("Unsaved", "HKLM"));
@@ -135,8 +126,8 @@ internal static class AppServicesTests
                 reads == previousReads + 1 && published?.Count(entry => entry.FavoriteId is not null) == 1,
                 "Jump List resolves the overridden settings factory afresh instead of capturing a window's unsaved state");
             check(
-                AppSettings.Load(path).HiddenJumpListFavorites.Contains(settings.Favorites[0].Id) &&
-                settings.HiddenJumpListFavorites.Count == 0,
+                AppSettings.Load(path).HiddenJumpListFavorites.Contains(settings.Favorites[0].Id)
+                && settings.HiddenJumpListFavorites.Count == 0,
                 "Jump List removals use the configured profile without mutating a scoped settings snapshot");
         }
         finally

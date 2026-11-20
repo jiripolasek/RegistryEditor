@@ -84,9 +84,7 @@ public sealed partial class ListCommandBar : CommandBar
             };
             command.PropertyChanged += handler;
             this._generated.Add((command, button, handler));
-            var target = command.Placement == ToolCommandPlacement.Primary
-                ? this.PrimaryCommands
-                : this.SecondaryCommands;
+            var target = command.Placement == ToolCommandPlacement.Primary ? this.PrimaryCommands : this.SecondaryCommands;
             target.Add((ICommandBarElement)button);
         }
     }
@@ -131,8 +129,7 @@ public sealed partial class ListCommandBar : CommandBar
             {
                 commandIcon.Symbol = command.Symbol;
             }
-            else if (icon is IconSourceElement source &&
-                     (source.IconSource as FontIconSource)?.Glyph != SymbolGlyphs.Get(command.Symbol))
+            else if (icon is IconSourceElement source && (source.IconSource as FontIconSource)?.Glyph != SymbolGlyphs.Get(command.Symbol))
             {
                 source.IconSource = new FontIconSource { Glyph = SymbolGlyphs.Get(command.Symbol) };
             }
@@ -225,40 +222,38 @@ public sealed partial class ListCommandBar : CommandBar
         }
 
         button.ApplyTemplate();
-        if (VisualTreeHelper.GetChildrenCount(button) == 0 ||
-            VisualTreeHelper.GetChild(button, 0) is not FrameworkElement root)
+        if (VisualTreeHelper.GetChildrenCount(button) == 0 || VisualTreeHelper.GetChild(button, 0) is not FrameworkElement root)
         {
             return;
         }
 
         var labelState = VisualStateManager.GetVisualStateGroups(root).SelectMany(group => group.States)
             .FirstOrDefault(state => state.Name == "LabelOnRight");
-        var labelMargin = labelState?.Storyboard?.Children.OfType<ObjectAnimationUsingKeyFrames>()
-            .FirstOrDefault(animation => Storyboard.GetTargetName(animation) == "TextLabel" &&
-                                         Storyboard.GetTargetProperty(animation) == "Margin");
+        var labelMargin = labelState?.Storyboard?.Children.OfType<ObjectAnimationUsingKeyFrames>().FirstOrDefault(animation =>
+            Storyboard.GetTargetName(animation) == "TextLabel" && Storyboard.GetTargetProperty(animation) == "Margin");
         if (labelMargin is null || labelMargin.KeyFrames.Count == 0)
         {
             return;
         }
 
         // shortcut: WinUI's label margin is static; recheck this native state when upgrading templates.
-        var labelOnRight = this.DefaultLabelPosition == CommandBarDefaultLabelPosition.Right && button switch
-        {
-            AppBarButton actionButton => !actionButton.IsInOverflow &&
-                                         actionButton.LabelPosition != CommandBarLabelPosition.Collapsed,
-            AppBarToggleButton toggle => !toggle.IsInOverflow &&
-                                         toggle.LabelPosition != CommandBarLabelPosition.Collapsed,
-            _ => false
-        };
+        var labelOnRight = this.DefaultLabelPosition == CommandBarDefaultLabelPosition.Right
+                           && button switch
+                           {
+                               AppBarButton actionButton => !actionButton.IsInOverflow
+                                                            && actionButton.LabelPosition != CommandBarLabelPosition.Collapsed,
+                               AppBarToggleButton toggle => !toggle.IsInOverflow
+                                                            && toggle.LabelPosition != CommandBarLabelPosition.Collapsed,
+                               _ => false
+                           };
         if (labelOnRight)
         {
             VisualStateManager.GoToState(button, "FullSize", false);
         }
 
         labelMargin.KeyFrames[0].Value = this._toolToolbar ? new Thickness(8, 0, 8, 0) : new Thickness(8, 10, 12, 10);
-        var chevronMargin = labelState?.Storyboard?.Children.OfType<ObjectAnimationUsingKeyFrames>()
-            .FirstOrDefault(animation => Storyboard.GetTargetName(animation) == "SubItemChevron" &&
-                                         Storyboard.GetTargetProperty(animation) == "Margin");
+        var chevronMargin = labelState?.Storyboard?.Children.OfType<ObjectAnimationUsingKeyFrames>().FirstOrDefault(animation =>
+            Storyboard.GetTargetName(animation) == "SubItemChevron" && Storyboard.GetTargetProperty(animation) == "Margin");
         if (chevronMargin is { KeyFrames.Count: > 0 } && root.FindName("SubItemChevron") is FrameworkElement chevron)
         {
             chevronMargin.KeyFrames[0].Value = new Thickness(-7, 0, 12, 0);
@@ -295,9 +290,7 @@ public sealed partial class ListCommandBar : CommandBar
         var compact = this.DefaultLabelPosition == CommandBarDefaultLabelPosition.Collapsed;
         icon.Width = icon.Height = double.NaN;
         icon.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
-        icon.RenderTransform = compact && icon is SymbolIcon or CommandIcon
-            ? new ScaleTransform { ScaleX = 0.8, ScaleY = 0.8 }
-            : null;
+        icon.RenderTransform = compact && icon is SymbolIcon or CommandIcon ? new ScaleTransform { ScaleX = 0.8, ScaleY = 0.8 } : null;
         if (icon is CommandIcon commandIcon)
         {
             commandIcon.SetHost(button);
@@ -349,8 +342,10 @@ public sealed partial class ListCommandBar : CommandBar
 
     private void UpdateTrailingContent()
     {
-        if (this._trailing is null && this.TrailingContent is not null &&
-            this.GetTemplateChild("ContentRoot") is Grid root && this.GetTemplateChild("MoreButton") is Button more)
+        if (this._trailing is null
+            && this.TrailingContent is not null
+            && this.GetTemplateChild("ContentRoot") is Grid root
+            && this.GetTemplateChild("MoreButton") is Button more)
         {
             // shortcut: pin utilities right using native template parts; recheck them when upgrading WinUI.
             root.ColumnDefinitions[0].Width = GridLength.Auto;
@@ -399,13 +394,13 @@ public sealed partial class ListCommandBar : CommandBar
 
     private void PositionOverflow()
     {
-        if (this._trailing is not null && this.GetTemplateChild("OverflowPopup") is Popup popup &&
-            this.GetTemplateChild("MoreButton") is Button more)
+        if (this._trailing is not null
+            && this.GetTemplateChild("OverflowPopup") is Popup popup
+            && this.GetTemplateChild("MoreButton") is Button more)
         {
             // Native overflow aligns to the whole bar, including the utilities.
             popup.HorizontalOffset = this.IsOpen
-                ? more.TransformToVisual(this).TransformPoint(new Windows.Foundation.Point(more.ActualWidth, 0)).X -
-                  this.ActualWidth
+                ? more.TransformToVisual(this).TransformPoint(new Windows.Foundation.Point(more.ActualWidth, 0)).X - this.ActualWidth
                 : 0;
         }
     }

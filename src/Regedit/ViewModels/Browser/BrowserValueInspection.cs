@@ -13,13 +13,27 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 public sealed partial class BrowserViewModel
 {
+    internal event Action<Exception>? FileRevealFailed;
+
+    internal event Action<Exception>? WebSearchFailed;
+
     private CancellationTokenSource? _previewCancellation;
 
     internal Task PendingPreview { get; private set; } = Task.CompletedTask;
 
-    internal event Action<Exception>? FileRevealFailed;
+    [ObservableProperty]
+    internal partial bool IsPreviewCurrent { get; private set; } = true;
 
-    internal event Action<Exception>? WebSearchFailed;
+    [ObservableProperty]
+    public partial bool IsInspectorOpen { get; set; } = true;
+
+    [ObservableProperty]
+    internal partial ValueInspectorViewModel? Inspector { get; private set; }
+
+    private bool CanOpenLinkTarget =>
+        !this.IsLoading && RegistryLink.Resolve(this.SingleEntry?.Value, this.Location) is not null;
+
+    private bool CanRevealFile => RegistryFileReveal.CanResolve(this.Location, this.SingleEntry?.Value);
 
     [RelayCommand]
     private void SearchWeb((RegistryLocation? Location, string? ValueName) target)
@@ -31,8 +45,7 @@ public sealed partial class BrowserViewModel
 
         try
         {
-            var uri = RegistryWebSearch.CreateUri(
-                this._preferences?.WebSearchUrl ?? RegistryWebSearch.Bing, location, target.ValueName);
+            var uri = RegistryWebSearch.CreateUri(this._preferences?.WebSearchUrl ?? RegistryWebSearch.Bing, location, target.ValueName);
             this._launchWebSearch(uri);
         }
         catch (Exception ex)
@@ -41,15 +54,6 @@ public sealed partial class BrowserViewModel
             this.Error = ex.Message;
         }
     }
-
-    [ObservableProperty]
-    internal partial bool IsPreviewCurrent { get; private set; } = true;
-
-    [ObservableProperty]
-    public partial bool IsInspectorOpen { get; set; } = true;
-
-    [ObservableProperty]
-    internal partial ValueInspectorViewModel? Inspector { get; private set; }
 
     partial void OnIsInspectorOpenChanged(bool value) => this.UpdateInspector();
 
@@ -140,9 +144,6 @@ public sealed partial class BrowserViewModel
         return inspector;
     }
 
-    private bool CanOpenLinkTarget =>
-        !this.IsLoading && RegistryLink.Resolve(this.SingleEntry?.Value, this.Location) is not null;
-
     [RelayCommand(CanExecute = nameof(CanOpenLinkTarget))]
     private Task OpenLinkTargetAsync()
     {
@@ -150,8 +151,6 @@ public sealed partial class BrowserViewModel
             ? this.NavigateAsync(target)
             : Task.CompletedTask;
     }
-
-    private bool CanRevealFile => RegistryFileReveal.CanResolve(this.Location, this.SingleEntry?.Value);
 
     [RelayCommand(CanExecute = nameof(CanRevealFile))]
     private async Task RevealFileAsync()
@@ -166,8 +165,7 @@ public sealed partial class BrowserViewModel
         try
         {
             var start = await Task.Run(() => RegistryFileReveal.CreateStartInfo(
-                RegistryFileReveal.Resolve(location, value) ??
-                throw new FileNotFoundException("The file or folder no longer exists.")));
+                RegistryFileReveal.Resolve(location, value) ?? throw new FileNotFoundException("The file or folder no longer exists.")));
             using var process = Process.Start(start);
         }
         catch (Exception ex)

@@ -27,8 +27,7 @@ internal sealed class RegistryListMetadata
     internal async Task<bool> LoadAsync(IEnumerable<RegistryEntry> entries, bool includeLink)
     {
         this.Cancel();
-        var rows = entries
-            .Where(row => row.Key is { Machine: null } && (!row.DetailsRead || includeLink && !row.LinkRead)).ToArray();
+        var rows = entries.Where(row => row.Key is { Machine: null } && (!row.DetailsRead || includeLink && !row.LinkRead)).ToArray();
         if (rows.Length == 0)
         {
             return false;
@@ -49,8 +48,7 @@ internal sealed class RegistryListMetadata
                         {
                             result[index] = this._registry.ReadKeyDetails(rows[index].Key!, includeLink);
                         }
-                        catch (Exception ex) when (ex is Win32Exception or IOException or UnauthorizedAccessException
-                                                       or SecurityException)
+                        catch (Exception ex) when (ex is Win32Exception or IOException or UnauthorizedAccessException or SecurityException)
                         {
                             // A single denied or disappearing child must leave the rest of the list usable.
                         }

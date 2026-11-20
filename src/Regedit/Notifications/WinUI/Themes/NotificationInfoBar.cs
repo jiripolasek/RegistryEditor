@@ -16,7 +16,10 @@ public sealed partial class NotificationInfoBar : InfoBar
 {
     // A native InfoBar peer would also announce entries outside the expanded stack's viewport.
     /// <inheritdoc/>
-    protected override AutomationPeer OnCreateAutomationPeer() => new NotificationInfoBarAutomationPeer(this);
+    protected override AutomationPeer OnCreateAutomationPeer()
+    {
+        return new NotificationInfoBarAutomationPeer(this);
+    }
 
     private sealed partial class NotificationInfoBarAutomationPeer : FrameworkElementAutomationPeer
     {
@@ -25,8 +28,14 @@ public sealed partial class NotificationInfoBar : InfoBar
         {
         }
 
-        protected override string GetClassNameCore() => nameof(InfoBar);
+        protected override string GetClassNameCore()
+        {
+            return nameof(InfoBar);
+        }
 
-        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.StatusBar;
+        protected override AutomationControlType GetAutomationControlTypeCore()
+        {
+            return AutomationControlType.StatusBar;
+        }
     }
 }

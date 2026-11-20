@@ -120,10 +120,8 @@ internal static class CodeBehindMoveTests
         var time = new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero);
         var first = new WatchObservation(
             new RegistryDifference(
-                location, RegistryChangeKind.ValueAdded,
-                After: new RegistryValue("A", RegistryValueType.DWord, [1, 0, 0, 0])), time);
-        var second = new WatchObservation(
-            new RegistryDifference(location.Child("Child"), RegistryChangeKind.KeyAdded), time.AddMinutes(1));
+                location, RegistryChangeKind.ValueAdded, After: new RegistryValue("A", RegistryValueType.DWord, [1, 0, 0, 0])), time);
+        var second = new WatchObservation(new RegistryDifference(location.Child("Child"), RegistryChangeKind.KeyAdded), time.AddMinutes(1));
         var rows = new[] { InvestigationRow.Observation(first), InvestigationRow.Observation(second) };
 
         var copied = new List<string>();
@@ -138,18 +136,19 @@ internal static class CodeBehindMoveTests
         actions.CopyPowerShellCommand.Execute(null);
         actions.CopyRegExeCommand.Execute(null);
         check(
-            copied.Count == 2 && copied[0] == RegistryScripts.PowerShell([first.Change, second.Change]) &&
-            copied[1] == RegistryScripts.RegExe([first.Change, second.Change]) &&
-            notices.All(notice => notice is ("Script copied", NoticeKind.Success)),
+            copied.Count == 2
+            && copied[0] == RegistryScripts.PowerShell([first.Change, second.Change])
+            && copied[1] == RegistryScripts.RegExe([first.Change, second.Change])
+            && notices.All(notice => notice is ("Script copied", NoticeKind.Success)),
             "Script copying formats watch changes in display order and reports success");
 
         copied.Clear();
         actions.CopyPathsCommand.Execute(null);
         actions.CopyResultsCommand.Execute(null);
         check(
-            copied[0] == location.Address + Environment.NewLine + location.Child("Child").Address &&
-            copied[1].Split(Environment.NewLine) is [var line, _] &&
-            line == $"{rows[0].TableSubject}\t{rows[0].Path}\t{rows[0].TableSummary}",
+            copied[0] == location.Address + Environment.NewLine + location.Child("Child").Address
+            && copied[1].Split(Environment.NewLine) is [var line, _]
+            && line == $"{rows[0].TableSubject}\t{rows[0].Path}\t{rows[0].TableSummary}",
             "Path and table copies use the tool row subject, path and summary");
 
         actions.ReleaseCache();
@@ -160,41 +159,37 @@ internal static class CodeBehindMoveTests
         var empty = new JournalEntry(Guid.NewGuid(), time, "Activity", [], []);
         actions.Select([InvestigationRow.Journal(empty, "Completed")]);
         check(
-            !actions.HasChanges && !actions.CopyPowerShellCommand.CanExecute(null) &&
-            actions.CopyPathsCommand.CanExecute(null), "Journal entries without differences cannot produce a script");
+            !actions.HasChanges && !actions.CopyPowerShellCommand.CanExecute(null) && actions.CopyPathsCommand.CanExecute(null),
+            "Journal entries without differences cannot produce a script");
 
         var failing = new ToolResultActionsViewModel(_ => throw new InvalidOperationException("Clipboard busy"));
         var failure = default((string Title, string Message, NoticeKind Kind));
         failing.Notice += (title, message, kind) => failure = (title, message, kind);
         failing.CopyExactBytesCommand.Execute(new RegistryValue("A", RegistryValueType.Binary, [0xAB, 0xCD]));
-        check(
-            failure == ("Could not copy exact bytes", "Clipboard busy", NoticeKind.Error),
-            "Clipboard failures surface as error notices");
+        check(failure == ("Could not copy exact bytes", "Clipboard busy", NoticeKind.Error), "Clipboard failures surface as error notices");
 
         var value = new RegistryValue("A", RegistryValueType.Binary, [0xAB, 0xCD]);
         check(
-            ResultText.Hex(value) == "ABCD" && ResultText.BytesCopied(value) == "Copied 2 bytes as hexadecimal." &&
-            ResultText.Paths([rows[0], rows[0]]) == location.Address,
-            "Result text copies exact hex bytes and de-duplicates paths");
+            ResultText.Hex(value) == "ABCD"
+            && ResultText.BytesCopied(value) == "Copied 2 bytes as hexadecimal."
+            && ResultText.Paths([rows[0], rows[0]]) == location.Address, "Result text copies exact hex bytes and de-duplicates paths");
     }
 
     private static void Rows(Action<bool, string> check)
     {
         check(
-            ToolPresentation.EmptyState(ToolKind.Notes, false) ==
-            ("No notes yet", "Select a registry key to write your first note.") &&
-            ToolPresentation.EmptyState(ToolKind.Journal, true).Title == "No matches",
+            ToolPresentation.EmptyState(ToolKind.Notes, false) == ("No notes yet", "Select a registry key to write your first note.")
+            && ToolPresentation.EmptyState(ToolKind.Journal, true).Title == "No matches",
             "Empty states depend on the tool and whether a search is active");
         var location = RegistryLocation.Parse(@"HKCU\Software", RegistryView.Registry32);
         check(
-            ToolPresentation.Address(location) == location.Address + " · 32-bit" &&
-            ToolPresentation.Address(null) == "Select a registry tab", "Tool addresses carry the registry view");
+            ToolPresentation.Address(location) == location.Address + " · 32-bit"
+            && ToolPresentation.Address(null) == "Select a registry tab", "Tool addresses carry the registry view");
 
         var written = new NoteDraft(location, "Line one\nLine two");
         var blank = new NoteDraft(location.Child("Blank"), string.Empty);
         using var noteStore = NotesStoreTests.CreateStore(new AppSettings());
-        var notes = new NotesViewModel(
-            noteStore, (_, _) => Task.CompletedTask, _ => { }, false, _ => { }, _ => Task.FromResult(false));
+        var notes = new NotesViewModel(noteStore, (_, _) => Task.CompletedTask, _ => { }, false, _ => { }, _ => Task.FromResult(false));
         var visible = notes.VisibleRows([written, blank], string.Empty).ToArray();
         check(
             visible is [{ Source: NoteDraft only, Subtitle: "Line one Line two" }] && only == written,
@@ -216,24 +211,23 @@ internal static class CodeBehindMoveTests
         });
         var roots = await suggestions.SuggestAsync("hkc", RegistryView.Registry64, CancellationToken.None);
         var expected = RegistryLocation.Roots.Where(root =>
-            root.Alias.StartsWith("hkc", StringComparison.OrdinalIgnoreCase) ||
-            root.Name.StartsWith("hkc", StringComparison.OrdinalIgnoreCase)).Select(root => root.Name);
+            root.Alias.StartsWith("hkc", StringComparison.OrdinalIgnoreCase)
+            || root.Name.StartsWith("hkc", StringComparison.OrdinalIgnoreCase)).Select(root => root.Name);
         check(
-            roots.Select(item => item.Label).SequenceEqual(expected) &&
-            roots.Any(item => item.Label == "HKEY_CURRENT_USER") && reads.Count == 0,
-            "Root suggestions match aliases without reading the registry");
+            roots.Select(item => item.Label).SequenceEqual(expected)
+            && roots.Any(item => item.Label == "HKEY_CURRENT_USER")
+            && reads.Count == 0, "Root suggestions match aliases without reading the registry");
 
-        var keys = await suggestions.SuggestAsync(
-            @"Computer\HKCU\Software\key", RegistryView.Registry64, CancellationToken.None);
+        var keys = await suggestions.SuggestAsync(@"Computer\HKCU\Software\key", RegistryView.Registry64, CancellationToken.None);
         check(
-            keys.Count == RegistryAddressSuggestions.SuggestionLimit && keys[0].Label == "Key00" &&
-            reads is [{ SubKey: "Software" }] &&
-            keys[0].Address == RegistryLocation.Parse(@"HKCU\Software").Child("Key00").Address,
+            keys.Count == RegistryAddressSuggestions.SuggestionLimit
+            && keys[0].Label == "Key00"
+            && reads is [{ SubKey: "Software" }]
+            && keys[0].Address == RegistryLocation.Parse(@"HKCU\Software").Child("Key00").Address,
             "Subkey suggestions strip the Computer prefix, filter by prefix and stop at the limit");
 
         reads.Clear();
-        var remote = await suggestions.SuggestAsync(
-            @"\\SERVER\HKLM\Soft", RegistryView.Registry64, CancellationToken.None);
+        var remote = await suggestions.SuggestAsync(@"\\SERVER\HKLM\Soft", RegistryView.Registry64, CancellationToken.None);
         check(remote.Count == 0 && reads.Count == 0, "Remote paths never query the network while typing");
 
         var current = RegistryLocation.Parse(@"HKCU\Software");
@@ -247,8 +241,7 @@ internal static class CodeBehindMoveTests
     {
         var target = ApplicationRegistryViewModel.RemoteRoot(@" \\SERVER01\ ", RegistryView.Registry32);
         check(
-            target.Machine == "SERVER01" && target.Hive == RegistryHive.LocalMachine &&
-            target.View == RegistryView.Registry32,
+            target.Machine == "SERVER01" && target.Hive == RegistryHive.LocalMachine && target.View == RegistryView.Registry32,
             "Typed computer names resolve to the remote HKEY_LOCAL_MACHINE root");
 
         var directory = Directory.CreateTempSubdirectory("RegeditAppMenu.");
@@ -257,18 +250,16 @@ internal static class CodeBehindMoveTests
             var settings = new AppSettings();
             var registry = new RegistryService();
             var window = new MainWindowViewModel(
-                settings, new InvestigationStore(settings, () => { }), registry,
-                location => new BrowserViewModel(registry, location), NullLogger<MainWindowViewModel>.Instance,
-                NotesStoreTests.CreateStore(settings));
+                settings, new InvestigationStore(settings, () => { }), registry, location => new BrowserViewModel(registry, location),
+                NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
             var journal = new JournalViewModel(
-                new RegistryJournal(Path.Combine(directory.FullName, "journal")),
-                NullLogger<JournalViewModel>.Instance);
+                new RegistryJournal(Path.Combine(directory.FullName, "journal")), NullLogger<JournalViewModel>.Instance);
             var dialogs = new MenuDialogs();
             var started = new List<ProcessStartInfo>();
             var standardStarts = new List<RegistryLocation>();
             var menu = new ApplicationRegistryViewModel(
-                window, registry, journal, dialogs, new RegistryBranchCommands(registry), NullLogger.Instance,
-                isAdministrator: false, started.Add, (_, location) => standardStarts.Add(location));
+                window, registry, journal, dialogs, new RegistryBranchCommands(registry), NullLogger.Instance, isAdministrator: false,
+                started.Add, (_, location) => standardStarts.Add(location));
             var notices = new List<(string Title, string Message, NoticeKind Kind)>();
             menu.Notice += (title, message, kind) => notices.Add((title, message, kind));
 
@@ -287,14 +278,13 @@ internal static class CodeBehindMoveTests
             dialogs.Calls.Clear();
             await menu.ImportCommand.ExecuteAsync(null);
             check(
-                dialogs.Calls.SequenceEqual(["open"]) && previews is [("preview.reg", RegistryView.Registry64)] &&
-                notices.Count == 0, "Import opens a file preview without confirming or writing to the registry");
+                dialogs.Calls.SequenceEqual(["open"]) && previews is [("preview.reg", RegistryView.Registry64)] && notices.Count == 0,
+                "Import opens a file preview without confirming or writing to the registry");
 
             dialogs.Calls.Clear();
             await menu.ImportCommand.ExecuteAsync("dropped.REG");
             check(
-                dialogs.Calls.Count == 0 && previews[^1] == ("dropped.REG", RegistryView.Registry64) &&
-                notices.Count == 0,
+                dialogs.Calls.Count == 0 && previews[^1] == ("dropped.REG", RegistryView.Registry64) && notices.Count == 0,
                 "Dropped registry files open the preview without a picker, including an uppercase extension");
             var previewCount = previews.Count;
             await menu.ImportCommand.ExecuteAsync("unsupported.txt");
@@ -346,12 +336,10 @@ internal static class CodeBehindMoveTests
             check(started.Count == 1 && notices.Count == 0, "Elevation starts one elevated process");
 
             var elevated = new ApplicationRegistryViewModel(
-                window, registry, journal, dialogs, new RegistryBranchCommands(registry), NullLogger.Instance,
-                isAdministrator: true, started.Add, (_, location) => standardStarts.Add(location));
+                window, registry, journal, dialogs, new RegistryBranchCommands(registry), NullLogger.Instance, isAdministrator: true,
+                started.Add, (_, location) => standardStarts.Add(location));
             check(!elevated.ElevateCommand.CanExecute(null), "Elevation is unavailable when already elevated");
-            check(
-                !menu.OpenStandardAccessCommand.CanExecute(null),
-                "Standard access is unavailable when already unelevated");
+            check(!menu.OpenStandardAccessCommand.CanExecute(null), "Standard access is unavailable when already unelevated");
             await menu.OpenStandardAccessCommand.ExecuteAsync(null);
             check(standardStarts.Count == 0, "Standard access cannot be launched from an unelevated window");
 
@@ -362,8 +350,7 @@ internal static class CodeBehindMoveTests
                 "Standard access preserves the current computer, path and registry view");
 
             var failedLaunch = new ApplicationRegistryViewModel(
-                window, registry, journal, dialogs, new RegistryBranchCommands(registry), NullLogger.Instance,
-                isAdministrator: true,
+                window, registry, journal, dialogs, new RegistryBranchCommands(registry), NullLogger.Instance, isAdministrator: true,
                 startStandardAccess: (_, _) => throw new InvalidOperationException("No desktop shell"));
             failedLaunch.Notice += (title, message, kind) => notices.Add((title, message, kind));
             await failedLaunch.OpenStandardAccessCommand.ExecuteAsync(null);
@@ -384,8 +371,7 @@ internal static class CodeBehindMoveTests
             window.OpenBrowser(new RegistryLocation { View = RegistryView.Registry32 });
             await menu.ImportCommand.ExecuteAsync("local.reg");
             check(
-                previews[^1] == ("local.reg", RegistryView.Registry32) && dialogs.Calls.SequenceEqual(["computer"]) &&
-                notices.Count == 0,
+                previews[^1] == ("local.reg", RegistryView.Registry32) && dialogs.Calls.SequenceEqual(["computer"]) && notices.Count == 0,
                 "Dropped registry files preserve the current local registry view without showing a picker");
             var refreshed = new List<string>();
             window.OpenBrowser(RegistryLocation.Parse("HKCU\\Software\\ImportRefreshOne"));

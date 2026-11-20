@@ -4,7 +4,6 @@
 
 using CommunityToolkit.Mvvm.Input;
 using JPSoftworks.Notifications;
-using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Core.Search;
@@ -14,6 +13,7 @@ using JPSoftworks.Regedit.Dialogs;
 using JPSoftworks.Regedit.Infrastructure;
 using JPSoftworks.Regedit.Infrastructure.Input;
 using JPSoftworks.Regedit.Models.Tools;
+using JPSoftworks.Regedit.Services;
 using JPSoftworks.Regedit.ViewModels;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using JPSoftworks.Regedit.ViewModels.Tools;
@@ -52,20 +52,12 @@ public sealed partial class InvestigationPage : Page, IPanelView
 
     internal bool IsSaved => this.Saved is not null;
 
-    public string PanelCommandsId => "ItemCommands";
-
-    public IReadOnlyList<ToolCommand> PanelCommands =>
-        (ToolCommand[])[.. this._itemCommands, this.LocalControls.ViewCommand];
-
-    public PanelSearch? PanelSearch { get; }
-
     internal Button MenuButton => this.PageHeader.MenuButton;
 
     // The inner list of the column control; selection, menus, density and scrolling helpers act on it.
     private ListView Results => this.ResultColumns.ListView;
 
-    private bool IsWide => !this._docked &&
-                           this.Layout.ActualWidth - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
+    private bool IsWide => !this._docked && this.Layout.ActualWidth - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
 
     internal InvestigationPage(
         InvestigationViewModel viewModel,
@@ -77,8 +69,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
         this.ViewModel = viewModel;
         this._dialogs = dialogs;
         this.InitializeComponent();
-        this.LocalControls.PresentationChanged
-            += (_, _) => this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
+        this.LocalControls.PresentationChanged += (_, _) => this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
         this.InitializeResults(layouts);
         if (this.IsSearch)
         {
@@ -104,17 +95,14 @@ public sealed partial class InvestigationPage : Page, IPanelView
         this.BuildItemCommands();
         this.ItemCommands.SetCommands(this._itemCommands.Where(command => command != this._inspectCommand));
         var panelSearch = new PanelSearch(
-            this.IsSearch ? "Filter search results" : "Filter tool items",
-            this.IsSearch ? "SearchResultFilter" : "ToolSearch",
+            this.IsSearch ? "Filter search results" : "Filter tool items", this.IsSearch ? "SearchResultFilter" : "ToolSearch",
             this.IsSearch ? "Filter results…" : "Search " + viewModel.Title.ToLowerInvariant() + "…",
-            "Filter by name, registry path or displayed data", () => this.Search?.Filter ?? viewModel.Query,
-            text => this.SetFilter(text));
+            "Filter by name, registry path or displayed data", () => this.Search?.Filter ?? viewModel.Query, text => this.SetFilter(text));
         this.PanelSearch = panelSearch;
         this.LocalControls.SearchPlaceholder = panelSearch.Placeholder;
         this.LocalControls.SearchName = this.IsSearch ? "Filter search results" : "Filter tool items";
         this.LocalControls.SearchText = this.Search?.Filter ?? viewModel.Query;
-        AutomationProperties.SetAutomationId(
-            this.LocalControls.SearchBox, this.IsSearch ? "SearchResultFilter" : "ToolSearch");
+        AutomationProperties.SetAutomationId(this.LocalControls.SearchBox, this.IsSearch ? "SearchResultFilter" : "ToolSearch");
         viewModel.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(SearchResultsViewModel.Filter) or nameof(InvestigationViewModel.Query))
@@ -130,8 +118,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
         var notificationKey = "investigation-" + Guid.NewGuid().ToString("N");
         viewModel.Notice += (title, message, kind) =>
         {
-            this._notification = StatusNotifications.Show(
-                notifications, title, message, kind, key: notificationKey);
+            this._notification = StatusNotifications.Show(notifications, title, message, kind, key: notificationKey);
         };
         viewModel.NameRequested += this.RequestNameAsync;
         Action? restoreViewport = null;
@@ -187,10 +174,31 @@ public sealed partial class InvestigationPage : Page, IPanelView
                 }
             };
             MiddleClick.Attach(
-                this.Results,
-                args => MiddleClick.Container<ListViewItem>(this.Results, args)?.Content as InvestigationRow,
+                this.Results, args => MiddleClick.Container<ListViewItem>(this.Results, args)?.Content as InvestigationRow,
                 row => search.OpenInBackgroundCommand.Execute(row));
         }
+    }
+
+    public string PanelCommandsId => "ItemCommands";
+
+    public IReadOnlyList<ToolCommand> PanelCommands =>
+        (ToolCommand[])[.. this._itemCommands, this.LocalControls.ViewCommand];
+
+    public PanelSearch? PanelSearch { get; }
+
+    public void SetDocked(bool docked)
+    {
+        this._docked = docked;
+        this.Layout.Style = docked ? null : (Style)Application.Current.Resources["ToolPageSurfaceStyle"];
+        this.PageHeader.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
+        this.Count.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
+        this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
+        this.Collection.RowSpacing = docked ? 0 : 8;
+        this.SearchContext.Margin = docked ? new Thickness(12, 0, 12, 0) : new Thickness(0);
+
+        // The panel header renders the filter and item commands; the page keeps its own bar in place.
+        this.LocalControls.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
+        this.ShowSelection(this.ViewModel.Selected);
     }
 
     private void InitializeResults(ColumnLayoutPersistence? layouts)
@@ -261,15 +269,9 @@ public sealed partial class InvestigationPage : Page, IPanelView
                 });
             this._itemCommands.Add(this._inspectCommand);
             this._itemCommands.Add(
-                new ToolCommand("Search scope", Symbol.Filter, ToolCommandPlacement.Overflow)
-                {
-                    Flyout = this.SearchScopeFlyout
-                });
+                new ToolCommand("Search scope", Symbol.Filter, ToolCommandPlacement.Overflow) { Flyout = this.SearchScopeFlyout });
             this._itemCommands.Add(
-                new ToolCommand("Save search", Symbol.Save, ToolCommandPlacement.Overflow)
-                {
-                    Command = search.SaveCommand
-                });
+                new ToolCommand("Save search", Symbol.Save, ToolCommandPlacement.Overflow) { Command = search.SaveCommand });
             return;
         }
 
@@ -281,12 +283,9 @@ public sealed partial class InvestigationPage : Page, IPanelView
         }
         else if (this.Workspaces is { } workspaces)
         {
-            this._itemCommands.Add(
-                new ToolCommand("Save workspace…", Symbol.Save) { Command = workspaces.SaveCommand });
-            this._itemCommands.Add(
-                new ToolCommand("Open workspace", Symbol.OpenFile) { Command = workspaces.OpenCommand });
-            this._itemCommands.Add(
-                new ToolCommand("Remove selected", Symbol.Delete) { Command = workspaces.RemoveCommand });
+            this._itemCommands.Add(new ToolCommand("Save workspace…", Symbol.Save) { Command = workspaces.SaveCommand });
+            this._itemCommands.Add(new ToolCommand("Open workspace", Symbol.OpenFile) { Command = workspaces.OpenCommand });
+            this._itemCommands.Add(new ToolCommand("Remove selected", Symbol.Delete) { Command = workspaces.RemoveCommand });
         }
     }
 
@@ -328,8 +327,8 @@ public sealed partial class InvestigationPage : Page, IPanelView
     {
         var dialog = new AppDialog(
             "Connect to workspace computers?",
-            "Opening this workspace uses your Windows credentials to read registries on: " +
-            string.Join(", ", computers), "Connect and open", defaultButton: ContentDialogButton.Close);
+            "Opening this workspace uses your Windows credentials to read registries on: " + string.Join(", ", computers),
+            "Connect and open", defaultButton: ContentDialogButton.Close);
         return await this._dialogs.ShowAsync(dialog) == ContentDialogResult.Primary;
     }
 
@@ -376,21 +375,6 @@ public sealed partial class InvestigationPage : Page, IPanelView
         ListDensity.SetSpacing(this.Results, spacing);
     }
 
-    public void SetDocked(bool docked)
-    {
-        this._docked = docked;
-        this.Layout.Style = docked ? null : (Style)Application.Current.Resources["ToolPageSurfaceStyle"];
-        this.PageHeader.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
-        this.Count.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
-        this.ResultColumns.ShowColumns = this.LocalControls.ShowColumns;
-        this.Collection.RowSpacing = docked ? 0 : 8;
-        this.SearchContext.Margin = docked ? new Thickness(12, 0, 12, 0) : new Thickness(0);
-
-        // The panel header renders the filter and item commands; the page keeps its own bar in place.
-        this.LocalControls.Visibility = docked ? Visibility.Collapsed : Visibility.Visible;
-        this.ShowSelection(this.ViewModel.Selected);
-    }
-
     internal void DismissNotification()
     {
         this._notification?.Dismiss();
@@ -421,8 +405,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
         this._inspectCommand.Label = visible ? "Hide details" : "Show details";
         if (selected.Count > 1)
         {
-            this.Details.Show(
-                $"{selected.Count:N0} items selected", string.Empty, "Select one item to inspect its details.");
+            this.Details.Show($"{selected.Count:N0} items selected", string.Empty, "Select one item to inspect its details.");
         }
         else if (selected is [var row])
         {
@@ -433,12 +416,10 @@ public sealed partial class InvestigationPage : Page, IPanelView
             else if (row.Source is SavedSearch search)
             {
                 this.Details.Show(
-                    search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty,
-                    (ToolComparison[])
+                    search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty, (ToolComparison[])
                     [
                         new ToolComparison(
-                            string.Empty, search.Options.Text, ToolPresentation.SearchOptionsText(search.Options),
-                            "Query", "Match options")
+                            string.Empty, search.Options.Text, ToolPresentation.SearchOptionsText(search.Options), "Query", "Match options")
                     ]);
             }
             else
@@ -446,8 +427,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
                 var comparison = row.Source switch
                 {
                     RegistrySearchMatch match => new ToolComparison(
-                        string.Empty, row.Before, row.After, match.Value is null ? "Key" : "Value", "Match",
-                        AfterValue: match.Value),
+                        string.Empty, row.Before, row.After, match.Value is null ? "Key" : "Value", "Match", AfterValue: match.Value),
                     RegistryDifference difference => ToolPresentation.Compare(difference) with { Name = string.Empty },
                     _ => new ToolComparison(string.Empty, row.Before, row.After, "Details", "Contents")
                 };
@@ -474,9 +454,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
             return;
         }
 
-        this.Layout.Padding = this._docked
-            ? new Thickness(0)
-            : new Thickness(this.Layout.ActualWidth < 760 ? 16 : 24, 24, 12, 16);
+        this.Layout.Padding = this._docked ? new Thickness(0) : new Thickness(this.Layout.ActualWidth < 760 ? 16 : 24, 24, 12, 16);
         var beside = this._docked || this.IsWide;
         var visible = this.Details.Visibility == Visibility.Visible;
         this.InspectorWidth.Width = visible && beside ? new GridLength(285) : new GridLength(0);
@@ -505,8 +483,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
 
     private async void InspectValue(RegistryValue value)
     {
-        var dialog = new AppDialog(
-            "Value inspector", new ValueInspector(new ValueInspectorViewModel(value)), "Close", string.Empty);
+        var dialog = new AppDialog("Value inspector", new ValueInspector(new ValueInspectorViewModel(value)), "Close", string.Empty);
         await this._dialogs.ShowAsync(dialog);
     }
 }

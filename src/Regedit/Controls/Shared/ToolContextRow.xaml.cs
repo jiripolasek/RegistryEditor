@@ -15,8 +15,6 @@ public sealed partial class ToolContextRow : UserControl
     public static readonly DependencyProperty SecondaryContentProperty = DependencyProperty.Register(
         nameof(SecondaryContent), typeof(UIElement), typeof(ToolContextRow), new PropertyMetadata(null));
 
-    public ToolContextRow() { this.InitializeComponent(); }
-
     public UIElement? PrimaryContent
     {
         get => (UIElement?)this.GetValue(PrimaryContentProperty);
@@ -28,6 +26,8 @@ public sealed partial class ToolContextRow : UserControl
         get => (UIElement?)this.GetValue(SecondaryContentProperty);
         set => this.SetValue(SecondaryContentProperty, value);
     }
+
+    public ToolContextRow() { this.InitializeComponent(); }
 
     public Visibility ContentVisibility(UIElement? content)
     {

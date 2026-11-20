@@ -33,13 +33,11 @@ public sealed partial class SettingsPage : Page
         this.AddShortcutGroup(
             "Tabs and navigation", ("Open the application menu", "Alt+F"), ("Open Settings", "Ctrl+,"),
             ("Open Keyboard shortcuts", "Ctrl+/"), ("Open Help and about", "F1"), ("New tab", "Ctrl+T"),
-            ("Reopen closed tab", "Ctrl+Shift+T"), ("Close tab", "Ctrl+W"),
-            ("Next / previous tab", "Ctrl+Tab / Ctrl+Shift+Tab"), ("Focus the address bar", "Ctrl+L / Alt+D"),
-            ("Back / forward", "Alt+Left / Alt+Right"),
+            ("Reopen closed tab", "Ctrl+Shift+T"), ("Close tab", "Ctrl+W"), ("Next / previous tab", "Ctrl+Tab / Ctrl+Shift+Tab"),
+            ("Focus the address bar", "Ctrl+L / Alt+D"), ("Back / forward", "Alt+Left / Alt+Right"),
             ("Back in the list / select the parent in the tree", "Backspace"), ("Open the parent key", "Alt+Up"),
             ("Switch between HKLM and HKCU", "Ctrl+Shift+H"), ("Sync tree to current key", "Alt+Shift+L"),
-            ("Refresh the current key", "F5"), ("Cycle through visible panes", "F6"),
-            ("Show toolbar key hints", "Alt"));
+            ("Refresh the current key", "F5"), ("Cycle through visible panes", "F6"), ("Show toolbar key hints", "Alt"));
         this.AddShortcutGroup(
             "Search and filtering", ("Search the registry", "Ctrl+F"), ("Open advanced search", "Ctrl+Shift+F"),
             ("Find the next match", "F3"), ("Filter the current key", "Ctrl+Alt+F"),
@@ -49,21 +47,17 @@ public sealed partial class SettingsPage : Page
             ("Undo / redo this tab's last registry edit", "Ctrl+Z / Ctrl+Y"), ("Inspect the selected value", "Ctrl+I"),
             ("Show or close the detail panel", "Alt+P"), ("Open the New menu in the registry list", "Ctrl+N"),
             ("Copy the selected key or value", "Ctrl+C"), ("Paste keys or values", "Ctrl+V"),
-            ("Rename the selected registry item or favorite", "F2"),
-            ("Delete selected registry items or remove favorites", "Delete"));
+            ("Rename the selected registry item or favorite", "F2"), ("Delete selected registry items or remove favorites", "Delete"));
         this.AddShortcutGroup(
-            "Tools and favorites", ("Open / close the right sidebar", "F9"),
-            ("Open / close the bottom panel", "Ctrl+J"),
-            ("Add or remove the selected key or current location in Favorites", "Ctrl+D"),
-            ("Save the current note in Notes", "Ctrl+S"));
+            "Tools and favorites", ("Open / close the right sidebar", "F9"), ("Open / close the bottom panel", "Ctrl+J"),
+            ("Add or remove the selected key or current location in Favorites", "Ctrl+D"), ("Save the current note in Notes", "Ctrl+S"));
         this.AddShortcutGroup(
             "Registry file editor", ("Open the File menu", "Alt+F"), ("Open / save a registry file", "Ctrl+O / Ctrl+S"),
-            ("Save as", "Ctrl+Shift+S"), ("Editor / split / preview", "Alt+1 / Alt+2 / Alt+3"),
-            ("Open editor settings", "Ctrl+,"), ("Close the preview window", "Ctrl+W / Alt+F4"));
+            ("Save as", "Ctrl+Shift+S"), ("Editor / split / preview", "Alt+1 / Alt+2 / Alt+3"), ("Open editor settings", "Ctrl+,"),
+            ("Close the preview window", "Ctrl+W / Alt+F4"));
         this.AddShortcutGroup(
             "Mouse actions", ("Back / forward", "Mouse Back / Forward buttons"),
-            ("Open a location in a background tab", "Middle-click the location"),
-            ("Close a tab", "Middle-click the tab"));
+            ("Open a location in a background tab", "Middle-click the location"), ("Close a tab", "Middle-click the tab"));
     }
 
     private async void FontExpander_Expanded(object? sender, EventArgs args)
@@ -104,8 +98,8 @@ public sealed partial class SettingsPage : Page
 
     private void ToolbarButton_Toggled(object sender, RoutedEventArgs args)
     {
-        if (sender is ToggleSwitch { Tag: ToolbarButtons button } toggle &&
-            toggle.IsOn != this.ToolbarButtonChecked(this.ViewModel.ToolbarButtons, button))
+        if (sender is ToggleSwitch { Tag: ToolbarButtons button } toggle
+            && toggle.IsOn != this.ToolbarButtonChecked(this.ViewModel.ToolbarButtons, button))
         {
             this.ViewModel.ToggleToolbarButtonCommand.Execute(button);
         }
@@ -126,8 +120,7 @@ public sealed partial class SettingsPage : Page
         this.CancelDeferredFocus();
         var request = this._focusRequest;
         this.SettingsScroll.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
-        this.ShortcutsScroll.Visibility
-            = this.ShortcutsBackButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        this.ShortcutsScroll.Visibility = this.ShortcutsBackButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         this.PageHeader.Title = show ? "Keyboard shortcuts" : "Settings";
         var target = focusTarget ?? (show ? (Control)this.ShortcutsBackButton : this.ThemeSelector);
         if (!target.IsLoaded)
@@ -158,10 +151,7 @@ public sealed partial class SettingsPage : Page
                 var scroll = show ? this.ShortcutsScroll : this.SettingsScroll;
                 scroll.UpdateLayout();
                 scroll.ChangeView(
-                    null,
-                    target == this.KeyboardShortcutsButton || target == this.AboutExpander
-                        ? scroll.ScrollableHeight
-                        : 0, null, true);
+                    null, target == this.KeyboardShortcutsButton || target == this.AboutExpander ? scroll.ScrollableHeight : 0, null, true);
                 target.Focus(FocusState.Keyboard);
                 target.StartBringIntoView();
             });

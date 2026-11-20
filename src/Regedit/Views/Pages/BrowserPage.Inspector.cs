@@ -60,8 +60,7 @@ public sealed partial class BrowserPage
         this.ValueInspectorPane.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         this.ValueInspectorHeader.Visibility = beside ? Visibility.Collapsed : Visibility.Visible;
         this.ValueInspectorWidth.Width = visible && beside ? new GridLength(340) : new GridLength(0);
-        this.ValueInspectorHeight.Height
-            = visible && !beside ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        this.ValueInspectorHeight.Height = visible && !beside ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         Grid.SetColumn(this.ValueInspectorPane, beside ? 1 : 0);
         Grid.SetRow(this.ValueInspectorPane, beside ? 0 : 1);
         Grid.SetColumnSpan(this.ValueInspectorPane, beside ? 1 : 2);
@@ -78,8 +77,7 @@ public sealed partial class BrowserPage
 
     private async Task ShowValueInspectorAsync(ValueInspectorViewModel inspector)
     {
-        await this._window.Dialogs.ShowAsync(
-            new AppDialog("Value inspector", new ValueInspector(inspector), "Close", string.Empty));
+        await this._window.Dialogs.ShowAsync(new AppDialog("Value inspector", new ValueInspector(inspector), "Close", string.Empty));
     }
 
     private void ToggleValueInspector_Click(object sender, RoutedEventArgs args)

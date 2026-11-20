@@ -26,15 +26,12 @@ internal static class NotificationSessionTests
 
         var message = new Notification { Title = "Saved" };
         using var session = new NotificationSession();
-        Reject<ArgumentException>(
-            () => session.Show(message with { Title = " " }), "Notification titles must be meaningful");
+        Reject<ArgumentException>(() => session.Show(message with { Title = " " }), "Notification titles must be meaningful");
         Reject<ArgumentException>(
             () => session.Show(message with { Duration = TimeSpan.Zero }), "Zero notification durations are rejected");
+        Reject<ArgumentException>(() => session.Show(message with { Key = " " }), "Empty deduplication keys are rejected");
         Reject<ArgumentException>(
-            () => session.Show(message with { Key = " " }), "Empty deduplication keys are rejected");
-        Reject<ArgumentException>(
-            () => session.Show(message with { Severity = (NotificationSeverity)99 }),
-            "Unknown severities are rejected");
+            () => session.Show(message with { Severity = (NotificationSeverity)99 }), "Unknown severities are rejected");
         foreach (var value in new[] { -1d, 1.1, double.NaN, double.PositiveInfinity })
         {
             Reject<ArgumentOutOfRangeException>(
@@ -45,10 +42,8 @@ internal static class NotificationSessionTests
         Reject<ArgumentException>(
             () => session.Show(message with { Actions = [new NotificationAction(" ", _ => Task.CompletedTask)] }),
             "Actions need accessible labels");
-        Reject<ArgumentNullException>(
-            () => session.Show(message with { Actions = null! }), "Action collections cannot be null");
-        Reject<ArgumentNullException>(
-            () => session.Show(message with { Actions = [null!] }), "Action entries cannot be null");
+        Reject<ArgumentNullException>(() => session.Show(message with { Actions = null! }), "Action collections cannot be null");
+        Reject<ArgumentNullException>(() => session.Show(message with { Actions = [null!] }), "Action entries cannot be null");
         var selectedAction = 0;
         var secondary = new NotificationAction(
             "Open", _ =>
@@ -68,9 +63,7 @@ internal static class NotificationSessionTests
         var choiceActions = new List<NotificationAction> { secondary, preferred };
         var choice = session.Show(message with { Actions = choiceActions });
         choiceActions.Clear();
-        check(
-            session.GetActive().Single().Content.Actions.Count == 2,
-            "Published action collections are insulated from caller mutation");
+        check(session.GetActive().Single().Content.Actions.Count == 2, "Published action collections are insulated from caller mutation");
         check(
             ((IList<NotificationAction>)session.GetActive().Single().Content.Actions).IsReadOnly,
             "Snapshots expose a read-only action collection");
@@ -82,28 +75,22 @@ internal static class NotificationSessionTests
         check(
             session.GetHistory().All(item => item.Content.Actions.Count == 0),
             "History releases every action in a multi-action notification");
-        Reject<ArgumentException>(
-            () => session.Show(message with { DismissLabel = " " }), "Custom dismiss labels must be meaningful");
-        Reject<ArgumentException>(
-            () => session.Show(message with { IconKey = "" }), "Empty custom icon keys are rejected");
-        Reject<ArgumentException>(
-            () => session.Show(message with { IconKey = " " }), "Whitespace custom icon keys are rejected");
-        var iconMessage = message with
-        {
-            Severity = NotificationSeverity.Neutral, DismissLabel = "Got it", IconKey = "save"
-        };
+        Reject<ArgumentException>(() => session.Show(message with { DismissLabel = " " }), "Custom dismiss labels must be meaningful");
+        Reject<ArgumentException>(() => session.Show(message with { IconKey = "" }), "Empty custom icon keys are rejected");
+        Reject<ArgumentException>(() => session.Show(message with { IconKey = " " }), "Whitespace custom icon keys are rejected");
+        var iconMessage = message with { Severity = NotificationSeverity.Neutral, DismissLabel = "Got it", IconKey = "save" };
         var neutral = session.Show(iconMessage);
         var ordinary = session.Show(message);
         check(
             session.GetActive().Single(item => item.Id == neutral.Id).Content.Severity == NotificationSeverity.Neutral,
             "Neutral is an independent notification severity");
         check(
-            session.GetActive().Single(item => item.Id == neutral.Id).Content.DismissLabel == "Got it" &&
-            session.GetActive().Single(item => item.Id == ordinary.Id).Content.DismissLabel is null,
+            session.GetActive().Single(item => item.Id == neutral.Id).Content.DismissLabel == "Got it"
+            && session.GetActive().Single(item => item.Id == ordinary.Id).Content.DismissLabel is null,
             "A custom dismiss label belongs only to its notification instance");
         check(
-            session.GetActive().Single(item => item.Id == neutral.Id).Content.IconKey == "save" &&
-            session.GetActive().Single(item => item.Id == ordinary.Id).Content.IconKey is null,
+            session.GetActive().Single(item => item.Id == neutral.Id).Content.IconKey == "save"
+            && session.GetActive().Single(item => item.Id == ordinary.Id).Content.IconKey is null,
             "Custom icon keys belong only to their notification instance");
         neutral.Update(iconMessage with { IconKey = "edit" });
         check(
@@ -118,8 +105,7 @@ internal static class NotificationSessionTests
         ordinary.Dismiss();
         check(
             session.GetHistory().Single(item => item.Id == ordinary.Id).Content is
-                { IconKey: "save", Severity: NotificationSeverity.Error },
-            "History preserves custom icons independently of severity");
+                { IconKey: "save", Severity: NotificationSeverity.Error }, "History preserves custom icons independently of severity");
         check(
             (int)NotificationSeverity.Information == 0 && (int)NotificationSeverity.Error == 3,
             "Adding neutral preserves existing severity values");
@@ -133,11 +119,9 @@ internal static class NotificationSessionTests
         var next = session.Show(message with { Key = "save" });
         check(next.Id != first.Id, "A dismissed key can be reused with a fresh identity");
         first.Dismiss();
-        check(
-            session.GetActive().Single().Id == next.Id, "An old handle cannot dismiss a replacement with the same key");
+        check(session.GetActive().Single().Id == next.Id, "An old handle cannot dismiss a replacement with the same key");
         var other = session.Show(message with { Key = "other" });
-        Reject<ArgumentException>(
-            () => other.Update(message with { Key = "save" }), "Updates cannot steal another active key");
+        Reject<ArgumentException>(() => other.Update(message with { Key = "save" }), "Updates cannot steal another active key");
         session.DismissAll();
 
         using var timed = new NotificationSession(TimeSpan.FromSeconds(5));
@@ -174,13 +158,10 @@ internal static class NotificationSessionTests
             bounded.GetActive().Length == 50 && bounded.GetHistory().Length == 50,
             "A notification flood has bounded active and history storage");
         check(bounded.OmittedCount == 20, "Truncated history is counted for the presentation layer");
-        check(
-            bounded.GetHistory().All(item => item.Content.Actions.Count == 0),
-            "History releases application action callbacks");
+        check(bounded.GetHistory().All(item => item.Content.Actions.Count == 0), "History releases application action callbacks");
         bounded.DismissAll();
         check(
-            bounded.GetActive().Length == 0 && bounded.GetHistory().Length == 50,
-            "Dismiss all archives messages within the history bound");
+            bounded.GetActive().Length == 0 && bounded.GetHistory().Length == 50, "Dismiss all archives messages within the history bound");
 
         using var parallel = new NotificationSession();
         await Task.Run(() => Parallel.For(0, 200, i => parallel.Show(message with { Key = (i % 10).ToString() })));
@@ -208,9 +189,7 @@ internal static class NotificationSessionTests
         var invocation = actions.InvokeActionAsync(actionable.Id);
         await actions.InvokeActionAsync(actionable.Id);
         actions.Advance(TimeSpan.FromDays(1), [actionable.Id]);
-        check(
-            calls == 1 && actions.GetActive().Single().IsActionRunning,
-            "An awaited action runs once and prevents expiry");
+        check(calls == 1 && actions.GetActive().Single().IsActionRunning, "An awaited action runs once and prevents expiry");
         release.SetResult();
         await invocation;
         check(actions.GetActive().Length == 0, "A successful action dismisses its original message");
@@ -221,9 +200,7 @@ internal static class NotificationSessionTests
         changing.Update(message with { Title = "Newer state" });
         release.SetResult();
         await invocation;
-        check(
-            actions.GetActive().Single().Content.Title == "Newer state",
-            "Action completion cannot dismiss a newer revision");
+        check(actions.GetActive().Single().Content.Title == "Newer state", "Action completion cannot dismiss a newer revision");
         actions.DismissAll();
 
         var attempts = 0;
@@ -234,8 +211,7 @@ internal static class NotificationSessionTests
                 Actions =
                 [
                     new NotificationAction(
-                        "Retry",
-                        _ => ++attempts == 1 ? Task.FromException(new IOException("Unavailable")) : Task.CompletedTask)
+                        "Retry", _ => ++attempts == 1 ? Task.FromException(new IOException("Unavailable")) : Task.CompletedTask)
                 ]
             });
         try
@@ -250,8 +226,8 @@ internal static class NotificationSessionTests
 
         var failed = actions.GetActive().Single();
         check(
-            failed.Content.Severity == NotificationSeverity.Error && failed.Content.Duration is null &&
-            !failed.IsActionRunning, "A failed action remains visible and can be retried");
+            failed.Content.Severity == NotificationSeverity.Error && failed.Content.Duration is null && !failed.IsActionRunning,
+            "A failed action remains visible and can be retried");
         check(failed.Content.IconKey == "save", "Action failure changes severity without removing its custom icon");
         await actions.InvokeActionAsync(failing.Id);
         check(actions.GetActive().Length == 0 && attempts == 2, "Retry succeeds after an action failure");
@@ -305,10 +281,7 @@ internal static class NotificationSessionTests
 
         var closing = new NotificationSession();
         var canceled = closing.Show(
-            message with
-            {
-                Actions = [new NotificationAction("Wait", token => Task.Delay(Timeout.InfiniteTimeSpan, token))]
-            });
+            message with { Actions = [new NotificationAction("Wait", token => Task.Delay(Timeout.InfiniteTimeSpan, token))] });
         invocation = closing.InvokeActionAsync(canceled.Id);
         closing.Dispose();
         try
@@ -324,9 +297,7 @@ internal static class NotificationSessionTests
         canceled.Update(message);
         canceled.Dismiss();
         closing.Dispose();
-        check(
-            closing.GetActive().Length == 0 && closing.GetHistory().Length == 0,
-            "Shutdown releases messages and tolerates late handles");
+        check(closing.GetActive().Length == 0 && closing.GetHistory().Length == 0, "Shutdown releases messages and tolerates late handles");
         Reject<ObjectDisposedException>(() => closing.Show(message), "Closed sessions reject new work explicitly");
     }
 }

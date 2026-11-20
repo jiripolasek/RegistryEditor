@@ -15,8 +15,7 @@ public sealed class WatchSession : ObservableObject
 {
     private readonly object _gate = new();
 
-    private readonly TaskCompletionSource<bool>
-        _baselineReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _baselineReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly BulkObservableCollection<WatchObservation> _observations = [];
     private CancellationTokenSource? _cancellation = new();
@@ -32,16 +31,16 @@ public sealed class WatchSession : ObservableObject
 
     public Exception? Error { get => this._error; private set => this.SetProperty(ref this._error, value); }
 
-    public string Target => Environment.MachineName + " · " + this.Definition.Location.Address +
-                            (this.Definition.Location.View == Microsoft.Win32.RegistryView.Registry32
-                                ? " · 32-bit"
-                                : " · 64-bit") + (this.Definition.ValueName is { } name
+    public string Target => Environment.MachineName
+                            + " · "
+                            + this.Definition.Location.Address
+                            + (this.Definition.Location.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit")
+                            + (this.Definition.ValueName is { } name
                                 ? " · Value: " + (name.Length == 0 ? "(Default)" : name)
                                 : " · Branch");
 
-    public string Title => this.Definition.Location.Name + (this.Definition.ValueName is { } name
-        ? " · " + (name.Length == 0 ? "(Default)" : name)
-        : string.Empty);
+    public string Title => this.Definition.Location.Name
+                           + (this.Definition.ValueName is { } name ? " · " + (name.Length == 0 ? "(Default)" : name) : string.Empty);
 
     public string Status
     {
@@ -58,8 +57,13 @@ public sealed class WatchSession : ObservableObject
 
     public string DisplayTitle => this.ToString();
 
-    public string CaptureLabel => (this.IsRunning ? "Active" : "Stopped") + " · " + this.Started.ToString("d") + " " +
-                                  this.Started.ToString("HH:mm:ss.fff") + " · " + this.Title;
+    public string CaptureLabel => (this.IsRunning ? "Active" : "Stopped")
+                                  + " · "
+                                  + this.Started.ToString("d")
+                                  + " "
+                                  + this.Started.ToString("HH:mm:ss.fff")
+                                  + " · "
+                                  + this.Title;
 
     public bool IsRunning
     {
@@ -77,16 +81,6 @@ public sealed class WatchSession : ObservableObject
 
     internal Task<bool> BaselineReady => this._baselineReady.Task;
 
-    public override string ToString()
-    {
-        return this.Definition.Location.Address +
-               (this.Definition.Location.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit") +
-               (this.Definition.ValueName is { } name
-                   ? " · " + (name.Length == 0 ? "(Default)" : name)
-                   : string.Empty) + " · " + this.Started.ToString("d") + " " + this.Started.ToString("HH:mm:ss.fff") +
-               " · " + this.Status;
-    }
-
     public WatchSession(RegistryService registry, WatchDefinition definition, Func<Action, Task> dispatch)
     {
         RegistryWorkspace.ValidateLocation(definition.Location);
@@ -102,6 +96,19 @@ public sealed class WatchSession : ObservableObject
 
         this.Definition = definition;
         this.Completion = this.RunAsync(registry, dispatch, this._cancellation.Token);
+    }
+
+    public override string ToString()
+    {
+        return this.Definition.Location.Address
+               + (this.Definition.Location.View == Microsoft.Win32.RegistryView.Registry32 ? " · 32-bit" : " · 64-bit")
+               + (this.Definition.ValueName is { } name ? " · " + (name.Length == 0 ? "(Default)" : name) : string.Empty)
+               + " · "
+               + this.Started.ToString("d")
+               + " "
+               + this.Started.ToString("HH:mm:ss.fff")
+               + " · "
+               + this.Status;
     }
 
     public void Stop()
@@ -130,8 +137,7 @@ public sealed class WatchSession : ObservableObject
                             "The 10,000-observation limit was reached. Earlier observations are retained; restart to capture a fresh session.");
                     }
 
-                    this._observations.AddRange(
-                        changes.Select(change => new WatchObservation(change, comparison.After.Completed)));
+                    this._observations.AddRange(changes.Select(change => new WatchObservation(change, comparison.After.Completed)));
                     var count = this.Observations.Count;
                     this.Status = count == 1 ? "Watching · 1 observation" : $"Watching · {count:N0} observations";
                 }), () => ready.TrySetResult(), token, this.Definition.ValueName);

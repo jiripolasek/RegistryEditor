@@ -15,9 +15,9 @@ public sealed partial class ToolView
 {
     private void UpdateCount()
     {
-        this.Count.Text = $"{this.Rows.Count:N0} {(this.Rows.Count == 1 ? "item" : "items")}" +
-                          (this.Selected.Length > 0 ? $" · {this.Selected.Length:N0} selected" : string.Empty) +
-                          (this.Tool == ToolKind.Journal ? " · Retained until removed" : string.Empty);
+        this.Count.Text = $"{this.Rows.Count:N0} {(this.Rows.Count == 1 ? "item" : "items")}"
+                          + (this.Selected.Length > 0 ? $" · {this.Selected.Length:N0} selected" : string.Empty)
+                          + (this.Tool == ToolKind.Journal ? " · Retained until removed" : string.Empty);
     }
 
     private void UpdateDetails()
@@ -26,8 +26,9 @@ public sealed partial class ToolView
         var selected = this.Selected;
         this.SyncResultSelection();
         var detailTool = this.Tool is ToolKind.Journal or ToolKind.Watches;
-        var wide = !this._compact && !this._docked &&
-                   this.Layout.ActualWidth - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
+        var wide = !this._compact
+                   && !this._docked
+                   && this.Layout.ActualWidth - this.Layout.Padding.Left - this.Layout.Padding.Right >= 1000;
         var visible = detailTool && selected.Length > 0 && (wide ? !this._detailsCollapsed : this._detailsExpanded);
         this.Details.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (this.Tool == ToolKind.Notes)
@@ -54,10 +55,8 @@ public sealed partial class ToolView
                 this.Details.Show(
                     $"{selected.Length:N0} items selected", string.Empty, this.Tool switch
                     {
-                        ToolKind.Journal =>
-                            "Copy a script for the selected changes. Select one edit to inspect or revert it.",
-                        ToolKind.Watches =>
-                            "Copy a script for the selected observations. Select one observation to inspect it.",
+                        ToolKind.Journal => "Copy a script for the selected changes. Select one edit to inspect or revert it.",
+                        ToolKind.Watches => "Copy a script for the selected observations. Select one observation to inspect it.",
                         _ => "Use the collection actions to organize these items."
                     });
             }
@@ -71,13 +70,11 @@ public sealed partial class ToolView
                         var conflict = this.JournalHistory.BlockingEdit(entry);
                         var views = entry.Before.Select(state => state.Scope.Location)
                             .Concat(entry.ActivityLocation is { } location ? (RegistryLocation[])[location] : [])
-                            .Select(location => location.View == RegistryView.Registry32 ? "32-bit" : "64-bit")
-                            .Distinct();
+                            .Select(location => location.View == RegistryView.Registry32 ? "32-bit" : "64-bit").Distinct();
                         this.Details.Show(
                             entry.Operation, entry.Path, $"{row.Status}\n{string.Join(", ", views)}",
                             entry.Activity is not null
-                                ? (ToolComparison[])
-                                [new ToolComparison("Activity", entry.Activity, string.Empty, "Details")]
+                                ? (ToolComparison[])[new ToolComparison("Activity", entry.Activity, string.Empty, "Details")]
                                 : changes.Take(30).Select(change =>
                                     changes.Count == 1
                                         ? ToolPresentation.Compare(change) with { Name = string.Empty }
@@ -90,8 +87,7 @@ public sealed partial class ToolView
                         this.Details.Show(
                             observation.Change.Change, observation.Change.Location.Address,
                             observation.Change.Location.View == RegistryView.Registry32 ? "32-bit" : "64-bit",
-                            (ToolComparison[])
-                            [ToolPresentation.Compare(observation.Change) with { Name = string.Empty }],
+                            (ToolComparison[])[ToolPresentation.Compare(observation.Change) with { Name = string.Empty }],
                             timestamp: observation.Time);
                         break;
                 }
@@ -122,9 +118,7 @@ public sealed partial class ToolView
         var width = this.Layout.ActualWidth;
         var stacked = this._compact || this._docked || width < 900;
         this.CaptureStatus.MaxWidth = this.Tool == ToolKind.Watches ? (stacked ? 220 : 360) : double.PositiveInfinity;
-        this.Layout.Padding = this._compact || this._docked
-            ? new Thickness(0)
-            : new Thickness(stacked ? 16 : 24, 24, 12, 16);
+        this.Layout.Padding = this._compact || this._docked ? new Thickness(0) : new Thickness(stacked ? 16 : 24, 24, 12, 16);
         this.PageHeader.Margin = new Thickness(0, 0, 0, 16);
         this.LocalControls.Margin = new Thickness(0, 0, 0, 12);
 
@@ -133,14 +127,13 @@ public sealed partial class ToolView
         this.Collection.Visibility = compactNotes ? Visibility.Collapsed : Visibility.Visible;
         var inspector = this.Tool == ToolKind.Notes ? (FrameworkElement)this.NotePanel : this.Details;
         var visible = inspector.Visibility == Visibility.Visible;
-        var beside = this._docked || !this._compact && width - this.Layout.Padding.Left - this.Layout.Padding.Right >=
-            (this.Tool == ToolKind.Notes ? 760 : 1000);
+        var beside = this._docked
+                     || !this._compact
+                     && width - this.Layout.Padding.Left - this.Layout.Padding.Right >= (this.Tool == ToolKind.Notes ? 760 : 1000);
         this.InspectorWidth.Width = visible && (beside || compactNotes)
             ? this.Tool == ToolKind.Notes ? new GridLength(1, GridUnitType.Star) : new GridLength(285)
             : new GridLength(0);
-        this.InspectorHeight.Height = visible && !beside && !compactNotes
-            ? new GridLength(2, GridUnitType.Star)
-            : new GridLength(0);
+        this.InspectorHeight.Height = visible && !beside && !compactNotes ? new GridLength(2, GridUnitType.Star) : new GridLength(0);
         Grid.SetColumn(inspector, beside || compactNotes ? 1 : 0);
         Grid.SetRow(inspector, beside || compactNotes ? 0 : 1);
         Grid.SetColumnSpan(inspector, beside || compactNotes ? 1 : 2);

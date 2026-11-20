@@ -71,8 +71,8 @@ public sealed partial class ListColumn : DependencyObject
     public ColumnSpec ToSpec()
     {
         return new ColumnSpec(
-            this.Id, this.DefaultWidth, this.MinWidth, this.MaxWidth, this.FillWeight, this.CanHide, this.CanResize,
-            this.CanReorder, this.DefaultVisible);
+            this.Id, this.DefaultWidth, this.MinWidth, this.MaxWidth, this.FillWeight, this.CanHide, this.CanResize, this.CanReorder,
+            this.DefaultVisible);
     }
 
     internal FrameworkElement CreateCell()
@@ -86,16 +86,13 @@ public sealed partial class ListColumn : DependencyObject
         {
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment
-                = this.HeaderAlignment == HorizontalAlignment.Right
-                    ? HorizontalAlignment.Right
-                    : HorizontalAlignment.Stretch,
+                = this.HeaderAlignment == HorizontalAlignment.Right ? HorizontalAlignment.Right : HorizontalAlignment.Stretch,
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextWrapping = TextWrapping.NoWrap,
             IsTextScaleFactorEnabled = true
         };
         var format = this.CellText;
-        text.DataContextChanged += (sender, args) =>
-            ((TextBlock)sender).Text = format?.Invoke(args.NewValue) ?? string.Empty;
+        text.DataContextChanged += (sender, args) => ((TextBlock)sender).Text = format?.Invoke(args.NewValue) ?? string.Empty;
         return text;
     }
 }

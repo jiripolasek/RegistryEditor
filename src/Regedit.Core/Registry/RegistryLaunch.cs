@@ -42,8 +42,7 @@ public static partial class RegistryLaunch
             }
             else if (address is not null)
             {
-                throw new ArgumentException(
-                    "Specify one registry path or regedit2:// link. Put paths containing spaces in double quotes.");
+                throw new ArgumentException("Specify one registry path or regedit2:// link. Put paths containing spaces in double quotes.");
             }
             else
             {
@@ -96,9 +95,9 @@ public static partial class RegistryLaunch
         // Decode each key after splitting so escaped slashes remain part of its name.
         var parts = path.Replace('\\', '/').TrimEnd('/').Split('/');
         var root = DecodeSegment(parts[0]);
-        if (!root.Equals("Computer", StringComparison.OrdinalIgnoreCase) && !RegistryLocation.Roots.Any(hive =>
-                hive.Name.Equals(root, StringComparison.OrdinalIgnoreCase) ||
-                hive.Alias.Equals(root, StringComparison.OrdinalIgnoreCase)))
+        if (!root.Equals("Computer", StringComparison.OrdinalIgnoreCase)
+            && !RegistryLocation.Roots.Any(hive =>
+                hive.Name.Equals(root, StringComparison.OrdinalIgnoreCase) || hive.Alias.Equals(root, StringComparison.OrdinalIgnoreCase)))
         {
             throw new ArgumentException("Registry links must start with a local registry hive or Computer.");
         }
@@ -126,11 +125,9 @@ public static partial class RegistryLaunch
                 continue;
             }
 
-            if (index + 2 >= segment.Length || !Uri.IsHexDigit(segment[index + 1]) ||
-                !Uri.IsHexDigit(segment[index + 2]))
+            if (index + 2 >= segment.Length || !Uri.IsHexDigit(segment[index + 1]) || !Uri.IsHexDigit(segment[index + 2]))
             {
-                throw new ArgumentException(
-                    "The registry link contains an invalid percent escape. Encode a literal % as %25.");
+                throw new ArgumentException("The registry link contains an invalid percent escape. Encode a literal % as %25.");
             }
 
             index += 2;

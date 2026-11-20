@@ -44,10 +44,10 @@ public partial class SecondaryWindow : Window
         var height = Math.Min((int)(initialSize.Height * scale), work.Height);
         var position = owner.Position;
         var size = owner.Size;
-        this.AppWindow.MoveAndResize(new RectInt32(
-            Math.Clamp(position.X + (size.Width - width) / 2, work.X, work.X + work.Width - width),
-            Math.Clamp(position.Y + (size.Height - height) / 2, work.Y, work.Y + work.Height - height),
-            width, height));
+        this.AppWindow.MoveAndResize(
+            new RectInt32(
+                Math.Clamp(position.X + (size.Width - width) / 2, work.X, work.X + work.Width - width),
+                Math.Clamp(position.Y + (size.Height - height) / 2, work.Y, work.Y + work.Height - height), width, height));
         if (this.AppWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.PreferredMinimumWidth = Math.Min((int)(minimumSize.Width * scale), work.Width);

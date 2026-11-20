@@ -39,8 +39,9 @@ public static class RegistryExport
                         {
                             snapshot = service.Read(location);
                         }
-                        catch (Exception ex) when (skipInaccessible && ex is UnauthorizedAccessException
-                                                       or SecurityException or IOException or Win32Exception)
+                        catch (Exception ex) when (skipInaccessible
+                                                   && ex is UnauthorizedAccessException or SecurityException or IOException
+                                                       or Win32Exception)
                         {
                             skipped++;
                             await writer.WriteLineAsync($"; Skipped inaccessible key: {location.Path}");
@@ -99,18 +100,15 @@ public static class RegistryExport
         {
             var text = value.EditText(false);
             // Quoted strings must preserve the original UTF-16 bytes and fit on one line.
-            if (text.IndexOfAny(['\0', '\r', '\n']) < 0 &&
-                value.Data.AsSpan().SequenceEqual(RegistryValue.ParseData(value.Type, text)))
+            if (text.IndexOfAny(['\0', '\r', '\n']) < 0 && value.Data.AsSpan().SequenceEqual(RegistryValue.ParseData(value.Type, text)))
             {
-                await writer.WriteLineAsync(
-                    $"{name}=\"{text.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"".AsMemory(), token);
+                await writer.WriteLineAsync($"{name}=\"{text.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"".AsMemory(), token);
                 return;
             }
         }
         else if (value.Type == RegistryValueType.DWord && value.Data.Length == 4)
         {
-            await writer.WriteLineAsync(
-                $"{name}=dword:{BinaryPrimitives.ReadUInt32LittleEndian(value.Data):x8}".AsMemory(), token);
+            await writer.WriteLineAsync($"{name}=dword:{BinaryPrimitives.ReadUInt32LittleEndian(value.Data):x8}".AsMemory(), token);
             return;
         }
 

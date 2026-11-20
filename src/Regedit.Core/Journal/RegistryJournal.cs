@@ -15,11 +15,19 @@ namespace JPSoftworks.Regedit.Core.Journal;
 
 public sealed class RegistryJournal
 {
+    private const long MaximumFileBytes = 256 * 1024 * 1024;
+
+    private static readonly IEqualityComparer<JournalSecurity> SecurityComparer = EqualityComparer<JournalSecurity>.Create(
+        static (left, right) => left is not null
+                                && right is not null
+                                && left.Path.Equals(right.Path, StringComparison.OrdinalIgnoreCase)
+                                && left.Descriptor == right.Descriptor,
+        static item => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(item.Path), item.Descriptor));
+
     private readonly string _folder;
     private readonly object _gate = new();
     private readonly AsyncLocal<List<JournalEntry>?> _trackedEdits = new();
     private readonly RegistryService _registry = new();
-    private const long MaximumFileBytes = 256 * 1024 * 1024;
     private readonly long _captureLimit;
     private readonly long _fileLimit;
 
@@ -30,11 +38,7 @@ public sealed class RegistryJournal
     {
     }
 
-    internal RegistryJournal(
-        string folder,
-        bool administratorOnly,
-        long captureLimit,
-        long fileLimit = MaximumFileBytes)
+    internal RegistryJournal(string folder, bool administratorOnly, long captureLimit, long fileLimit = MaximumFileBytes)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(captureLimit);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(fileLimit);
@@ -54,8 +58,7 @@ public sealed class RegistryJournal
 
     private static IOException StorageDenied(UnauthorizedAccessException failure)
     {
-        return new IOException(
-            "The journal storage cannot be accessed. Check the journal folder's permissions and try again.", failure);
+        return new IOException("The journal storage cannot be accessed. Check the journal folder's permissions and try again.", failure);
     }
 
     private AdministratorJournalDirectory? PrepareStorage()
@@ -79,8 +82,8 @@ public sealed class RegistryJournal
     private static IOException WriterBusy(Exception? inner = null)
     {
         return new IOException(
-            "Another Registry Editor operation is using the journal. Wait for it to finish, then try again. " +
-            "If it remains busy, close the other Registry Editor windows and retry.", inner);
+            "Another Registry Editor operation is using the journal. Wait for it to finish, then try again. "
+            + "If it remains busy, close the other Registry Editor windows and retry.", inner);
     }
 
     private void EnterGate(long started, CancellationToken cancellationToken)
@@ -106,8 +109,7 @@ public sealed class RegistryJournal
             throw WriterBusy(contention);
         }
 
-        cancellationToken.WaitHandle.WaitOne(
-            remaining < TimeSpan.FromMilliseconds(25) ? remaining : TimeSpan.FromMilliseconds(25));
+        cancellationToken.WaitHandle.WaitOne(remaining < TimeSpan.FromMilliseconds(25) ? remaining : TimeSpan.FromMilliseconds(25));
     }
 
     private FileStream OpenWriterLock(long started, CancellationToken cancellationToken)
@@ -148,8 +150,8 @@ public sealed class RegistryJournal
             using var storage = this.PrepareStorage();
             using var lease = this.OpenWriterLock(started, cancellationToken);
             var entry = new JournalEntry(
-                Guid.NewGuid(), DateTimeOffset.UtcNow, operation, [], null, ActivityLocation: location,
-                Activity: details, Kind: JournalOperation.Activity);
+                Guid.NewGuid(), DateTimeOffset.UtcNow, operation, [], null, ActivityLocation: location, Activity: details,
+                Kind: JournalOperation.Activity);
             cancellationToken.ThrowIfCancellationRequested();
             this.Save(entry);
             try
@@ -211,8 +213,7 @@ public sealed class RegistryJournal
                     try
                     {
                         using var stream = new FileStream(
-                            file, FileMode.Open, FileAccess.Read,
-                            reader is null ? FileShare.Read : FileShare.Read | FileShare.Delete);
+                            file, FileMode.Open, FileAccess.Read, reader is null ? FileShare.Read : FileShare.Read | FileShare.Delete);
                         if (reader is not null && this.AdministratorOnly)
                         {
                             AdministratorJournalDirectory.ValidateFile(stream);
@@ -226,8 +227,8 @@ public sealed class RegistryJournal
                         var entry = reader?.Find(file, stream);
                         if (entry is null)
                         {
-                            entry = JsonSerializer.Deserialize(stream, JournalJsonContext.Default.JournalEntry) ??
-                                    throw new InvalidDataException("A journal entry is empty.");
+                            entry = JsonSerializer.Deserialize(stream, JournalJsonContext.Default.JournalEntry)
+                                    ?? throw new InvalidDataException("A journal entry is empty.");
                             Validate(entry);
                         }
 
@@ -239,9 +240,9 @@ public sealed class RegistryJournal
                         reader?.Keep(file, entry);
                         entries.Add(entry);
                     }
-                    catch (Exception ex) when (damaged is not null && ex is JsonException or InvalidDataException
-                                                   or ArgumentException or FormatException or IOException
-                                                   or UnauthorizedAccessException or InvalidOperationException)
+                    catch (Exception ex) when (damaged is not null
+                                               && ex is JsonException or InvalidDataException or ArgumentException or FormatException
+                                                   or IOException or UnauthorizedAccessException or InvalidOperationException)
                     {
                         damaged.Add(Path.GetFileName(file));
                     }
@@ -277,14 +278,12 @@ public sealed class RegistryJournal
 
                 try
                 {
-                    if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(file), "N", out var id) ||
-                        id == Guid.Empty)
+                    if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(file), "N", out var id) || id == Guid.Empty)
                     {
                         throw new InvalidDataException("Invalid journal archive marker name.");
                     }
 
-                    using var stream = new FileStream(
-                        file, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                    using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
                     if (this.AdministratorOnly)
                     {
                         AdministratorJournalDirectory.ValidateFile(stream);
@@ -363,8 +362,8 @@ public sealed class RegistryJournal
         CancellationToken cancellationToken = default)
     {
         this.Execute(
-            reverts.HasValue ? JournalOperation.Revert : JournalOperations.FromLegacy(operation), operation, scopes,
-            action, reverts, cancellationToken);
+            reverts.HasValue ? JournalOperation.Revert : JournalOperations.FromLegacy(operation), operation, scopes, action, reverts,
+            cancellationToken);
     }
 
     private void Execute(
@@ -384,8 +383,7 @@ public sealed class RegistryJournal
             // The file lock also serializes edits from another editor process using this journal.
             using var lease = this.OpenWriterLock(started, cancellationToken);
             this.ExecuteLocked(
-                kind, operation, scopes, action, reverts, cancellationToken: cancellationToken,
-                minimumAfterBytes: minimumAfterBytes);
+                kind, operation, scopes, action, reverts, cancellationToken: cancellationToken, minimumAfterBytes: minimumAfterBytes);
         }
         finally
         {
@@ -427,9 +425,8 @@ public sealed class RegistryJournal
             return scope with { ValueNames = unique.ToArray() };
         }).ToArray();
         var entry = new JournalEntry(
-            Guid.NewGuid(), DateTimeOffset.UtcNow, operation,
-            before ?? scopes.Select(scope => this.Capture(scope, budget)).ToArray(), null, Reverts: reverts,
-            Kind: kind);
+            Guid.NewGuid(), DateTimeOffset.UtcNow, operation, before ?? scopes.Select(scope => this.Capture(scope, budget)).ToArray(), null,
+            Reverts: reverts, Kind: kind);
         budget.Check(minimumAfterBytes);
         // Once the pending entry is saved, complete the mutation and its final record despite cancellation.
         cancellationToken.ThrowIfCancellationRequested();
@@ -446,18 +443,15 @@ public sealed class RegistryJournal
 
         try
         {
-            entry = entry with
-            {
-                After = scopes.Select(scope => this.Capture(scope, budget)).ToArray(), Error = failure?.Message
-            };
+            entry = entry with { After = scopes.Select(scope => this.Capture(scope, budget)).ToArray(), Error = failure?.Message };
             this.Save(entry);
         }
         catch (Exception ex)
         {
             throw new IOException(
-                "The operation may have changed the registry, but its final journal state could not be saved. The before-state is retained. " +
-                (failure is null ? string.Empty : "The mutation failed: " + failure.Message + " ") + ex.Message,
-                failure is null ? ex : new AggregateException(failure, ex));
+                "The operation may have changed the registry, but its final journal state could not be saved. The before-state is retained. "
+                + (failure is null ? string.Empty : "The mutation failed: " + failure.Message + " ")
+                + ex.Message, failure is null ? ex : new AggregateException(failure, ex));
         }
 
         if (failure is not null)
@@ -501,11 +495,9 @@ public sealed class RegistryJournal
             var entries = this.ReadEntries();
             var byId = entries.ToDictionary(entry => entry.Id);
             var selected = ids.Reverse()
-                .Select(id =>
-                    byId.TryGetValue(id, out var entry)
-                        ? entry
-                        : throw new InvalidOperationException(
-                            "This edit is missing from the journal. Inspect the history before continuing."))
+                .Select(id => byId.TryGetValue(id, out var entry)
+                    ? entry
+                    : throw new InvalidOperationException("This edit is missing from the journal. Inspect the history before continuing."))
                 .Select(entry => (Entry: entry, UndoRename: RenameDirection(entry, byId))).ToArray();
             var reverted = JournalEntry.GetRevertedIds(entries);
             var ignored = reverted.Concat(ids).ToHashSet();
@@ -546,14 +538,12 @@ public sealed class RegistryJournal
                 }
 
                 this.ExecuteLocked(
-                    JournalOperation.Revert, "Revert: " + entry.Operation,
-                    entry.Before.Select(state => state.Scope).ToArray(), () =>
+                    JournalOperation.Revert, "Revert: " + entry.Operation, entry.Before.Select(state => state.Scope).ToArray(), () =>
                     {
                         // External writers can change the key while the pending journal record is flushed.
                         foreach (var state in after)
                         {
-                            CheckCurrent(
-                                state, this.Capture(state.Scope, new JournalCaptureBudget(this._captureLimit)));
+                            CheckCurrent(state, this.Capture(state.Scope, new JournalCaptureBudget(this._captureLimit)));
                         }
 
                         if (undoRename is { } reverse)
@@ -568,8 +558,7 @@ public sealed class RegistryJournal
                         {
                             this.Restore(pair.First, pair.Second);
                         }
-                    }, entry.Id, before, cancellationToken, budget,
-                    JournalCaptureBudget.MinimumStateBytes(entry.Before));
+                    }, entry.Id, before, cancellationToken, budget, JournalCaptureBudget.MinimumStateBytes(entry.Before));
             }
         }
         finally
@@ -587,8 +576,7 @@ public sealed class RegistryJournal
         {
             if (!visited.Add(original.Id) || !entries.TryGetValue(parent, out var previous))
             {
-                throw new InvalidDataException(
-                    "This revert's original edit is missing or cyclic. Inspect the Journal before continuing.");
+                throw new InvalidDataException("This revert's original edit is missing or cyclic. Inspect the Journal before continuing.");
             }
 
             reverse = !reverse;
@@ -600,9 +588,9 @@ public sealed class RegistryJournal
             return null;
         }
 
-        if (entry.Before.Length != 2 || entry.Before.Any(state => state.Scope.ValueNames is not null) || !entry.Before
-                .Select(state => state.Scope.Location)
-                .SequenceEqual(original.Before.Select(state => state.Scope.Location)))
+        if (entry.Before.Length != 2
+            || entry.Before.Any(state => state.Scope.ValueNames is not null)
+            || !entry.Before.Select(state => state.Scope.Location).SequenceEqual(original.Before.Select(state => state.Scope.Location)))
         {
             throw new InvalidDataException("This revert does not cover its original key rename. Nothing was changed.");
         }
@@ -612,41 +600,43 @@ public sealed class RegistryJournal
 
     private static void CheckCurrent(JournalState expected, JournalState current)
     {
-        if (!Same(expected, current) || expected.Scope.KeyPaths is { } paths &&
-            !paths.SequenceEqual(current.Scope.KeyPaths!, StringComparer.OrdinalIgnoreCase))
+        if (!Same(expected, current)
+            || expected.Scope.KeyPaths is { } paths && !paths.SequenceEqual(current.Scope.KeyPaths!, StringComparer.OrdinalIgnoreCase))
         {
-            throw new IOException(
-                "Conflict: the registry no longer matches this edit's after-state. Nothing was reverted.");
+            throw new IOException("Conflict: the registry no longer matches this edit's after-state. Nothing was reverted.");
         }
     }
 
-    public static JournalConflict? FindLaterConflict(
-        IReadOnlyList<JournalEntry> entries,
-        JournalEntry entry,
-        IReadOnlySet<Guid> reverted)
+    public static JournalConflict? FindLaterConflict(IReadOnlyList<JournalEntry> entries, JournalEntry entry, IReadOnlySet<Guid> reverted)
     {
         var protectedStates = entry.Before.Concat(entry.After ?? []).ToArray();
         foreach (var later in entries.SkipWhile(item => item.Id != entry.Id).Skip(1))
         {
-            if (reverted.Contains(later.Id) || later.Reverts is { } original &&
-                later.OperationKind == JournalOperation.Revert && later.After is not null && later.Error is null &&
-                reverted.Contains(original))
+            if (reverted.Contains(later.Id)
+                || later.Reverts is { } original
+                && later.OperationKind == JournalOperation.Revert
+                && later.After is not null
+                && later.Error is null
+                && reverted.Contains(original))
             {
                 continue;
             }
 
-            var activity = later.ActivityLocation is { } location && protectedStates.Any(state =>
-                RegistryKeyIdentity.SameComputer(location.Machine, state.Scope.Location.Machine));
+            var activity = later.ActivityLocation is { } location
+                           && protectedStates.Any(state =>
+                               RegistryKeyIdentity.SameComputer(location.Machine, state.Scope.Location.Machine));
             var touchesScope = later.Before.Concat(later.After ?? []).Any(state =>
                 protectedStates.Any(earlier => Overlaps(state.Scope, earlier.Scope)));
-            if (activity || touchesScope && (later.After is null || !Enum.IsDefined(later.OperationKind) ||
-                                             later.OperationKind == JournalOperation.Unknown || later.Before
-                                                 .Zip(later.After).Any(pair => !Same(pair.First, pair.Second))))
+            if (activity
+                || touchesScope
+                && (later.After is null
+                    || !Enum.IsDefined(later.OperationKind)
+                    || later.OperationKind == JournalOperation.Unknown
+                    || later.Before.Zip(later.After).Any(pair => !Same(pair.First, pair.Second))))
             {
                 if (protectedStates.Any(state => !RegistryKeyIdentity.IsLocal(state.Scope.Location.Machine)))
                 {
-                    return Conflict(
-                        "A later journal entry may touch the same remote key or value. Its backing key cannot be verified.");
+                    return Conflict("A later journal entry may touch the same remote key or value. Its backing key cannot be verified.");
                 }
 
                 return Conflict(
@@ -656,17 +646,18 @@ public sealed class RegistryJournal
 
                 JournalConflict Conflict(string reason)
                 {
-                    var names = later.Before.SelectMany(state => state.Scope.ValueNames ?? [])
-                        .Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToArray();
-                    var target = later.Path + (names.Length == 0
-                        ? string.Empty
-                        : " · " +
-                          string.Join(", ", names.Take(3).Select(name => name.Length == 0 ? "(Default)" : name)) +
-                          (names.Length > 3 ? ", …" : string.Empty));
+                    var names = later.Before.SelectMany(state => state.Scope.ValueNames ?? []).Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(4).ToArray();
+                    var target = later.Path
+                                 + (names.Length == 0
+                                     ? string.Empty
+                                     : " · "
+                                       + string.Join(", ", names.Take(3).Select(name => name.Length == 0 ? "(Default)" : name))
+                                       + (names.Length > 3 ? ", …" : string.Empty));
                     return new JournalConflict(
                         later,
-                        $"{reason} {later.Operation} at {later.Time.ToLocalTime():G}: {target}. " +
-                        "Revert or review this later edit first.");
+                        $"{reason} {later.Operation} at {later.Time.ToLocalTime():G}: {target}. "
+                        + "Revert or review this later edit first.");
                 }
             }
         }
@@ -676,9 +667,10 @@ public sealed class RegistryJournal
 
     public static bool Overlaps(JournalScope left, JournalScope right)
     {
-        if (!RegistryKeyIdentity.SameComputer(left.Location.Machine, right.Location.Machine) ||
-            left.ValueNames is not null && right.ValueNames is not null &&
-            !left.ValueNames.Intersect(right.ValueNames, StringComparer.OrdinalIgnoreCase).Any())
+        if (!RegistryKeyIdentity.SameComputer(left.Location.Machine, right.Location.Machine)
+            || left.ValueNames is not null
+            && right.ValueNames is not null
+            && !left.ValueNames.Intersect(right.ValueNames, StringComparer.OrdinalIgnoreCase).Any())
         {
             return false;
         }
@@ -689,8 +681,9 @@ public sealed class RegistryJournal
             return true;
         }
 
-        if (left.Location.View == right.Location.View && left.Location.Hive == right.Location.Hive &&
-            Intersects(left.Location.Path, right.Location.Path))
+        if (left.Location.View == right.Location.View
+            && left.Location.Hive == right.Location.Hive
+            && Intersects(left.Location.Path, right.Location.Path))
         {
             return true;
         }
@@ -701,18 +694,19 @@ public sealed class RegistryJournal
 
         bool Intersects(string first, string second)
         {
-            return first.Equals(second, StringComparison.OrdinalIgnoreCase) ||
-                   left.ValueNames is null && RegistryKeyIdentity.AtOrBelow(second, first) ||
-                   right.ValueNames is null && RegistryKeyIdentity.AtOrBelow(first, second);
+            return first.Equals(second, StringComparison.OrdinalIgnoreCase)
+                   || left.ValueNames is null && RegistryKeyIdentity.AtOrBelow(second, first)
+                   || right.ValueNames is null && RegistryKeyIdentity.AtOrBelow(first, second);
         }
     }
 
     private JournalState Capture(JournalScope scope, JournalCaptureBudget budget)
     {
         budget.Charge(
-            512 + 2 * JournalCaptureBudget.TextBytes(scope.Location.SubKey) +
-            2 * JournalCaptureBudget.TextBytes(scope.Location.Machine) +
-            JournalCaptureBudget.TextBytes(Environment.MachineName));
+            512
+            + 2 * JournalCaptureBudget.TextBytes(scope.Location.SubKey)
+            + 2 * JournalCaptureBudget.TextBytes(scope.Location.Machine)
+            + JournalCaptureBudget.TextBytes(Environment.MachineName));
         var paths = RegistryKeyIdentity.Paths(scope.Location);
         scope = scope with { KeyPaths = paths };
         foreach (var path in paths)
@@ -723,15 +717,13 @@ public sealed class RegistryJournal
         if (scope.ValueNames is null)
         {
             var snapshot = RegistryBranchSnapshot.Capture(
-                location => this._registry.Read(location, budget), scope.Location, allowMissingRoot: true,
-                budget: budget);
+                location => this._registry.Read(location, budget), scope.Location, allowMissingRoot: true, budget: budget);
             var security = snapshot.Keys.Select(key =>
             {
                 budget.Charge(128 + JournalCaptureBudget.TextBytes(key.Path));
                 using var handle = this._registry.Open(At(scope.Location, key.Path));
                 var descriptor = handle
-                    .GetAccessControl(
-                        AccessControlSections.Access | AccessControlSections.Owner | AccessControlSections.Group)
+                    .GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner | AccessControlSections.Group)
                     .GetSecurityDescriptorSddlForm(
                         AccessControlSections.Access | AccessControlSections.Owner | AccessControlSections.Group);
                 budget.Charge(JournalCaptureBudget.TextBytes(descriptor));
@@ -767,13 +759,6 @@ public sealed class RegistryJournal
         return root with { SubKey = string.Join('\\', new[] { root.SubKey, path }.Where(part => part.Length > 0)) };
     }
 
-    private static readonly IEqualityComparer<JournalSecurity> SecurityComparer
-        = EqualityComparer<JournalSecurity>.Create(
-            static (left, right) => left is not null && right is not null &&
-                                    left.Path.Equals(right.Path, StringComparison.OrdinalIgnoreCase) &&
-                                    left.Descriptor == right.Descriptor,
-            static item => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(item.Path), item.Descriptor));
-
     internal static bool Same(JournalState left, JournalState right)
     {
         if (left.Security.Length != right.Security.Length)
@@ -782,8 +767,9 @@ public sealed class RegistryJournal
         }
 
         var security = new HashSet<JournalSecurity>(right.Security, SecurityComparer);
-        return left.Security.All(security.Remove) && security.Count == 0 &&
-               new RegistryComparison(left.Snapshot, right.Snapshot).Differences.Count == 0;
+        return left.Security.All(security.Remove)
+               && security.Count == 0
+               && new RegistryComparison(left.Snapshot, right.Snapshot).Differences.Count == 0;
     }
 
     private void Restore(JournalState before, JournalState after)
@@ -821,12 +807,10 @@ public sealed class RegistryJournal
             throw new InvalidOperationException("This branch operation cannot be safely reversed automatically.");
         }
 
-        foreach (var key in before.Snapshot.Keys.OrderBy(key => key.Path.Count(c => c == '\\'))
-                     .ThenBy(key => key.Path.Length))
+        foreach (var key in before.Snapshot.Keys.OrderBy(key => key.Path.Count(c => c == '\\')).ThenBy(key => key.Path.Length))
         {
             var target = At(location, key.Path);
-            this._registry.CreateKey(
-                target.Parent ?? throw new InvalidOperationException("Cannot restore a root hive."), target.Name);
+            this._registry.CreateKey(target.Parent ?? throw new InvalidOperationException("Cannot restore a root hive."), target.Name);
             foreach (var value in key.Values)
             {
                 this._registry.Write(target, value, null);
@@ -839,15 +823,11 @@ public sealed class RegistryJournal
             using var root = target.Machine is null
                 ? RegistryKey.OpenBaseKey(target.Hive!.Value, target.View)
                 : RemoteRegistryCredentials.OpenBaseKey(target.Hive!.Value, target.Machine, target.View);
-            using var key = root.OpenSubKey(
-                                target.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree,
-                                RegistryRights.FullControl) ??
-                            throw new IOException(
-                                "The restored key disappeared before its permissions could be restored.");
+            using var key = root.OpenSubKey(target.SubKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryRights.FullControl)
+                            ?? throw new IOException("The restored key disappeared before its permissions could be restored.");
             var descriptor = new RegistrySecurity();
             descriptor.SetSecurityDescriptorSddlForm(
-                security.Descriptor,
-                AccessControlSections.Access | AccessControlSections.Owner | AccessControlSections.Group);
+                security.Descriptor, AccessControlSections.Access | AccessControlSections.Owner | AccessControlSections.Group);
             key.SetAccessControl(descriptor);
         }
     }
@@ -908,9 +888,12 @@ public sealed class RegistryJournal
 
     private static void Validate(JournalEntry entry)
     {
-        if (entry.Id == Guid.Empty || entry.Time == default || string.IsNullOrEmpty(entry.Operation) ||
-            entry.Before is null || entry.Before.Length == 0 && entry.Activity is null ||
-            entry.After is not null && entry.After.Length != entry.Before.Length)
+        if (entry.Id == Guid.Empty
+            || entry.Time == default
+            || string.IsNullOrEmpty(entry.Operation)
+            || entry.Before is null
+            || entry.Before.Length == 0 && entry.Activity is null
+            || entry.After is not null && entry.After.Length != entry.Before.Length)
         {
             throw new InvalidDataException("Invalid journal entry.");
         }
@@ -922,10 +905,14 @@ public sealed class RegistryJournal
 
         foreach (var state in entry.Before.Concat(entry.After ?? []))
         {
-            if (state?.Snapshot is null || state.Scope?.Location is null ||
-                state.Scope.Location != state.Snapshot.Root || state.Security is null ||
-                state.Scope.KeyPaths is { } paths && (paths.Length is < 1 or > 2 || paths.Any(path =>
-                    string.IsNullOrEmpty(path) || !path.StartsWith(@"\REGISTRY\", StringComparison.OrdinalIgnoreCase))))
+            if (state?.Snapshot is null
+                || state.Scope?.Location is null
+                || state.Scope.Location != state.Snapshot.Root
+                || state.Security is null
+                || state.Scope.KeyPaths is { } paths
+                && (paths.Length is < 1 or > 2
+                    || paths.Any(path =>
+                        string.IsNullOrEmpty(path) || !path.StartsWith(@"\REGISTRY\", StringComparison.OrdinalIgnoreCase))))
             {
                 throw new InvalidDataException("Invalid journal scope.");
             }
@@ -942,8 +929,7 @@ public sealed class RegistryJournal
             var securityPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var security in state.Security)
             {
-                if (security?.Path is null || string.IsNullOrEmpty(security.Descriptor) ||
-                    !securityPaths.Add(security.Path))
+                if (security?.Path is null || string.IsNullOrEmpty(security.Descriptor) || !securityPaths.Add(security.Path))
                 {
                     throw new InvalidDataException("Invalid journal security descriptor.");
                 }
@@ -953,12 +939,11 @@ public sealed class RegistryJournal
             }
         }
 
-        if (entry.OperationKind == JournalOperation.RenameKey && (entry.Before.Length != 2 ||
-                                                                  entry.Before.Any(state =>
-                                                                      state.Scope.ValueNames is not null) ||
-                                                                  entry.Before[0].Scope.Location.Parent is not
-                                                                      { } parent || parent != entry.Before[1].Scope
-                                                                      .Location.Parent))
+        if (entry.OperationKind == JournalOperation.RenameKey
+            && (entry.Before.Length != 2
+                || entry.Before.Any(state => state.Scope.ValueNames is not null)
+                || entry.Before[0].Scope.Location.Parent is not { } parent
+                || parent != entry.Before[1].Scope.Location.Parent))
         {
             throw new InvalidDataException("Invalid journal key rename.");
         }
@@ -971,8 +956,7 @@ public sealed class RegistryJournal
                 var afterNames = pair.Second.Scope.ValueNames;
                 if (beforeNames is null
                         ? afterNames is not null
-                        : afterNames is null || !beforeNames.ToHashSet(StringComparer.OrdinalIgnoreCase)
-                            .SetEquals(afterNames))
+                        : afterNames is null || !beforeNames.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(afterNames))
                 {
                     throw new InvalidDataException("The before and after states cover different journal targets.");
                 }

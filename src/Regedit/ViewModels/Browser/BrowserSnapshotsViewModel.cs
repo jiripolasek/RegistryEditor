@@ -12,9 +12,6 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry) : ObservableObject
 {
-    private CancellationTokenSource? _cancellation;
-    private bool _closed;
-
     internal event Func<Task<string?>>? SaveFileRequested;
 
     internal event Func<Task<string?>>? OpenFileRequested;
@@ -27,9 +24,11 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
 
     internal event Action<string, string>? OperationStarted;
 
+    private CancellationTokenSource? _cancellation;
+    private bool _closed;
+
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(
-        nameof(CaptureCommand), nameof(CompareFileCommand), nameof(CompareLastCommand), nameof(CancelCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CaptureCommand), nameof(CompareFileCommand), nameof(CompareLastCommand), nameof(CancelCommand))]
     public partial bool IsBusy { get; private set; }
 
     [ObservableProperty]
@@ -42,14 +41,14 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
 
     private bool IsIdle => !this._closed && !this.IsBusy;
 
+    private bool CanCompareLast => this.IsIdle && this.LastSnapshot is not null;
+
+    private bool HasComparison => this.LastComparison is not null;
+
     private bool CanCapture(RegistryLocation? location)
     {
         return this.IsIdle && location is { IsComputer: false };
     }
-
-    private bool CanCompareLast => this.IsIdle && this.LastSnapshot is not null;
-
-    private bool HasComparison => this.LastComparison is not null;
 
     [RelayCommand(CanExecute = nameof(CanCapture))]
     private Task CaptureAsync(RegistryLocation? location)
@@ -67,8 +66,7 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
 
                     token.ThrowIfCancellationRequested();
                     this.ReportReading("Capturing branch…");
-                    var snapshot = await Task.Run(
-                        () => RegistryBranchSnapshot.Capture(registry, location!, token), token);
+                    var snapshot = await Task.Run(() => RegistryBranchSnapshot.Capture(registry, location!, token), token);
                     await Task.Run(() => snapshot.SaveAsync(file, token), token);
                     token.ThrowIfCancellationRequested();
                     this.LastSnapshot = snapshot;
@@ -88,8 +86,7 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
                 if (this.OpenFileRequested is not null && await this.OpenFileRequested() is { } file)
                 {
                     token.ThrowIfCancellationRequested();
-                    this.OperationStarted?.Invoke(
-                        "Loading snapshot…", "Reading the saved snapshot. No registry data is changed.");
+                    this.OperationStarted?.Invoke("Loading snapshot…", "Reading the saved snapshot. No registry data is changed.");
                     var snapshot = await Task.Run(() => RegistryBranchSnapshot.LoadAsync(file, token), token);
                     await this.CompareAsync(snapshot, token);
                 }
@@ -100,9 +97,7 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
     private Task CompareLastAsync()
     {
         return this.LastSnapshot is { } before
-            ? this.RunAsync(
-                "Couldn't compare the snapshot", "Snapshot comparison canceled",
-                token => this.CompareAsync(before, token))
+            ? this.RunAsync("Couldn't compare the snapshot", "Snapshot comparison canceled", token => this.CompareAsync(before, token))
             : Task.CompletedTask;
     }
 
@@ -110,45 +105,38 @@ internal sealed partial class BrowserSnapshotsViewModel(RegistryService registry
     {
         using var connection = RemoteRegistryCredentials.Retain((string?[])[before.Root.Machine]);
         token.ThrowIfCancellationRequested();
-        if (before.Root.Machine is null && !before.Computer.Equals(
-                Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+        if (before.Root.Machine is null && !before.Computer.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException(
-                $"This local snapshot belongs to {before.Computer}. Compare it on that computer.");
+            throw new InvalidOperationException($"This local snapshot belongs to {before.Computer}. Compare it on that computer.");
         }
 
-        if (before.Root.Machine is not null && (this.RemoteConfirmationRequested is null ||
-                                                !await this.RemoteConfirmationRequested(before.Root)))
+        if (before.Root.Machine is not null
+            && (this.RemoteConfirmationRequested is null || !await this.RemoteConfirmationRequested(before.Root)))
         {
             return;
         }
 
         this.ReportReading("Comparing branch…");
         var comparison = await Task.Run(
-            () => new RegistryComparison(
-                before, RegistryBranchSnapshot.Capture(registry, before.Root, token, true), token), token);
+            () => new RegistryComparison(before, RegistryBranchSnapshot.Capture(registry, before.Root, token, true), token), token);
         token.ThrowIfCancellationRequested();
         this.LastSnapshot = before;
         this.LastComparison = comparison;
         this.Notice?.Invoke(
-            "Comparison complete", $"{comparison.Differences.Count:N0} differences in {before.Root.Address}",
-            NoticeKind.Information);
+            "Comparison complete", $"{comparison.Differences.Count:N0} differences in {before.Root.Address}", NoticeKind.Information);
         await this.ShowComparisonAsync();
     }
 
     [RelayCommand(CanExecute = nameof(HasComparison))]
     private Task ShowComparisonAsync()
     {
-        return this.LastComparison is { } result && this.ComparisonRequested is { } show
-            ? show(result)
-            : Task.CompletedTask;
+        return this.LastComparison is { } result && this.ComparisonRequested is { } show ? show(result) : Task.CompletedTask;
     }
 
     private void ReportReading(string title)
     {
         this.OperationStarted?.Invoke(
-            title,
-            "Reading keys, types, and raw values. No registry data is changed. Inaccessible branches stop the capture.");
+            title, "Reading keys, types, and raw values. No registry data is changed. Inaccessible branches stop the capture.");
     }
 
     private async Task RunAsync(string failureTitle, string canceledTitle, Func<CancellationToken, Task> operation)

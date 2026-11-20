@@ -36,11 +36,11 @@ namespace JPSoftworks.Regedit.Views.Pages;
 public sealed partial class BrowserPage : Page
 {
     private readonly MainWindow _window;
-    private bool _initialized;
     private readonly RegistryDialogs _dialogs;
     private readonly string _notificationKey = "browser-" + Guid.NewGuid().ToString("N");
     private readonly OperationNotification _exportNotification;
     private readonly OperationNotification _snapshotNotification;
+    private bool _initialized;
     private RegistryLocation? _treeContextLocation;
     private bool _keepRenameRejectionNotice;
     private bool _closed;
@@ -54,13 +54,6 @@ public sealed partial class BrowserPage : Page
     internal SettingsViewModel Preferences => this._window.Preferences;
 
     internal Button MenuButton => this.GlobalMenuButton;
-
-    public void SelectValue(string name)
-    {
-        this.EntryList.SelectEntry(
-            this.ViewModel.Entries.FirstOrDefault(entry =>
-                entry.Value?.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == true));
-    }
 
     public BrowserPage(MainWindow window, BrowserViewModel viewModel, string? selectedValue = null)
     {
@@ -77,25 +70,21 @@ public sealed partial class BrowserPage : Page
         this.GlobalMenuButton.Click += this._window.ApplicationMenu_Click;
         this.TreePane.Initialize(viewModel, (MenuFlyout)this.Resources["RegistryTreeMenu"]);
         this.EntryList.Initialize(
-            viewModel, this.Preferences, (MenuFlyout)this.Resources["RegistryEntryMenu"],
-            (MenuFlyout)this.Resources["RegistryListMenu"]);
+            viewModel, this.Preferences, (MenuFlyout)this.Resources["RegistryEntryMenu"], (MenuFlyout)this.Resources["RegistryListMenu"]);
         this.EntryList.RenameRejected += error =>
         {
             this.ShowError(error, "Couldn't rename the item");
             this._keepRenameRejectionNotice = true;
         };
         this.TreePane.OpenInBackground += this._window.ViewModel.OpenInBackground;
-        this.EntryList.OpenInBackground += entry =>
-            this._window.ViewModel.OpenBrowser(this.EntryLocation(entry), entry.Value?.Name, false);
+        this.EntryList.OpenInBackground += entry => this._window.ViewModel.OpenBrowser(this.EntryLocation(entry), entry.Value?.Name, false);
         viewModel.Search.FindRequested += this.ShowFindDialogAsync;
         viewModel.Search.Notice += this.ShowNotice;
         viewModel.Search.StatusChanged += message =>
         {
-            var peer = FrameworkElementAutomationPeer.FromElement(this) ??
-                       FrameworkElementAutomationPeer.CreatePeerForElement(this);
+            var peer = FrameworkElementAutomationPeer.FromElement(this) ?? FrameworkElementAutomationPeer.CreatePeerForElement(this);
             peer?.RaiseNotificationEvent(
-                AutomationNotificationKind.Other, AutomationNotificationProcessing.CurrentThenMostRecent, message,
-                "RegistrySearchStatus");
+                AutomationNotificationKind.Other, AutomationNotificationProcessing.CurrentThenMostRecent, message, "RegistrySearchStatus");
         };
         viewModel.Branches.Dialogs = this._dialogs;
         viewModel.Branches.Notice += this.ShowNotice;
@@ -114,33 +103,29 @@ public sealed partial class BrowserPage : Page
         };
         viewModel.Branches.ExportCommand.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(viewModel.Branches.ExportCommand.IsRunning) &&
-                !viewModel.Branches.ExportCommand.IsRunning)
+            if (args.PropertyName == nameof(viewModel.Branches.ExportCommand.IsRunning) && !viewModel.Branches.ExportCommand.IsRunning)
             {
                 this._exportNotification.Complete();
             }
         };
-        viewModel.Branches.Failed
-            += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Registry branch operation", ex);
+        viewModel.Branches.Failed += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Registry branch operation", ex);
         viewModel.Snapshots.SaveFileRequested += () => this._dialogs.PickSaveAsync(
             "Registry snapshot " + DateTime.Now.ToString("yyyy-MM-dd HHmmss"), ".regsnap", "Registry branch snapshot");
         viewModel.Snapshots.OpenFileRequested += () => this._dialogs.PickOpenAsync(".regsnap");
         viewModel.Snapshots.RemoteConfirmationRequested += root => this.ConfirmAsync(
-            "Compare remote snapshot?",
-            $"Connect to {root.Machine} using your Windows credentials and read {root.Path}?", "Connect and compare");
+            "Compare remote snapshot?", $"Connect to {root.Machine} using your Windows credentials and read {root.Path}?",
+            "Connect and compare");
         viewModel.Snapshots.ComparisonRequested += comparison => this.GuardAsync(
             "Couldn't open the comparison", "Opening the comparison was canceled", async () =>
             {
                 var content = new SnapshotComparisonView(
                     new SnapshotComparisonViewModel(
-                        comparison,
-                        () => this._dialogs.PickSaveAsync("Registry differences", ".reg", "Registry differences"),
+                        comparison, () => this._dialogs.PickSaveAsync("Registry differences", ".reg", "Registry differences"),
                         ClipboardText.Set));
                 await content.ShowAsync(this._window.Root, this._window.Dialogs);
             });
         this._snapshotNotification = new OperationNotification(
-            window.Notifications, this._notificationKey + ":snapshot",
-            () => viewModel.Snapshots.CancelCommand.Execute(null));
+            window.Notifications, this._notificationKey + ":snapshot", () => viewModel.Snapshots.CancelCommand.Execute(null));
         viewModel.Snapshots.Notice += this._snapshotNotification.ShowResult;
         viewModel.Snapshots.OperationStarted += this._snapshotNotification.Start;
         viewModel.Snapshots.PropertyChanged += (_, args) =>
@@ -166,8 +151,7 @@ public sealed partial class BrowserPage : Page
         viewModel.EditPromptRequested += this.ShowEditPromptAsync;
         viewModel.ConfirmHistoryChange = (title, message) => this.ConfirmAsync(title, message, "Check and apply");
         viewModel.HistoryJournalRequested += id => this.GuardAsync(
-            "Couldn't open the Journal", "Opening the Journal was canceled",
-            () => this._window.ShowHistoryJournalAsync(id));
+            "Couldn't open the Journal", "Opening the Journal was canceled", () => this._window.ShowHistoryJournalAsync(id));
         viewModel.HistoryNotice += (title, message, needsReview) =>
         {
             this.ShowMessage(
@@ -176,18 +160,15 @@ public sealed partial class BrowserPage : Page
                     new NotificationAction(
                         needsReview ? "Show in Journal" : "Go to change", _ =>
                         {
-                            (needsReview ? viewModel.ShowHistoryJournalCommand : viewModel.GoToHistoryChangeCommand)
-                                .Execute(null);
+                            (needsReview ? viewModel.ShowHistoryJournalCommand : viewModel.GoToHistoryChangeCommand).Execute(null);
                             return Task.CompletedTask;
                         })
                 ]);
         };
         viewModel.CopyTextRequested += this.CopyText;
         viewModel.EditFailed += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Registry edit", ex);
-        viewModel.DetailsLoadFailed += ex =>
-            this._window.Logger.LogFailure(LogLevel.Warning, "Load registry list details", ex);
-        viewModel.FileRevealFailed
-            += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Reveal registry file", ex);
+        viewModel.DetailsLoadFailed += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Load registry list details", ex);
+        viewModel.FileRevealFailed += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Reveal registry file", ex);
         viewModel.WebSearchFailed += ex => this._window.Logger.LogFailure(LogLevel.Warning, "Web search", ex);
         this.TreePane.LoadFailed += ex =>
         {
@@ -202,10 +183,8 @@ public sealed partial class BrowserPage : Page
             this.FilterBox.SelectionStart = this.FilterBox.Text.Length;
         };
         viewModel.RegistryChanged += (_, _) => this._window.JournalHistory.RegistryActivityCompleted();
-        this.AddressBar.SuggestionProvider = (text, token) =>
-            viewModel.Addresses.SuggestAsync(text, viewModel.Location.View, token);
-        this.AddressBar.ChildrenProvider = (address, token) =>
-            viewModel.Addresses.ChildrenAsync(address, viewModel.Location, token);
+        this.AddressBar.SuggestionProvider = (text, token) => viewModel.Addresses.SuggestAsync(text, viewModel.Location.View, token);
+        this.AddressBar.ChildrenProvider = (address, token) => viewModel.Addresses.ChildrenAsync(address, viewModel.Location, token);
         this.ApplyViewSettings();
         this.ViewModel.Navigated += this.ViewModel_Navigated;
         if (selectedValue is { } name)
@@ -217,8 +196,7 @@ public sealed partial class BrowserPage : Page
             void SelectInitialValue(object? sender, EventArgs args)
             {
                 this.ViewModel.Navigated -= SelectInitialValue;
-                if (initialLocation.IsSameLocation(this.ViewModel.Location) &&
-                    initialNavigation == this.ViewModel.NavigationVersion)
+                if (initialLocation.IsSameLocation(this.ViewModel.Location) && initialNavigation == this.ViewModel.NavigationVersion)
                 {
                     this.SelectValue(name);
                 }
@@ -240,8 +218,8 @@ public sealed partial class BrowserPage : Page
             if (args.PropertyName is nameof(BrowserViewModel.Filter) or nameof(BrowserViewModel.Location))
             {
                 var empty = this.ViewModel.Filter.Length == 0;
-                var focused = this.XamlRoot is { } root && IsInside(
-                    FocusManager.GetFocusedElement(root) as DependencyObject, this.FilterArea);
+                var focused = this.XamlRoot is { } root
+                              && IsInside(FocusManager.GetFocusedElement(root) as DependencyObject, this.FilterArea);
                 var keepEditing = focused && args.PropertyName == nameof(BrowserViewModel.Filter);
                 if (empty && focused && !keepEditing)
                 {
@@ -254,8 +232,7 @@ public sealed partial class BrowserPage : Page
         this.AddShortcut(VirtualKey.L, VirtualKeyModifiers.Control, this.AddressBar.BeginEdit);
         this.AddShortcut(VirtualKey.D, VirtualKeyModifiers.Menu, this.AddressBar.BeginEdit);
         this.AddShortcut(
-            VirtualKey.L, VirtualKeyModifiers.Menu | VirtualKeyModifiers.Shift,
-            () => this.SyncTree_Click(this, new RoutedEventArgs()));
+            VirtualKey.L, VirtualKeyModifiers.Menu | VirtualKeyModifiers.Shift, () => this.SyncTree_Click(this, new RoutedEventArgs()));
         this.AddShortcut(
             VirtualKey.H, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () =>
             {
@@ -265,11 +242,9 @@ public sealed partial class BrowserPage : Page
                 }
             });
         this.AddShortcut(VirtualKey.F, VirtualKeyModifiers.Control, () => this.QuickSearch.Focus(FocusState.Keyboard));
+        this.AddShortcut(VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, viewModel.Search.FindCommand);
         this.AddShortcut(
-            VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, viewModel.Search.FindCommand);
-        this.AddShortcut(
-            VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu,
-            () => this.Filter_Click(this, new RoutedEventArgs()));
+            VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu, () => this.Filter_Click(this, new RoutedEventArgs()));
         var favoriteShortcut = new KeyboardAccelerator { Key = VirtualKey.D, Modifiers = VirtualKeyModifiers.Control };
         favoriteShortcut.Invoked += this.Favorite_Invoked;
         this.LayoutRoot.KeyboardAccelerators.Add(favoriteShortcut);
@@ -288,11 +263,16 @@ public sealed partial class BrowserPage : Page
         this.AccessModePrompt.Text = this._window.IsAdministrator
             ? "Open this location in a new standard-access window using the desktop user's account? The current window will stay open."
             : "Open this location in a new administrator window? Windows will ask for permission. The current window will stay open.";
-        this.AccessModeLaunchButton.Content
-            = this._window.IsAdministrator ? "Open with standard access" : "Open as administrator";
+        this.AccessModeLaunchButton.Content = this._window.IsAdministrator ? "Open with standard access" : "Open as administrator";
         this.AccessModeLaunchButton.Command = this._window.IsAdministrator
             ? this._window.RegistryMenu.OpenStandardAccessCommand
             : this._window.RegistryMenu.ElevateCommand;
+    }
+
+    public void SelectValue(string name)
+    {
+        this.EntryList.SelectEntry(
+            this.ViewModel.Entries.FirstOrDefault(entry => entry.Value?.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == true));
     }
 
     private void RegistryViewMenu_Opening(object sender, object args)
@@ -424,9 +404,7 @@ public sealed partial class BrowserPage : Page
         }
 
         this.PopulateCopyPathMenu(this.TreeCopyPathAsMenu.Items, location);
-        this.TreeFavoriteMenu.Text = this._window.Favorites.Contains(location)
-            ? "Remove from favorites"
-            : "Add to favorites…";
+        this.TreeFavoriteMenu.Text = this._window.Favorites.Contains(location) ? "Remove from favorites" : "Add to favorites…";
         await this.ViewModel.NavigateAsync(location);
     }
 
@@ -455,11 +433,9 @@ public sealed partial class BrowserPage : Page
         }
 
         breadcrumbs[^1] = breadcrumbs[^1] with { HasChildren = this.ViewModel.HasSubKeys };
-        this.AddressBar.LocationIconSource
-            = new FontIconSource { Glyph = RegistryTreePane.TreeGlyph(location), FontSize = 16 };
+        this.AddressBar.LocationIconSource = new FontIconSource { Glyph = RegistryTreePane.TreeGlyph(location), FontSize = 16 };
         this.AddressBar.SetLocation(location.Address, breadcrumbs);
-        this.QuickSearch.PlaceholderText
-            = location.IsComputer ? "Search all hives" : $"Search {location.Name} and subkeys";
+        this.QuickSearch.PlaceholderText = location.IsComputer ? "Search all hives" : $"Search {location.Name} and subkeys";
         ToolTipService.SetToolTip(this.QuickSearch, $"{location.Address} · {this.ViewModel.Connection}");
     }
 
@@ -483,8 +459,7 @@ public sealed partial class BrowserPage : Page
         var treeWidth = Math.Min(this.ViewModel.Layout.TreeWidth, Math.Max(160, width - 300));
         this.TreeColumn.Width = new GridLength(showTree ? treeWidth : 0);
         this.SplitterColumn.Width = new GridLength(showTree ? 6 : 0);
-        this.NavigationPane.Visibility
-            = this.PaneSplitter.Visibility = showTree ? Visibility.Visible : Visibility.Collapsed;
+        this.NavigationPane.Visibility = this.PaneSplitter.Visibility = showTree ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ResizeSearch(double delta)
@@ -495,8 +470,7 @@ public sealed partial class BrowserPage : Page
             return;
         }
 
-        var width = total * this.AddressColumn.Width.Value /
-                    (this.AddressColumn.Width.Value + this.SearchColumn.Width.Value);
+        var width = total * this.AddressColumn.Width.Value / (this.AddressColumn.Width.Value + this.SearchColumn.Width.Value);
         width = PaneResize.Apply(width, delta, 180, total - 180);
         this.AddressColumn.Width = new GridLength(width, GridUnitType.Star);
         this.SearchColumn.Width = new GridLength(total - width, GridUnitType.Star);
@@ -538,8 +512,7 @@ public sealed partial class BrowserPage : Page
     {
         this.EntryList.SelectContextItem(((MenuFlyout)sender).Target);
         UpdateHiveSwitchMenu(
-            this.EntrySwitchHiveMenu,
-            this.ViewModel.SelectedEntries.Count == 1 ? this.ViewModel.SelectedEntry?.Key : null);
+            this.EntrySwitchHiveMenu, this.ViewModel.SelectedEntries.Count == 1 ? this.ViewModel.SelectedEntry?.Key : null);
         if (this.ViewModel.SelectedEntry is not { } entry)
         {
             return;
@@ -567,13 +540,11 @@ public sealed partial class BrowserPage : Page
         this.EntryCopyMenu.Visibility = this.EntryRenameMenu.Visibility = this.EntryCopySeparator.Visibility
             = this.EntryToolsSeparator.Visibility = Visible(itemActions);
         this.EntryDeleteMenu.Visibility = Visible(!single || !entry.IsParent);
-        this.EntryBinaryMenu.Visibility
-            = this.EntryInspectMenu.Visibility = this.EntryWatchMenu.Visibility = Visible(valueActions);
+        this.EntryBinaryMenu.Visibility = this.EntryInspectMenu.Visibility = this.EntryWatchMenu.Visibility = Visible(valueActions);
         this.EntryRevealMenu.Visibility = Visible(valueActions && this.ViewModel.RevealFileCommand.CanExecute(null));
         this.EntryDuplicateMenu.Visibility = Visible(valueActions && entry.Value is not null);
         this.EntryOpenTargetMenu.Visibility = Visible(valueActions && entry.IsLink);
-        this.EntryFavoriteMenu.Visibility = this.EntryExportMenu.Visibility
-            = this.EntryPermissionsMenu.Visibility = Visible(keyActions);
+        this.EntryFavoriteMenu.Visibility = this.EntryExportMenu.Visibility = this.EntryPermissionsMenu.Visibility = Visible(keyActions);
         this.EntryFavoriteMenu.Text = entry.Key is { } key && this._window.Favorites.Contains(key)
             ? "Remove from favorites"
             : "Add to favorites…";
@@ -623,16 +594,11 @@ public sealed partial class BrowserPage : Page
         }
 
         this._keepRenameRejectionNotice = false;
-        this._notificationContent = StatusNotifications.Create(
-            title, message, severity, actions, this._notificationKey);
+        this._notificationContent = StatusNotifications.Create(title, message, severity, actions, this._notificationKey);
         this._notification = this._window.Notifications.Show(this._notificationContent);
     }
 
-    private async Task GuardAsync(
-        string failureTitle,
-        string canceledTitle,
-        Func<Task> action,
-        [CallerMemberName] string operation = "")
+    private async Task GuardAsync(string failureTitle, string canceledTitle, Func<Task> action, [CallerMemberName] string operation = "")
     {
         try
         {
@@ -707,8 +673,7 @@ public sealed partial class BrowserPage : Page
     private void CopyPath_Click(object sender, RoutedEventArgs args)
     {
         this.CopyText(
-            (this.ViewModel.SelectedEntry?.ParentLocation ??
-             this.ViewModel.SelectedEntry?.Key ?? this.ViewModel.Location).Address);
+            (this.ViewModel.SelectedEntry?.ParentLocation ?? this.ViewModel.SelectedEntry?.Key ?? this.ViewModel.Location).Address);
     }
 
     private void CopyCurrentPath_Click(object sender, RoutedEventArgs args)
@@ -720,8 +685,7 @@ public sealed partial class BrowserPage : Page
     {
         if (this.ViewModel.SelectedEntries.Count == 1 && this.ViewModel.SelectedEntry is { } entry)
         {
-            this.ViewModel.SearchWebCommand.Execute(
-                (this.EntryLocation(entry), entry.IsDefaultValue ? string.Empty : entry.Value?.Name));
+            this.ViewModel.SearchWebCommand.Execute((this.EntryLocation(entry), entry.IsDefaultValue ? string.Empty : entry.Value?.Name));
         }
     }
 
@@ -751,10 +715,7 @@ public sealed partial class BrowserPage : Page
                  })
         {
             var path = location.FormatPath(format);
-            var item = new MenuFlyoutItem
-            {
-                Text = label, IsEnabled = path is not null, Icon = new FontIcon { Glyph = "\uE62F" }
-            };
+            var item = new MenuFlyoutItem { Text = label, IsEnabled = path is not null, Icon = new FontIcon { Glyph = "\uE62F" } };
             item.Click += (_, _) =>
             {
                 if (path is not null)
@@ -787,8 +748,7 @@ public sealed partial class BrowserPage : Page
     {
         if (this.ViewModel.SelectedEntry is { } entry)
         {
-            this.OpenTabAfterMenuCloses(
-                (MenuFlyout)this.Resources["RegistryEntryMenu"], this.EntryLocation(entry), entry.Value?.Name);
+            this.OpenTabAfterMenuCloses((MenuFlyout)this.Resources["RegistryEntryMenu"], this.EntryLocation(entry), entry.Value?.Name);
         }
     }
 
@@ -835,8 +795,7 @@ public sealed partial class BrowserPage : Page
 
     private Task AddFavoriteAsync(RegistryLocation location)
     {
-        return FavoritesViewModel.AddFavoriteAsync(
-            this._window.Favorites, new FavoriteDialogs(this._window.Dialogs), location, null, true);
+        return FavoritesViewModel.AddFavoriteAsync(this._window.Favorites, new FavoriteDialogs(this._window.Dialogs), location, null, true);
     }
 
     private async void EntryFavorite_Click(object sender, RoutedEventArgs args)

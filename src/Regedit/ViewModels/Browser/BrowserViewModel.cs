@@ -19,25 +19,9 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 public sealed partial class BrowserViewModel : ObservableObject
 {
-    internal RegistryService Registry { get; }
-
-    internal RegistryBranchCommands Branches { get; }
-
-    internal RegistryAddressSuggestions Addresses { get; }
-
-    /// <summary>Reads subkey names off the UI thread.</summary>
-    internal Task<string[]> ReadSubKeysAsync(RegistryLocation location)
-    {
-        return Task.Run(() => this.Registry.SubKeys(location));
-    }
-
     internal event Action? TreeRefreshRequested;
 
     internal event Func<RegistryLocation, (string OldName, string NewName)?, Task>? TreeBranchChanged;
-
-    internal BrowserSnapshotsViewModel Snapshots { get; }
-
-    internal BrowserSearchViewModel Search { get; }
 
     internal event Action<string>? ValueSelectionRequested;
 
@@ -49,6 +33,18 @@ public sealed partial class BrowserViewModel : ObservableObject
 
     internal event Action<Exception>? DetailsLoadFailed;
 
+    internal event Func<RegistryEditPrompt, Task<bool>>? EditPromptRequested;
+
+    internal event Action<string>? CopyTextRequested;
+
+    internal event Action<Exception>? EditFailed;
+
+    internal event Func<RegistryLocation, Task>? ElevationRequested;
+
+    internal event EventHandler? RegistryChanged;
+
+    public event EventHandler? Navigated;
+
     private readonly NavigationHistory _history;
     private readonly RegistryEntryClipboard _clipboard;
     private readonly FavoritesStore? _favorites;
@@ -57,25 +53,170 @@ public sealed partial class BrowserViewModel : ObservableObject
     private readonly Action<Uri> _launchWebSearch;
     private readonly RegistryHistoryBroadcaster? _historyBroadcaster;
     private readonly RegistryListMetadata _metadata;
+    private readonly CancellationTokenSource _editCancellation = new();
     private IReadOnlyList<RegistrySortColumn> _columns = RegistryColumns.Defaults();
-
-    internal Func<RegistryLocation, Task>? AddFavoriteRequested { get; set; }
 
     private List<RegistryEntry> _allEntries = [];
     private RegistryEntry? _parentEntry;
     private int _request;
     private int _navigationVersion;
 
+    private bool _closed;
+    private Task _pendingNavigation = Task.CompletedTask;
+    private CancellationTokenSource? _filterCancellation;
+
+    internal RegistryService Registry { get; }
+
+    internal RegistryBranchCommands Branches { get; }
+
+    internal RegistryAddressSuggestions Addresses { get; }
+
+    internal BrowserSnapshotsViewModel Snapshots { get; }
+
+    internal BrowserSearchViewModel Search { get; }
+
+    internal Func<RegistryLocation, Task>? AddFavoriteRequested { get; set; }
+
     internal int NavigationVersion => this._navigationVersion;
 
     internal bool HasSnapshot { get; private set; }
 
-    private bool _closed;
-    private readonly CancellationTokenSource _editCancellation = new();
-    private Task _pendingNavigation = Task.CompletedTask;
-    private CancellationTokenSource? _filterCancellation;
-
     internal Task PendingFilter { get; private set; } = Task.CompletedTask;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(
+        nameof(EditValueCommand), nameof(EditBinaryCommand), nameof(DuplicateValueCommand), nameof(CreateKeyCommand),
+        nameof(CreateValueCommand), nameof(RenameCommand), nameof(DeleteCommand), nameof(RenameTreeKeyCommand),
+        nameof(DeleteTreeKeyCommand), nameof(PasteCommand), nameof(PasteIntoCommand), nameof(ToggleFavoriteCommand),
+        nameof(SwitchHiveCommand), nameof(UndoCommand), nameof(RedoCommand))]
+    internal partial bool CanPrompt { get; private set; } = true;
+
+    private RegistryEntry? SingleEntry => this.SelectedEntries.Count == 1 ? this.SelectedEntries[0] : null;
+
+    internal RegistryLocation SelectedFavoriteLocation => this.SingleEntry?.Key ?? this.Location;
+
+    private RegistryLocation? EntryDestination => this.SingleEntry?.ParentLocation ?? this.SingleEntry?.Key;
+
+    private StoredRegistryItem? SingleStoredItem =>
+        this.SingleEntry is { } row ? StoredRegistryItem.FromRow(this.Location, row) : null;
+
+    internal bool IsAdministrator { get; set; }
+
+    [ObservableProperty]
+    public partial ObservableCollection<RegistryEntry> Entries { get; private set; } = [];
+
+    public int VisibleEntryCount => this.Entries.Count(entry => !entry.IsParent);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Title), nameof(Connection), nameof(Is32Bit), nameof(CanGoUp), nameof(IsKeyLocation))]
+    [NotifyCanExecuteChangedFor(
+        nameof(WatchBranchCommand), nameof(WatchValueCommand), nameof(UpCommand), nameof(CreateKeyCommand), nameof(CreateValueCommand),
+        nameof(DuplicateValueCommand), nameof(PasteCommand), nameof(ToggleFavoriteCommand), nameof(RevealFileCommand),
+        nameof(OpenLinkTargetCommand), nameof(SwitchHiveCommand))]
+    public partial RegistryLocation Location { get; private set; }
+
+    public RegistryEntry? SelectedEntry
+    {
+        get => this.SelectedEntries.FirstOrDefault();
+        set => this.SetSelection(value is null ? [] : (RegistryEntry[])[value]);
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedEntry), nameof(HasSelection), nameof(ActivateEntryCommand))]
+    [NotifyCanExecuteChangedFor(
+        nameof(NavigateEntryCommand), nameof(EditValueCommand), nameof(EditBinaryCommand), nameof(DuplicateValueCommand),
+        nameof(RenameCommand), nameof(DeleteCommand), nameof(CopyCommand), nameof(InspectCommand), nameof(WatchValueCommand),
+        nameof(RevealFileCommand), nameof(OpenLinkTargetCommand))]
+    public partial IReadOnlyList<RegistryEntry> SelectedEntries { get; private set; } = [];
+
+    public bool HasSelection => this.SelectedEntries.Count > 0;
+
+    public IAsyncRelayCommand ActivateEntryCommand =>
+        this.EntryDestination is not null ? this.NavigateEntryCommand : this.EditValueCommand;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FavoriteAction), nameof(FavoriteHelp), nameof(FavoriteGlyph))]
+    public partial bool IsFavorite { get; private set; }
+
+    public string FavoriteAction => this.IsFavorite ? "Remove favorite" : "Add favorite";
+
+    public string FavoriteHelp => this.FavoriteAction + " (Ctrl+D)";
+
+    public string FavoriteGlyph => this.IsFavorite ? "\uE735" : "\uE734";
+
+    private bool CanToggleFavorite => this.CanPrompt && this._favorites is not null;
+
+    [ObservableProperty]
+    public partial bool IsLoading { get; private set; }
+
+    [ObservableProperty]
+    internal partial bool IsUpdatingValue { get; private set; }
+
+    [ObservableProperty]
+    public partial string Filter { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool ShowKeysInList { get; set; }
+
+    [ObservableProperty]
+    public partial bool ShowParentKeyInList { get; set; }
+
+    [ObservableProperty]
+    public partial string Status { get; private set; } = "Ready";
+
+    [ObservableProperty]
+    public partial string? Error { get; private set; }
+
+    public bool CanGoBack => this._history.CanGoBack;
+
+    public bool CanGoForward => this._history.CanGoForward;
+
+    public bool CanGoUp => this.Location.GetNavigationParent() is not null;
+
+    public bool IsKeyLocation => !this.Location.IsComputer;
+
+    public bool HasSubKeys => this._allEntries.Any(item => item.IsKey);
+
+    public bool Is32Bit => this.Location.View == Microsoft.Win32.RegistryView.Registry32;
+
+    public string Title => (!this.Location.IsComputer && this.Location.Machine is { } machine
+                               ? $"{machine} · {this.Location.Name}"
+                               : this.Location.Name)
+                           + (this.Is32Bit ? " · 32-bit" : string.Empty);
+
+    public string Connection => (this.Location.Machine ?? "This computer")
+                                + (this.Location.View == Microsoft.Win32.RegistryView.Registry32
+                                    ? " · 32-bit registry"
+                                    : " · 64-bit registry");
+
+    private bool CanNavigateEntry => this.EntryDestination is not null;
+
+    private bool CanDuplicateValue => this.CanPrompt && this.IsKeyLocation && this.SingleEntry?.Value is not null;
+
+    private bool CanCreateKey => this.CanPrompt && this.IsKeyLocation;
+
+    private bool CanRename => this.CanPrompt && this.SingleStoredItem?.CanRename == true;
+
+    private bool CanDelete => this.CanPrompt && this.DeletableSelection().Any();
+
+    private bool CanInspect => this.SingleEntry?.Value is not null;
+
+    private bool CanWatchBranch => this.IsKeyLocation && this.Location.Machine is null;
+
+    private bool CanWatchValue => this.CanWatchBranch && this.SingleEntry is { IsKey: false, IsParent: false };
+
+    private bool CanCopy => this.SingleEntry is { IsStored: true } row && row.Key?.IsComputer != true;
+
+    private bool CanPaste => this.CanPasteInto(this.Location);
+
+    [ObservableProperty]
+    public partial BrowserLayout Layout { get; private set; } = new();
+
+    [ObservableProperty]
+    public partial RegistrySortColumn SortColumn { get; private set; } = RegistrySortColumn.Name;
+
+    [ObservableProperty]
+    public partial bool SortDescending { get; private set; }
 
     public BrowserViewModel(RegistryService registry, RegistryLocation initial)
         : this(registry, initial, new RegistryEntryClipboard())
@@ -98,9 +239,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         this._settings = settings;
         this._preferences = preferences;
         this._historyBroadcaster = historyBroadcaster;
-        this._launchWebSearch = launchWebSearch ??
-                                (uri => Process.Start(
-                                    new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }));
+        this._launchWebSearch = launchWebSearch ?? (uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }));
         if (settings is not null)
         {
             this._columns = settings.ListColumns;
@@ -135,67 +274,11 @@ public sealed partial class BrowserViewModel : ObservableObject
         this.RefreshFavorite();
     }
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(
-        nameof(EditValueCommand), nameof(EditBinaryCommand), nameof(DuplicateValueCommand), nameof(CreateKeyCommand),
-        nameof(CreateValueCommand), nameof(RenameCommand), nameof(DeleteCommand), nameof(RenameTreeKeyCommand),
-        nameof(DeleteTreeKeyCommand), nameof(PasteCommand), nameof(PasteIntoCommand), nameof(ToggleFavoriteCommand),
-        nameof(SwitchHiveCommand), nameof(UndoCommand), nameof(RedoCommand))]
-    internal partial bool CanPrompt { get; private set; } = true;
-
-    private RegistryEntry? SingleEntry => this.SelectedEntries.Count == 1 ? this.SelectedEntries[0] : null;
-
-    internal RegistryLocation SelectedFavoriteLocation => this.SingleEntry?.Key ?? this.Location;
-
-    private RegistryLocation? EntryDestination => this.SingleEntry?.ParentLocation ?? this.SingleEntry?.Key;
-
-    private StoredRegistryItem? SingleStoredItem =>
-        this.SingleEntry is { } row ? StoredRegistryItem.FromRow(this.Location, row) : null;
-
-    internal event Func<RegistryEditPrompt, Task<bool>>? EditPromptRequested;
-
-    internal event Action<string>? CopyTextRequested;
-
-    internal event Action<Exception>? EditFailed;
-
-    internal bool IsAdministrator { get; set; }
-
-    internal event Func<RegistryLocation, Task>? ElevationRequested;
-
-    internal event EventHandler? RegistryChanged;
-
-    [ObservableProperty]
-    public partial ObservableCollection<RegistryEntry> Entries { get; private set; } = [];
-
-    public int VisibleEntryCount => this.Entries.Count(entry => !entry.IsParent);
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(
-        nameof(Title), nameof(Connection), nameof(Is32Bit), nameof(CanGoUp), nameof(IsKeyLocation))]
-    [NotifyCanExecuteChangedFor(
-        nameof(WatchBranchCommand), nameof(WatchValueCommand), nameof(UpCommand), nameof(CreateKeyCommand),
-        nameof(CreateValueCommand), nameof(DuplicateValueCommand), nameof(PasteCommand), nameof(ToggleFavoriteCommand),
-        nameof(RevealFileCommand), nameof(OpenLinkTargetCommand), nameof(SwitchHiveCommand))]
-    public partial RegistryLocation Location { get; private set; }
-
-    public RegistryEntry? SelectedEntry
+    /// <summary>Reads subkey names off the UI thread.</summary>
+    internal Task<string[]> ReadSubKeysAsync(RegistryLocation location)
     {
-        get => this.SelectedEntries.FirstOrDefault();
-        set => this.SetSelection(value is null ? [] : (RegistryEntry[])[value]);
+        return Task.Run(() => this.Registry.SubKeys(location));
     }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedEntry), nameof(HasSelection), nameof(ActivateEntryCommand))]
-    [NotifyCanExecuteChangedFor(
-        nameof(NavigateEntryCommand), nameof(EditValueCommand), nameof(EditBinaryCommand),
-        nameof(DuplicateValueCommand), nameof(RenameCommand), nameof(DeleteCommand), nameof(CopyCommand),
-        nameof(InspectCommand), nameof(WatchValueCommand), nameof(RevealFileCommand), nameof(OpenLinkTargetCommand))]
-    public partial IReadOnlyList<RegistryEntry> SelectedEntries { get; private set; } = [];
-
-    public bool HasSelection => this.SelectedEntries.Count > 0;
-
-    public IAsyncRelayCommand ActivateEntryCommand =>
-        this.EntryDestination is not null ? this.NavigateEntryCommand : this.EditValueCommand;
 
     internal void SetSelection(IEnumerable<RegistryEntry> entries)
     {
@@ -207,18 +290,6 @@ public sealed partial class BrowserViewModel : ObservableObject
         this.PasteCommand.NotifyCanExecuteChanged();
         this.PasteIntoCommand.NotifyCanExecuteChanged();
     }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FavoriteAction), nameof(FavoriteHelp), nameof(FavoriteGlyph))]
-    public partial bool IsFavorite { get; private set; }
-
-    public string FavoriteAction => this.IsFavorite ? "Remove favorite" : "Add favorite";
-
-    public string FavoriteHelp => this.FavoriteAction + " (Ctrl+D)";
-
-    public string FavoriteGlyph => this.IsFavorite ? "\uE735" : "\uE734";
-
-    private bool CanToggleFavorite => this.CanPrompt && this._favorites is not null;
 
     partial void OnLocationChanged(RegistryLocation value) { this.RefreshFavorite(); }
 
@@ -258,15 +329,6 @@ public sealed partial class BrowserViewModel : ObservableObject
             this.CanPrompt = !this._closed;
         }
     }
-
-    [ObservableProperty]
-    public partial bool IsLoading { get; private set; }
-
-    [ObservableProperty]
-    internal partial bool IsUpdatingValue { get; private set; }
-
-    [ObservableProperty]
-    public partial string Filter { get; set; } = string.Empty;
 
     partial void OnFilterChanged(string value)
     {
@@ -325,51 +387,16 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
     }
 
-    [ObservableProperty]
-    public partial bool ShowKeysInList { get; set; }
-
     partial void OnShowKeysInListChanged(bool value)
     {
         this.ApplyFilter();
         _ = this.LoadSortDetailsAsync();
     }
 
-    [ObservableProperty]
-    public partial bool ShowParentKeyInList { get; set; }
-
     partial void OnShowParentKeyInListChanged(bool value)
     {
         this.ApplyFilter();
     }
-
-    [ObservableProperty]
-    public partial string Status { get; private set; } = "Ready";
-
-    [ObservableProperty]
-    public partial string? Error { get; private set; }
-
-    public bool CanGoBack => this._history.CanGoBack;
-
-    public bool CanGoForward => this._history.CanGoForward;
-
-    public bool CanGoUp => this.Location.GetNavigationParent() is not null;
-
-    public bool IsKeyLocation => !this.Location.IsComputer;
-
-    public bool HasSubKeys => this._allEntries.Any(item => item.IsKey);
-
-    public bool Is32Bit => this.Location.View == Microsoft.Win32.RegistryView.Registry32;
-
-    public string Title => (!this.Location.IsComputer && this.Location.Machine is { } machine
-        ? $"{machine} · {this.Location.Name}"
-        : this.Location.Name) + (this.Is32Bit ? " · 32-bit" : string.Empty);
-
-    public string Connection => (this.Location.Machine ?? "This computer") +
-                                (this.Location.View == Microsoft.Win32.RegistryView.Registry32
-                                    ? " · 32-bit registry"
-                                    : " · 64-bit registry");
-
-    public event EventHandler? Navigated;
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     private Task Use32BitViewAsync()
@@ -414,8 +441,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         var request = this._request;
         await navigation;
         token.ThrowIfCancellationRequested();
-        if (this._request == request && this.Location == hit.Location && this.Error is null &&
-            hit.ValueName is { } name)
+        if (this._request == request && this.Location == hit.Location && this.Error is null && hit.ValueName is { } name)
         {
             this.ValueSelectionRequested?.Invoke(name);
         }
@@ -509,9 +535,7 @@ public sealed partial class BrowserViewModel : ObservableObject
 
                 var snapshot = this.Registry.Read(target, target.Machine is null);
                 var loaded = snapshot.SubKeys.Select(name => new RegistryEntry(target.Child(name), null)).Concat(
-                        snapshot.Values.Select(value => RegistryEntry.ForValue(
-                            value, snapshot.LastWriteTimeUtc, target)))
-                    .ToList();
+                    snapshot.Values.Select(value => RegistryEntry.ForValue(value, snapshot.LastWriteTimeUtc, target))).ToList();
                 if (!snapshot.Values.Any(value => value.Name.Length == 0))
                 {
                     loaded.Add(RegistryEntry.ForValue(null, snapshot.LastWriteTimeUtc, target));
@@ -582,20 +606,14 @@ public sealed partial class BrowserViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanGoBack))]
     private Task BackAsync()
     {
-        return this._history.CanGoBack
-            ? this.LoadAsync(this._history.BackTarget, () => this._history.Back())
-            : Task.CompletedTask;
+        return this._history.CanGoBack ? this.LoadAsync(this._history.BackTarget, () => this._history.Back()) : Task.CompletedTask;
     }
 
     [RelayCommand(CanExecute = nameof(CanGoForward))]
     private Task ForwardAsync()
     {
-        return this._history.CanGoForward
-            ? this.LoadAsync(this._history.ForwardTarget, () => this._history.Forward())
-            : Task.CompletedTask;
+        return this._history.CanGoForward ? this.LoadAsync(this._history.ForwardTarget, () => this._history.Forward()) : Task.CompletedTask;
     }
-
-    private bool CanNavigateEntry => this.EntryDestination is not null;
 
     [RelayCommand(CanExecute = nameof(CanNavigateEntry), AllowConcurrentExecutions = true)]
     private Task NavigateEntryAsync()
@@ -627,16 +645,13 @@ public sealed partial class BrowserViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
-        return this.ShowValueEditorAsync(
-            this.Location, row.Value, row.Value?.Type ?? RegistryValueType.String, binary, false);
+        return this.ShowValueEditorAsync(this.Location, row.Value, row.Value?.Type ?? RegistryValueType.String, binary, false);
     }
 
     private bool CanCreateValue(string? type)
     {
         return this.CanCreateKey && uint.TryParse(type, out _);
     }
-
-    private bool CanDuplicateValue => this.CanPrompt && this.IsKeyLocation && this.SingleEntry?.Value is not null;
 
     [RelayCommand(CanExecute = nameof(CanDuplicateValue))]
     private Task DuplicateValueAsync()
@@ -663,9 +678,8 @@ public sealed partial class BrowserViewModel : ObservableObject
 
         var form = new RegistryNamePrompt(RegistryNameOperation.DuplicateValue, name);
         return this.PromptAndWriteAsync(
-            form, new RegistryEditTarget(owner),
-            token => this.Registry.Write(owner, value with { Name = form.Name }, null, token), refreshLocation: owner,
-            reselect: entries => entries.FirstOrDefault(entry => entry.Value?.Name == form.Name));
+            form, new RegistryEditTarget(owner), token => this.Registry.Write(owner, value with { Name = form.Name }, null, token),
+            refreshLocation: owner, reselect: entries => entries.FirstOrDefault(entry => entry.Value?.Name == form.Name));
     }
 
     [RelayCommand(CanExecute = nameof(CanCreateValue))]
@@ -676,17 +690,11 @@ public sealed partial class BrowserViewModel : ObservableObject
             : Task.CompletedTask;
     }
 
-    private Task ShowValueEditorAsync(
-        RegistryLocation owner,
-        RegistryValue? original,
-        RegistryValueType type,
-        bool binary,
-        bool creating)
+    private Task ShowValueEditorAsync(RegistryLocation owner, RegistryValue? original, RegistryValueType type, bool binary, bool creating)
     {
         var editor = new RegistryValueEditorViewModel(original, type, binary, creating);
         return this.PromptAndWriteAsync(
-            editor, new RegistryEditTarget(owner, original?.Name),
-            token => this.Registry.Write(owner, editor.Value, original, token));
+            editor, new RegistryEditTarget(owner, original?.Name), token => this.Registry.Write(owner, editor.Value, original, token));
     }
 
     private async Task RefreshValueAsync(RegistryLocation owner, string name)
@@ -711,8 +719,8 @@ public sealed partial class BrowserViewModel : ObservableObject
                 return;
             }
 
-            var index = this._allEntries.FindIndex(entry => !entry.IsKey && string.Equals(
-                entry.Value?.Name ?? string.Empty, name, StringComparison.OrdinalIgnoreCase));
+            var index = this._allEntries.FindIndex(entry =>
+                !entry.IsKey && string.Equals(entry.Value?.Name ?? string.Empty, name, StringComparison.OrdinalIgnoreCase));
             if (index < 0)
             {
                 return;
@@ -784,8 +792,6 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
     }
 
-    private bool CanCreateKey => this.CanPrompt && this.IsKeyLocation;
-
     [RelayCommand(CanExecute = nameof(CanCreateKey))]
     private Task CreateKeyAsync()
     {
@@ -797,11 +803,9 @@ public sealed partial class BrowserViewModel : ObservableObject
 
         var form = new RegistryNamePrompt(RegistryNameOperation.CreateKey, "New Key");
         return this.PromptAndWriteAsync(
-            form, new RegistryEditTarget(parent), token => this.Registry.CreateKey(parent, form.Name, token),
-            () => parent.Child(form.Name), parent);
+            form, new RegistryEditTarget(parent), token => this.Registry.CreateKey(parent, form.Name, token), () => parent.Child(form.Name),
+            parent);
     }
-
-    private bool CanRename => this.CanPrompt && this.SingleStoredItem?.CanRename == true;
 
     [RelayCommand(CanExecute = nameof(CanRename))]
     private Task RenameAsync()
@@ -859,10 +863,11 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
 
         var taken = this.Entries.Any(other =>
-            !ReferenceEquals(other, entry) && !other.IsParent && other.IsKey == entry.IsKey && string.Equals(
-                other.Name, name, StringComparison.OrdinalIgnoreCase));
-        return !taken ? null :
-            entry.IsKey ? "A key with this name already exists." : "A value with this name already exists.";
+            !ReferenceEquals(other, entry)
+            && !other.IsParent
+            && other.IsKey == entry.IsKey
+            && string.Equals(other.Name, name, StringComparison.OrdinalIgnoreCase));
+        return !taken ? null : entry.IsKey ? "A key with this name already exists." : "A value with this name already exists.";
     }
 
     /// <summary>
@@ -888,17 +893,16 @@ public sealed partial class BrowserViewModel : ObservableObject
             () => key is null ? null : this.LocationAfterKeyChange(key, form.Name), key?.Parent, key?.Name,
             confirmed: confirmedName is not null,
             reselect: entries => entries.FirstOrDefault(entry =>
-                !entry.IsParent && entry.IsKey == (key is not null) && string.Equals(
-                    entry.Name, form.Name, StringComparison.OrdinalIgnoreCase)));
+                !entry.IsParent
+                && entry.IsKey == (key is not null)
+                && string.Equals(entry.Name, form.Name, StringComparison.OrdinalIgnoreCase)));
     }
 
     private IEnumerable<StoredRegistryItem> DeletableSelection()
     {
-        return this.SelectedEntries.Select(row => StoredRegistryItem.FromRow(this.Location, row))
-            .OfType<StoredRegistryItem>().Where(item => item.CanDelete);
+        return this.SelectedEntries.Select(row => StoredRegistryItem.FromRow(this.Location, row)).OfType<StoredRegistryItem>()
+            .Where(item => item.CanDelete);
     }
-
-    private bool CanDelete => this.CanPrompt && this.DeletableSelection().Any();
 
     [RelayCommand(CanExecute = nameof(CanDelete))]
     private Task DeleteAsync()
@@ -933,8 +937,7 @@ public sealed partial class BrowserViewModel : ObservableObject
                 }
                 catch (Exception ex) when (items.Length > 1 && ex is not OperationCanceledException)
                 {
-                    throw new IOException(
-                        $"Deleted {deleted} of {items.Length} items before an error: {ex.Message}", ex);
+                    throw new IOException($"Deleted {deleted} of {items.Length} items before an error: {ex.Message}", ex);
                 }
             },
             () => items.OfType<StoredRegistryItem.Key>().Select(key => this.LocationAfterKeyChange(key.Location, null))
@@ -945,10 +948,11 @@ public sealed partial class BrowserViewModel : ObservableObject
     private RegistryLocation? LocationAfterKeyChange(RegistryLocation key, string? name)
     {
         var current = this.Location;
-        if (current.Hive != key.Hive || current.View != key.View ||
-            !string.Equals(current.Machine, key.Machine, StringComparison.OrdinalIgnoreCase) ||
-            !(current.SubKey.Equals(key.SubKey, StringComparison.OrdinalIgnoreCase) || current.SubKey.StartsWith(
-                key.SubKey + "\\", StringComparison.OrdinalIgnoreCase)))
+        if (current.Hive != key.Hive
+            || current.View != key.View
+            || !string.Equals(current.Machine, key.Machine, StringComparison.OrdinalIgnoreCase)
+            || !(current.SubKey.Equals(key.SubKey, StringComparison.OrdinalIgnoreCase)
+                 || current.SubKey.StartsWith(key.SubKey + "\\", StringComparison.OrdinalIgnoreCase)))
         {
             return null;
         }
@@ -960,8 +964,6 @@ public sealed partial class BrowserViewModel : ObservableObject
 
         return current with { SubKey = parent.Child(name).SubKey + current.SubKey[key.SubKey.Length..] };
     }
-
-    private bool CanInspect => this.SingleEntry?.Value is not null;
 
     [RelayCommand(CanExecute = nameof(CanInspect))]
     private async Task InspectAsync()
@@ -982,10 +984,6 @@ public sealed partial class BrowserViewModel : ObservableObject
             await show(inspector);
         }
     }
-
-    private bool CanWatchBranch => this.IsKeyLocation && this.Location.Machine is null;
-
-    private bool CanWatchValue => this.CanWatchBranch && this.SingleEntry is { IsKey: false, IsParent: false };
 
     [RelayCommand(CanExecute = nameof(CanWatchValue))]
     private void WatchValue()
@@ -1010,8 +1008,6 @@ public sealed partial class BrowserViewModel : ObservableObject
     {
         this.NotesRequested?.Invoke();
     }
-
-    private bool CanCopy => this.SingleEntry is { IsStored: true } row && row.Key?.IsComputer != true;
 
     [RelayCommand(CanExecute = nameof(CanCopy))]
     private void Copy()
@@ -1041,8 +1037,6 @@ public sealed partial class BrowserViewModel : ObservableObject
         this._clipboard.Entry = row with { };
         this.CopyTextRequested?.Invoke(row.Key?.Address ?? row.Data);
     }
-
-    private bool CanPaste => this.CanPasteInto(this.Location);
 
     [RelayCommand(CanExecute = nameof(CanPaste))]
     private Task PasteAsync()
@@ -1157,9 +1151,7 @@ public sealed partial class BrowserViewModel : ObservableObject
                 {
                     await refreshBranch(
                         changedParent,
-                        succeeded && renamedFrom is not null && prompt is RegistryNamePrompt name
-                            ? (renamedFrom, name.Name)
-                            : null);
+                        succeeded && renamedFrom is not null && prompt is RegistryNamePrompt name ? (renamedFrom, name.Name) : null);
                 }
 
                 if (this._closed)
@@ -1199,8 +1191,7 @@ public sealed partial class BrowserViewModel : ObservableObject
                         await refresh;
 
                         // The refresh replaces every row; keep the edited item selected (for example under its new name).
-                        if (succeeded && stillAtOrigin && version == this._request &&
-                            reselect?.Invoke(this.Entries) is { } edited)
+                        if (succeeded && stillAtOrigin && version == this._request && reselect?.Invoke(this.Entries) is { } edited)
                         {
                             this.SelectedEntry = edited;
                         }
@@ -1229,9 +1220,6 @@ public sealed partial class BrowserViewModel : ObservableObject
             this.CanPrompt = !this._closed;
         }
     }
-
-    [ObservableProperty]
-    public partial BrowserLayout Layout { get; private set; } = new();
 
     internal void RestoreLayout(BrowserLayout? layout)
     {
@@ -1266,12 +1254,6 @@ public sealed partial class BrowserViewModel : ObservableObject
         var width = Math.Clamp(current + delta, 80, 1600);
         this.Layout = this.Layout.WithWidth(column, width);
     }
-
-    [ObservableProperty]
-    public partial RegistrySortColumn SortColumn { get; private set; } = RegistrySortColumn.Name;
-
-    [ObservableProperty]
-    public partial bool SortDescending { get; private set; }
 
     public static string SortLabel(RegistrySortColumn column, RegistrySortColumn current, bool descending)
     {
@@ -1322,8 +1304,10 @@ public sealed partial class BrowserViewModel : ObservableObject
 
     private async Task LoadSortDetailsAsync()
     {
-        if (!this._closed && this.SortColumn.NeedsKeyDetails() && (this.Location.IsComputer || this.ShowKeysInList) &&
-            await this._metadata.LoadAsync(this.Entries, this._columns.Contains(RegistrySortColumn.LinkTarget)))
+        if (!this._closed
+            && this.SortColumn.NeedsKeyDetails()
+            && (this.Location.IsComputer || this.ShowKeysInList)
+            && await this._metadata.LoadAsync(this.Entries, this._columns.Contains(RegistrySortColumn.LinkTarget)))
         {
             this.ApplyFilter(true);
         }
@@ -1362,8 +1346,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         {
             if (entry.Key is { } key)
             {
-                entry.SetNote(
-                    notes.Count == 0 ? string.Empty : notes[key.Address].FirstOrDefault()?.Text ?? string.Empty);
+                entry.SetNote(notes.Count == 0 ? string.Empty : notes[key.Address].FirstOrDefault()?.Text ?? string.Empty);
             }
         }
     }
@@ -1391,10 +1374,11 @@ public sealed partial class BrowserViewModel : ObservableObject
         var visible = this._allEntries.Where(item =>
         {
             token.ThrowIfCancellationRequested();
-            return (includeKeys || !item.IsKey) && (text.Length == 0 ||
-                                                    item.Name.Contains(text, StringComparison.OrdinalIgnoreCase) ||
-                                                    item.Type.Contains(text, StringComparison.OrdinalIgnoreCase) ||
-                                                    item.Data.Contains(text, StringComparison.OrdinalIgnoreCase));
+            return (includeKeys || !item.IsKey)
+                   && (text.Length == 0
+                       || item.Name.Contains(text, StringComparison.OrdinalIgnoreCase)
+                       || item.Type.Contains(text, StringComparison.OrdinalIgnoreCase)
+                       || item.Data.Contains(text, StringComparison.OrdinalIgnoreCase));
         });
         var sorted = RegistryColumns.Sort(visible, this.SortColumn, this.SortDescending);
         if (this.ShowKeysInList && this.ShowParentKeyInList && this.Location.GetNavigationParent() is { } parent)

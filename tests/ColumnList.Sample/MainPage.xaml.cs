@@ -29,6 +29,20 @@ public sealed partial class MainPage : Page
     private readonly string _layoutFile = Path.Combine(Path.GetTempPath(), "ColumnList.Sample.layout.json");
     private SampleEntry[] _source = SampleData.Entries(EntryCount);
 
+    internal RangeObservableCollection<object> RegistrySelection { get; } = [];
+
+    internal RangeObservableCollection<object> ToolSelection { get; } = [];
+
+    internal int LayoutChanges { get; private set; }
+
+    internal string? LastSortRequest { get; private set; }
+
+    internal string? LastRename { get; private set; }
+
+    internal IReadOnlyList<SampleEntry> Entries => (IReadOnlyList<SampleEntry>)this.Registry.ItemsSource!;
+
+    internal string LayoutFile => this._layoutFile;
+
     public MainPage()
     {
         this.InitializeComponent();
@@ -50,25 +64,10 @@ public sealed partial class MainPage : Page
         this.Loaded += (_, _) => this.UpdateInspector();
     }
 
-    internal RangeObservableCollection<object> RegistrySelection { get; } = [];
-
-    internal RangeObservableCollection<object> ToolSelection { get; } = [];
-
-    internal int LayoutChanges { get; private set; }
-
-    internal string? LastSortRequest { get; private set; }
-
-    internal string? LastRename { get; private set; }
-
-    internal IReadOnlyList<SampleEntry> Entries => (IReadOnlyList<SampleEntry>)this.Registry.ItemsSource!;
-
-    internal string LayoutFile => this._layoutFile;
-
     internal void SaveLayout()
     {
         File.WriteAllText(
-            this._layoutFile,
-            JsonSerializer.Serialize(this.Registry.EffectiveLayout, ColumnListJsonContext.Default.ColumnLayout));
+            this._layoutFile, JsonSerializer.Serialize(this.Registry.EffectiveLayout, ColumnListJsonContext.Default.ColumnLayout));
     }
 
     internal void ReloadLayout()
@@ -106,8 +105,8 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        if (this.Entries.Any(entry => !ReferenceEquals(entry, args.Item) &&
-                                      string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase)))
+        if (this.Entries.Any(entry =>
+                !ReferenceEquals(entry, args.Item) && string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
             args.Cancel = true;
             args.Error = $"A value named \"{name}\" already exists.";
@@ -187,13 +186,11 @@ public sealed partial class MainPage : Page
 
     private void UpdateInspector()
     {
-        this.SelectionText.Text
-            = $"Selected: {this.RegistrySelection.Count} registry rows, {this.ToolSelection.Count} tool rows";
+        this.SelectionText.Text = $"Selected: {this.RegistrySelection.Count} registry rows, {this.ToolSelection.Count} tool rows";
         this.SortText.Text = this.Registry.SortColumnId is { } sort
             ? $"Sorted by {sort} {(this.Registry.SortDescending ? "descending" : "ascending")}"
             : "Unsorted";
         this.LayoutText.Text = JsonSerializer.Serialize(
-            this.Registry.EffectiveLayout,
-            new JsonSerializerOptions(ColumnListJsonContext.Default.Options) { WriteIndented = true });
+            this.Registry.EffectiveLayout, new JsonSerializerOptions(ColumnListJsonContext.Default.Options) { WriteIndented = true });
     }
 }

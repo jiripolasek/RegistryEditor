@@ -4,8 +4,4 @@
 
 namespace JPSoftworks.Regedit.Core.Registry;
 
-public sealed record RegistryKeyDetails(
-    DateTimeOffset? LastWriteTimeUtc,
-    int SubKeyCount,
-    int ValueCount,
-    string? LinkTarget);
+public sealed record RegistryKeyDetails(DateTimeOffset? LastWriteTimeUtc, int SubKeyCount, int ValueCount, string? LinkTarget);

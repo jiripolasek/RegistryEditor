@@ -13,6 +13,10 @@ namespace JPSoftworks.Regedit.Models.Tools;
 
 public sealed class InvestigationRow
 {
+    private string? _before;
+
+    private string? _tableSummary;
+
     public string Kind { get; }
 
     public string Title { get; }
@@ -56,8 +60,6 @@ public sealed class InvestigationRow
         _ => this.Time
     };
 
-    private string? _before;
-
     public string Before => this._before ??= this.Source is RegistrySearchMatch match
         ? Detail(match.Value, "Key name: " + match.Location.Name)
         : string.Empty;
@@ -72,15 +74,11 @@ public sealed class InvestigationRow
 
     public string TableSubject => this.Source switch
     {
-        JournalEntry entry when entry.Before.FirstOrDefault()?.Scope.ValueNames is [var name] => name.Length == 0
-            ? "(Default)"
-            : name,
+        JournalEntry entry when entry.Before.FirstOrDefault()?.Scope.ValueNames is [var name] => name.Length == 0 ? "(Default)" : name,
         WatchObservation { Change.Before: null, Change.After: null } observation => observation.Change.Location.Name,
         WatchObservation observation => observation.Change.Name.Length == 0 ? "(Default)" : observation.Change.Name,
         _ => this.Title
     };
-
-    private string? _tableSummary;
 
     public string TableSummary => this._tableSummary ??= Shorten(
         (this.Source switch
@@ -106,25 +104,33 @@ public sealed class InvestigationRow
     public bool HasDataIcon => this.MatchEntry?.HasDataIcon == true;
 
     public string Glyph => this.MatchEntry is { } match ? match.Glyph :
-        this.Source is JournalEntry entry ? ToolPresentation.JournalGlyph(entry.OperationKind) :
-        ToolPresentation.Glyph(this.Kind);
+        this.Source is JournalEntry entry ? ToolPresentation.JournalGlyph(entry.OperationKind) : ToolPresentation.Glyph(this.Kind);
 
-    public string IconFontFamily => this.MatchEntry?.IconFontFamily ?? (this.Kind is "Note" or "Notes"
-        ? ToolPresentation.FluentSystemIconsFontFamily
-        : "Segoe Fluent Icons, Segoe MDL2 Assets");
+    public string IconFontFamily => this.MatchEntry?.IconFontFamily
+                                    ?? (this.Kind is "Note" or "Notes"
+                                        ? ToolPresentation.FluentSystemIconsFontFamily
+                                        : "Segoe Fluent Icons, Segoe MDL2 Assets");
 
-    public string IconStyleKey => this.Source is JournalEntry entry
-        ? ToolPresentation.JournalIconStyleKey(entry)
-        : "ToolIconStyle";
+    public string IconStyleKey => this.Source is JournalEntry entry ? ToolPresentation.JournalIconStyleKey(entry) : "ToolIconStyle";
 
     public bool HasSubtitle => !string.IsNullOrEmpty(this.Subtitle);
 
     public string AccessibleName => this.Source switch
     {
-        JournalEntry entry => this.Title + ", " + JournalTarget(entry, false, this.Path) + ", " +
-                              JournalSummary(entry) + ", " + this.Status,
-        WatchObservation observation => this.Title + ", " + WatchTarget(observation, false) + ", " +
-                                        WatchSummary(observation) + ", " + this.Status,
+        JournalEntry entry => this.Title
+                              + ", "
+                              + JournalTarget(entry, false, this.Path)
+                              + ", "
+                              + JournalSummary(entry)
+                              + ", "
+                              + this.Status,
+        WatchObservation observation => this.Title
+                                        + ", "
+                                        + WatchTarget(observation, false)
+                                        + ", "
+                                        + WatchSummary(observation)
+                                        + ", "
+                                        + this.Status,
         _ => $"{this.Title}, {this.Path}, {this.Status}"
     };
 
@@ -147,10 +153,7 @@ public sealed class InvestigationRow
         this.After = source is RegistrySearchMatch ? Shorten(after, 512) : after;
         this.Source = source;
         this.MatchEntry = source is RegistrySearchMatch match
-            ? new RegistryEntry(match.Value is null ? match.Location : null, match.Value)
-            {
-                SourceLocation = match.Location
-            }
+            ? new RegistryEntry(match.Value is null ? match.Location : null, match.Value) { SourceLocation = match.Location }
             : null;
         this.Time = time;
         this.Status = status ?? subtitle;
@@ -180,25 +183,23 @@ public sealed class InvestigationRow
     internal static InvestigationRow Journal(JournalEntry entry, string status)
     {
         return new InvestigationRow(
-            entry.Operation, entry.Operation, ToolPresentation.JournalTarget(entry),
-            status == "Completed" ? string.Empty : status, string.Empty, string.Empty, entry,
-            entry.Time.ToLocalTime().ToString("t"), status);
+            entry.Operation, entry.Operation, ToolPresentation.JournalTarget(entry), status == "Completed" ? string.Empty : status,
+            string.Empty, string.Empty, entry, entry.Time.ToLocalTime().ToString("t"), status);
     }
 
     internal static InvestigationRow Observation(WatchObservation observation)
     {
         var change = observation.Change;
         return new InvestigationRow(
-            change.Change, change.Change + ": " + change.Name, change.Location.Address, change.Types, string.Empty,
-            string.Empty, observation, observation.Time.ToLocalTime().ToString("t"));
+            change.Change, change.Change + ": " + change.Name, change.Location.Address, change.Types, string.Empty, string.Empty,
+            observation, observation.Time.ToLocalTime().ToString("t"));
     }
 
     internal static InvestigationRow Note(NoteDraft note)
     {
         return new InvestigationRow(
-            "Note", note.Location.Name, ToolPresentation.Address(note.Location),
-            Shorten(note.Text.ReplaceLineEndings(" "), 256), string.Empty, string.Empty, note,
-            note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved" : string.Empty,
+            "Note", note.Location.Name, ToolPresentation.Address(note.Location), Shorten(note.Text.ReplaceLineEndings(" "), 256),
+            string.Empty, string.Empty, note, note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved" : string.Empty,
             note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved changes" : "Saved");
     }
 
@@ -243,26 +244,35 @@ public sealed class InvestigationRow
             : " · " + string.Join(", ", names.Select(value => value.Length == 0 ? "(Default)" : value));
         var identity = location is null
             ? string.Empty
-            : " · " + (location.Machine ?? Environment.MachineName) + " · " +
-              (location.View == Microsoft.Win32.RegistryView.Registry32 ? "32-bit" : "64-bit");
+            : " · "
+              + (location.Machine ?? Environment.MachineName)
+              + " · "
+              + (location.View == Microsoft.Win32.RegistryView.Registry32 ? "32-bit" : "64-bit");
         return fullAddress + fullSubject + identity;
     }
 
     private static string JournalSummary(JournalEntry entry)
     {
-        if (entry.Error is not null || entry.After is null || entry.OperationKind is not (JournalOperation.CreateValue
-                or JournalOperation.EditValue or JournalOperation.RenameValue or JournalOperation.DeleteValue))
+        if (entry.Error is not null
+            || entry.After is null
+            || entry.OperationKind is not (JournalOperation.CreateValue or JournalOperation.EditValue or JournalOperation.RenameValue
+                or JournalOperation.DeleteValue))
         {
             return entry.Activity ?? entry.Operation;
         }
 
         var before = entry.Before.Length == 1 ? entry.Before[0] : null;
         var after = entry.After.Length == 1 ? entry.After[0] : null;
-        if (before is null || after is null || before.Snapshot.Keys.Length != 1 || after.Snapshot.Keys.Length != 1 ||
-            before.Snapshot.Keys[0].Path.Length != 0 || after.Snapshot.Keys[0].Path.Length != 0 ||
-            !before.Scope.Location.IsSameLocation(after.Scope.Location) ||
-            before.Scope.ValueNames is not { Length: >= 1 and <= 2 } names || after.Scope.ValueNames is null ||
-            !names.SequenceEqual(after.Scope.ValueNames, StringComparer.OrdinalIgnoreCase))
+        if (before is null
+            || after is null
+            || before.Snapshot.Keys.Length != 1
+            || after.Snapshot.Keys.Length != 1
+            || before.Snapshot.Keys[0].Path.Length != 0
+            || after.Snapshot.Keys[0].Path.Length != 0
+            || !before.Scope.Location.IsSameLocation(after.Scope.Location)
+            || before.Scope.ValueNames is not { Length: >= 1 and <= 2 } names
+            || after.Scope.ValueNames is null
+            || !names.SequenceEqual(after.Scope.ValueNames, StringComparer.OrdinalIgnoreCase))
         {
             return entry.Operation;
         }
@@ -276,8 +286,8 @@ public sealed class InvestigationRow
 
         var oldValue = beforeValues.FirstOrDefault();
         var newValue = afterValues.FirstOrDefault();
-        if (oldValue is not null && !names.Contains(oldValue.Name, StringComparer.OrdinalIgnoreCase) ||
-            newValue is not null && !names.Contains(newValue.Name, StringComparer.OrdinalIgnoreCase))
+        if (oldValue is not null && !names.Contains(oldValue.Name, StringComparer.OrdinalIgnoreCase)
+            || newValue is not null && !names.Contains(newValue.Name, StringComparer.OrdinalIgnoreCase))
         {
             return entry.Operation;
         }
@@ -296,9 +306,12 @@ public sealed class InvestigationRow
 
         return compact
             ? CompactWatchTarget(change.Location, name)
-            : change.Location.Address + (name.Length == 0 ? string.Empty : " · " + name) + " · " +
-              (change.Location.Machine ?? Environment.MachineName) + " · " +
-              (change.Location.View == Microsoft.Win32.RegistryView.Registry32 ? "32-bit" : "64-bit");
+            : change.Location.Address
+              + (name.Length == 0 ? string.Empty : " · " + name)
+              + " · "
+              + (change.Location.Machine ?? Environment.MachineName)
+              + " · "
+              + (change.Location.View == Microsoft.Win32.RegistryView.Registry32 ? "32-bit" : "64-bit");
     }
 
     private static string CompactWatchTarget(RegistryLocation location, string name)
@@ -323,9 +336,7 @@ public sealed class InvestigationRow
 
     private static string ValueSummary(RegistryValue? value, string fallback)
     {
-        return value is null
-            ? fallback
-            : value.TypeName + " " + Shorten(value.DisplayPreview.Replace('\r', ' ').Replace('\n', ' '), 72);
+        return value is null ? fallback : value.TypeName + " " + Shorten(value.DisplayPreview.Replace('\r', ' ').Replace('\n', ' '), 72);
     }
 
     private static string CompactAddress(RegistryLocation location, int limit)

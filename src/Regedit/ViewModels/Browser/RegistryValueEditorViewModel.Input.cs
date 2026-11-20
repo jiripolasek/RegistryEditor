@@ -115,8 +115,9 @@ public sealed partial class RegistryValueEditorViewModel
             {
                 bytes = RegistryValue.ParseData(this._type, text, hex: true);
             }
-            else if (this.IsNumeric && this._type == RegistryValueType.DWord &&
-                     text.StartsWith("dword:", StringComparison.OrdinalIgnoreCase))
+            else if (this.IsNumeric
+                     && this._type == RegistryValueType.DWord
+                     && text.StartsWith("dword:", StringComparison.OrdinalIgnoreCase))
             {
                 bytes = RegistryValue.ParseData(this._type, text[6..], hex: true);
             }

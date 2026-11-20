@@ -13,8 +13,6 @@ namespace JPSoftworks.Regedit.Controls.Shared;
 
 public sealed partial class ResizeThumb : UserControl
 {
-    private readonly Thumb _thumb;
-
     public event DragDeltaEventHandler DragDelta
     {
         add => this._thumb.DragDelta += value;
@@ -27,6 +25,10 @@ public sealed partial class ResizeThumb : UserControl
         remove => this._thumb.DragCompleted -= value;
     }
 
+    private readonly Thumb _thumb;
+
+    private Orientation _direction;
+
     public Orientation ResizeDirection
     {
         get => this._direction;
@@ -34,13 +36,9 @@ public sealed partial class ResizeThumb : UserControl
         {
             this._direction = value;
             this.ProtectedCursor = InputSystemCursor.Create(
-                value == Orientation.Vertical
-                    ? InputSystemCursorShape.SizeNorthSouth
-                    : InputSystemCursorShape.SizeWestEast);
+                value == Orientation.Vertical ? InputSystemCursorShape.SizeNorthSouth : InputSystemCursorShape.SizeWestEast);
         }
     }
-
-    private Orientation _direction;
 
     public ResizeThumb()
     {
