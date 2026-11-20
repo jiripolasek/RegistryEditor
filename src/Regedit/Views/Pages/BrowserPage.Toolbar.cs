@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
+using WinRT;
 
 namespace JPSoftworks.Regedit.Views.Pages;
 
@@ -58,6 +59,7 @@ public sealed partial class BrowserPage
         this.UpdateToolsMenuPins();
     }
 
+    [DynamicWindowsRuntimeCast(typeof(ControlTemplate))]
     private void AttachToolsMenuPin(ToolbarButtons button, ToolCommand command, MenuFlyoutItem item)
     {
         var pin = new Button
