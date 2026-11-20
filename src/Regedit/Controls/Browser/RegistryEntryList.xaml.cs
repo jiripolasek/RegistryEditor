@@ -330,7 +330,7 @@ public sealed partial class RegistryEntryList : UserControl
     ///     Runs an edit that reloads the list, then puts the user back where they were: the same scroll position, the
     ///     selected row brought into view if it moved (a rename can re-sort it), and keyboard focus on that row.
     /// </summary>
-    private async Task KeepPlaceAsync(Func<Task> edit)
+    internal async Task KeepPlaceAsync(Func<Task> edit)
     {
         var scroll = ResultListViewport.FindScrollViewer(this.EntriesList);
         var offset = scroll?.VerticalOffset ?? 0;

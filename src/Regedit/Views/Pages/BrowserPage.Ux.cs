@@ -95,13 +95,23 @@ public sealed partial class BrowserPage
             }
 
             var focused = FocusManager.GetFocusedElement(this.XamlRoot) as DependencyObject;
-            if (IsInside(focused, this.EntryList) || IsInside(focused, this.TreePane) || IsInside(focused, this.Commands))
+            var inList = IsInside(focused, this.EntryList);
+            if (inList || IsInside(focused, this.TreePane) || IsInside(focused, this.Commands))
             {
                 args.Handled = true;
                 var command = args.Key == VirtualKey.Z ? this.ViewModel.UndoCommand : this.ViewModel.RedoCommand;
                 if (command.CanExecute(null))
                 {
-                    command.Execute(null);
+                    if (inList)
+                    {
+                        await this.GuardAsync(
+                            "Couldn't complete the registry action", "Registry action canceled",
+                            () => this.EntryList.KeepPlaceAsync(() => command.ExecuteAsync(null)));
+                    }
+                    else
+                    {
+                        command.Execute(null);
+                    }
                 }
             }
 
