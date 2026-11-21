@@ -29,5 +29,7 @@
     <NeutralLanguage>en-US</NeutralLanguage>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 </Project>
