@@ -34,12 +34,16 @@ public sealed partial class SettingsPage : Page
             "Tabs and navigation", ("Open the application menu", "Alt+F"), ("Open Settings", "Ctrl+,"),
             ("Open Keyboard shortcuts", "Ctrl+/"), ("Open Help and about", "F1"), ("New tab", "Ctrl+T"),
             ("Reopen closed tab", "Ctrl+Shift+T"), ("Close tab", "Ctrl+W"), ("Next / previous tab", "Ctrl+Tab / Ctrl+Shift+Tab"),
-            ("Focus the address bar", "Ctrl+L / Alt+D"), ("Back / forward", "Alt+Left / Alt+Right"),
+            ("Focus the address bar", "Ctrl+L / Alt+D"),
+            ("Open the command palette from a registry tab", "Ctrl+Shift+P"),
+            ("Open the command palette from the omnibox", ">"),
+            ("Back / forward", "Alt+Left / Alt+Right"),
             ("Back in the list / select the parent in the tree", "Backspace"), ("Open the parent key", "Alt+Up"),
             ("Switch between HKLM and HKCU", "Ctrl+Shift+H"), ("Sync tree to current key", "Alt+Shift+L"),
             ("Refresh the current key", "F5"), ("Cycle through visible panes", "F6"), ("Show toolbar key hints", "Alt"));
         this.AddShortcutGroup(
             "Search and filtering", ("Search the registry", "Ctrl+F"), ("Open advanced search", "Ctrl+Shift+F"),
+            ("Search from the omnibox", "?"),
             ("Find the next match", "F3"), ("Filter the current key", "Ctrl+Alt+F"),
             ("Filter by typing in the registry list", "Start typing"));
         this.AddShortcutGroup(

@@ -433,8 +433,7 @@ internal sealed partial class FavoritesViewModel(
 
     internal RegistryLocation Location(FavoriteItemId item)
     {
-        var favorite = this.Store.Bookmark(item.Id);
-        return RegistryLocation.Parse(favorite.Address, favorite.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
+        return this.Store.Bookmark(item.Id).GetLocation();
     }
 
     private void Refresh(bool rebuildTree = true)

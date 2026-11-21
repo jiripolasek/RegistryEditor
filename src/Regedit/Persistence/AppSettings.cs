@@ -61,6 +61,8 @@ public sealed partial class AppSettings
 
     public List<SavedSearch> Searches { get; set; } = [];
 
+    internal IReadOnlyList<string> RecentSearches { get; private set; } = [];
+
     public List<KeyNote> Notes { get; set; } = [];
 
     public List<RegistryWorkspace> Workspaces { get; set; } = [];
@@ -99,6 +101,8 @@ public sealed partial class AppSettings
     public bool ShowUpButton { get; set; } = true;
 
     public bool ShowRefreshButton { get; set; } = true;
+
+    public bool ShowSearchBox { get; set; } = true;
 
     public ToolbarButtons ToolbarButtons { get; set; }
 
@@ -213,6 +217,7 @@ public sealed partial class AppSettings
             settings.ShowForwardButton = saved.ShowForwardButton;
             settings.ShowUpButton = saved.ShowUpButton;
             settings.ShowRefreshButton = saved.ShowRefreshButton;
+            settings.ShowSearchBox = saved.ShowSearchBox;
             settings.ListColumns = RegistryColumns.FromNames(saved.ListColumns);
             settings.ColumnLayouts = (saved.ColumnLayouts ?? [])
                 .Where(pair => !string.IsNullOrEmpty(pair.Key) && pair.Value?.Columns is not null).ToDictionary(
@@ -226,6 +231,7 @@ public sealed partial class AppSettings
             settings.ToolPanePinned = saved.ToolPanePinned;
             settings.ToolPaneWidth = double.IsFinite(saved.ToolPaneWidth) ? Math.Clamp(saved.ToolPaneWidth, 300, 680) : 360;
             settings.SelectedTool = saved.SelectedTool is "Watches" or "Journal" or "Notes" ? saved.SelectedTool : "Favorites";
+            settings.RecentSearches = NormalizeRecentSearches(saved.RecentSearches ?? []);
             settings.Searches = saved.Searches ?? [];
             foreach (var search in settings.Searches)
             {
@@ -276,7 +282,7 @@ public sealed partial class AppSettings
             this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
             this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton,
             this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
-            this.EditorFont);
+            this.EditorFont, this.ShowSearchBox);
         try
         {
             change(this);
@@ -340,7 +346,7 @@ public sealed partial class AppSettings
                 this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
                 this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton,
                 this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl,
-                this.RegistryFileLayout, this.EditorFont) = previous;
+                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox) = previous;
             throw;
         }
     }
@@ -385,5 +391,7 @@ public sealed partial class AppSettings
         string[]? HiddenJumpListFavorites = null,
         string? WebSearchUrl = null,
         RegistryFileLayout RegistryFileLayout = RegistryFileLayout.Split,
-        RegistryFont? EditorFont = null);
+        RegistryFont? EditorFont = null,
+        string[]? RecentSearches = null,
+        bool ShowSearchBox = true);
 }

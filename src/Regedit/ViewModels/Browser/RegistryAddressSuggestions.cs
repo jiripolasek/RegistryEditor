@@ -51,7 +51,7 @@ internal sealed class RegistryAddressSuggestions(Func<RegistryLocation, string[]
             return RegistryLocation.Roots.Where(root =>
                     root.Name.StartsWith(text, StringComparison.OrdinalIgnoreCase)
                     || root.Alias.StartsWith(text, StringComparison.OrdinalIgnoreCase))
-                .Select(root => new OmniboxItem(root.Name, root.Name))
+                .Select(root => new OmniboxItem(root.Name, root.Name) { IconGlyph = "\uE8B7" })
                 .ToArray();
         }
 
@@ -65,6 +65,6 @@ internal sealed class RegistryAddressSuggestions(Func<RegistryLocation, string[]
         cancellationToken.ThrowIfCancellationRequested();
         var prefix = text[(slash + 1)..];
         return names.Where(name => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).Take(SuggestionLimit)
-            .Select(name => new OmniboxItem(name, parent.Child(name).Address)).ToArray();
+            .Select(name => new OmniboxItem(name, parent.Child(name).Address) { IconGlyph = "\uE8B7" }).ToArray();
     }
 }

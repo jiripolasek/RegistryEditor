@@ -129,6 +129,61 @@ internal static class AppServicesTests
                 AppSettings.Load(path).HiddenJumpListFavorites.Contains(settings.Favorites[0].Id)
                 && settings.HiddenJumpListFavorites.Count == 0,
                 "Jump List removals use the configured profile without mutating a scoped settings snapshot");
+
+            var history = first.GetRequiredService<SearchHistoryStore>();
+            var stale = AppSettings.Load(path);
+            await history.RecordAsync("First query");
+            stale.RecordSearch("Other window", path);
+            await history.RecordAsync("First query");
+            check(
+                ReferenceEquals(history, second.GetRequiredService<SearchHistoryStore>()) &&
+                history.Queries.SequenceEqual(["First query", "Other window"]) &&
+                AppSettings.Load(path).RecentSearches.SequenceEqual(history.Queries),
+                "Search history retains another window's query and moves repeat searches to the front");
+
+            const string firstQueued = "First queued query";
+            const string secondQueued = " Second queued query ";
+            Task firstWrite;
+            Task secondWrite;
+            using (File.Open(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            {
+                firstWrite = history.RecordAsync(firstQueued);
+                secondWrite = history.RecordAsync(secondQueued);
+                check(
+                    !firstWrite.IsCompleted && !secondWrite.IsCompleted &&
+                    history.Queries.Take(2).SequenceEqual([secondQueued, firstQueued]),
+                    "Search history is available while its disk writes wait for the profile lock");
+            }
+
+            await Task.WhenAll(firstWrite, secondWrite).WaitAsync(TimeSpan.FromSeconds(10));
+            check(
+                AppSettings.Load(path).RecentSearches.Take(2).SequenceEqual([secondQueued, firstQueued]),
+                "Queued search history persists in order with query whitespace intact");
+
+            await Task.WhenAll(Enumerable.Range(1, 20).Select(index => history.RecordAsync($"Query {index}")));
+            check(
+                AppSettings.Load(path).RecentSearches.SequenceEqual(
+                    Enumerable.Range(1, 20).Reverse().Select(index => $"Query {index}")),
+                "Search history persists the newest twenty queries");
+
+            var readable = File.ReadAllText(path);
+            const string unreadable = "{ damaged settings";
+            File.WriteAllText(path, unreadable);
+            using (var reopenedHistory = new SearchHistoryStore(
+                () => AppSettings.Load(path), path, NullLogger<SearchHistoryStore>.Instance))
+            {
+                await reopenedHistory.RecordAsync("Search on an unreadable profile");
+                check(
+                    File.ReadAllText(path) == unreadable && !directory.EnumerateFiles("settings.json.unreadable.*").Any(),
+                    "Opening search on an unreadable profile preserves the original settings file");
+
+                File.WriteAllText(path, readable);
+                _ = reopenedHistory.RecordAsync("Search after profile recovery");
+            }
+
+            check(
+                AppSettings.Load(path).RecentSearches.FirstOrDefault() == "Search after profile recovery",
+                "Search history resumes after profile recovery and flushes on shutdown");
         }
         finally
         {

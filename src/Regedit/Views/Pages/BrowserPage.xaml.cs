@@ -185,6 +185,7 @@ public sealed partial class BrowserPage : Page
         viewModel.RegistryChanged += (_, _) => this._window.JournalHistory.RegistryActivityCompleted();
         this.AddressBar.SuggestionProvider = (text, token) => viewModel.Addresses.SuggestAsync(text, viewModel.Location.View, token);
         this.AddressBar.ChildrenProvider = (address, token) => viewModel.Addresses.ChildrenAsync(address, viewModel.Location, token);
+        this.InitializeOmniboxScopes();
         this.ApplyViewSettings();
         this.ViewModel.Navigated += this.ViewModel_Navigated;
         if (selectedValue is { } name)
@@ -241,7 +242,7 @@ public sealed partial class BrowserPage : Page
                     viewModel.SwitchHiveCommand.Execute(null);
                 }
             });
-        this.AddShortcut(VirtualKey.F, VirtualKeyModifiers.Control, () => this.QuickSearch.Focus(FocusState.Keyboard));
+        this.AddShortcut(VirtualKey.F, VirtualKeyModifiers.Control, this.FocusSearch);
         this.AddShortcut(VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, viewModel.Search.FindCommand);
         this.AddShortcut(
             VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu, () => this.Filter_Click(this, new RoutedEventArgs()));

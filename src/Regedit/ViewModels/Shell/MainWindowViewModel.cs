@@ -48,6 +48,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     private readonly HashSet<WatchSession> _reportedWatchFailures = [];
 
     private readonly Dictionary<SearchResultsViewModel, (BrowserTab Tab, int Navigation)> _searchDestinations = [];
+    private readonly SearchHistoryStore? _searchHistory;
     private readonly AppSettings _settings;
     private BrowserTab? _contextTab;
 
@@ -73,6 +74,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     internal NotesStore NoteStore { get; }
 
     public ReadOnlyObservableCollection<NoteDraft> Notes => this.NoteStore.Notes;
+
+    internal IReadOnlyList<string> RecentSearches => this._searchHistory?.Queries ?? [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(VisibleBrowser))]
@@ -115,10 +118,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         ILogger<MainWindowViewModel> logger,
         NotesStore notes,
         RegistryHistoryBroadcaster? historyBroadcaster = null,
-        JournalViewModel? journalHistory = null)
+        JournalViewModel? journalHistory = null,
+        SearchHistoryStore? searchHistory = null)
     {
         this._logger = logger;
         this._settings = settings;
+        this._searchHistory = searchHistory;
         this._investigations = investigations;
         this._registry = registry;
         this._createBrowser = createBrowser;
@@ -553,6 +558,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         }
 
         _ = tab.RunCommand.ExecuteAsync(null);
+        _ = this._searchHistory?.RecordAsync(search.Options.Text);
     }
 
     private SearchResultsViewModel CreateSearch(SavedSearch search)

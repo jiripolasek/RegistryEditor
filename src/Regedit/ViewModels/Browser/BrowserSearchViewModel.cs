@@ -49,7 +49,7 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
     }
 
     [RelayCommand]
-    private async Task FindAsync()
+    private async Task FindAsync(string? query)
     {
         if (this.FindRequested is null || this._closed)
         {
@@ -58,7 +58,7 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
 
         try
         {
-            var form = new FindOptionsViewModel(location(), this.Query, this._search?.Options);
+            var form = new FindOptionsViewModel(location(), query ?? this.Query, this._search?.Options);
             if (await this.FindRequested(form) is { } search && !this._closed)
             {
                 this.StartSearch(search);

@@ -512,7 +512,7 @@
                     x:Name="AddressColumn"
                     Width="3*"
                     MinWidth="180" />
-                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition
                     x:Name="SearchColumn"
                     Width="*"
@@ -570,6 +570,7 @@
             <controls:Omnibox
                 x:Name="AddressBar"
                 Grid.Column="1"
+                VerticalAlignment="Center"
                 AutomationProperties.Name="Registry omnibox"
                 IsRootSelectorVisible="False"
                 NavigationRequested="Address_NavigationRequested">
@@ -583,6 +584,8 @@
                             Visibility="{x:Bind ViewModel.Is32Bit, Mode=OneWay}" />
                         <Button
                             x:Name="FavoriteButton"
+                            Height="32"
+                            VerticalAlignment="Center"
                             AccessKey="K"
                             AutomationProperties.Name="{x:Bind ViewModel.FavoriteAction, Mode=OneWay}"
                             Command="{x:Bind ViewModel.ToggleFavoriteCommand}"
@@ -596,80 +599,83 @@
             <shared:ResizeThumb
                 x:Name="SearchSplitter"
                 Grid.Column="2"
+                Width="8"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 AutomationProperties.AutomationId="SearchSplitter"
                 AutomationProperties.Name="Resize omnibox and search box"
                 PreviewKeyDown="Splitter_KeyDown"
                 ToolTipService.ToolTip="Resize omnibox and search box" />
-            <Border
+            <Grid
                 x:Name="SearchArea"
                 Grid.Column="3"
-                MinHeight="36"
-                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="4"
+                MinHeight="34"
+                VerticalAlignment="Center"
                 GotFocus="SearchArea_FocusChanged"
                 LostFocus="SearchArea_FocusChanged">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button
-                        x:Name="QuickSearchButton"
-                        Width="32"
-                        Height="32"
-                        Margin="1,0,0,0"
-                        Padding="8"
-                        AccessKey="S"
-                        AutomationProperties.Name="Start search"
-                        Command="{x:Bind ViewModel.Search.QuickSearchCommand}"
-                        Style="{StaticResource SubtleButtonStyle}"
-                        ToolTipService.ToolTip="Start search">
-                        <FontIcon FontSize="14" Glyph="&#xE721;" />
-                    </Button>
-                    <AutoSuggestBox
-                        x:Name="QuickSearch"
-                        Grid.Column="1"
-                        AutomationProperties.Name="Search registry"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="0"
-                        PlaceholderText="Search this branch"
-                        QuerySubmitted="QuickSearch_Submitted"
-                        Text="{x:Bind ViewModel.Search.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                        <AutoSuggestBox.TextBoxStyle>
-                            <Style BasedOn="{StaticResource AutoSuggestBoxTextBoxStyle}" TargetType="TextBox">
-                                <Setter Property="Padding" Value="2,9,2,4" />
-                            </Style>
-                        </AutoSuggestBox.TextBoxStyle>
-                        <AutoSuggestBox.Resources>
-                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
-                            <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
-                        </AutoSuggestBox.Resources>
-                    </AutoSuggestBox>
-                    <Button
-                        x:Name="AdvancedSearchButton"
-                        Grid.Column="2"
-                        Width="32"
-                        Height="32"
-                        Margin="0,0,1,0"
-                        Padding="8"
-                        AccessKey="A"
-                        AutomationProperties.Name="Advanced search"
-                        Command="{x:Bind ViewModel.Search.FindCommand}"
-                        Style="{StaticResource SubtleButtonStyle}"
-                        ToolTipService.ToolTip="Advanced search (Ctrl+Shift+F)">
-                        <FontIcon FontSize="12" Glyph="&#xE70D;" />
-                    </Button>
-                </Grid>
-            </Border>
+                <Border
+                    x:Name="SearchFrame"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                    CornerRadius="4"
+                    IsHitTestVisible="False" />
+                <Button
+                    x:Name="QuickSearchButton"
+                    Width="32"
+                    Height="32"
+                    Margin="2,0,0,0"
+                    Padding="8"
+                    HorizontalAlignment="Left"
+                    AccessKey="S"
+                    AutomationProperties.Name="Start search"
+                    Canvas.ZIndex="1"
+                    Command="{x:Bind ViewModel.Search.QuickSearchCommand}"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    ToolTipService.ToolTip="Start search">
+                    <FontIcon FontSize="14" Glyph="&#xE721;" />
+                </Button>
+                <AutoSuggestBox
+                    x:Name="QuickSearch"
+                    AutomationProperties.Name="Search registry"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    GotFocus="QuickSearch_GotFocus"
+                    PlaceholderText="Search this branch"
+                    QuerySubmitted="QuickSearch_Submitted"
+                    Text="{x:Bind ViewModel.Search.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    TextChanged="QuickSearch_TextChanged">
+                    <AutoSuggestBox.TextBoxStyle>
+                        <Style BasedOn="{StaticResource AutoSuggestBoxTextBoxStyle}" TargetType="TextBox">
+                            <Setter Property="Padding" Value="36,7,2,4" />
+                        </Style>
+                    </AutoSuggestBox.TextBoxStyle>
+                    <AutoSuggestBox.Resources>
+                        <!-- Keep the native clear button alongside the advanced search button. -->
+                        <x:Double x:Key="AutoSuggestBoxRightButtonMargin">38</x:Double>
+                        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                        <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+                    </AutoSuggestBox.Resources>
+                </AutoSuggestBox>
+                <Button
+                    x:Name="AdvancedSearchButton"
+                    Width="32"
+                    Height="32"
+                    Margin="0,0,2,0"
+                    Padding="8"
+                    HorizontalAlignment="Right"
+                    AccessKey="A"
+                    AutomationProperties.Name="Advanced search"
+                    Canvas.ZIndex="1"
+                    Command="{x:Bind ViewModel.Search.FindCommand}"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    ToolTipService.ToolTip="Advanced search (Ctrl+Shift+F)">
+                    <FontIcon FontSize="12" Glyph="&#xE70D;" />
+                </Button>
+            </Grid>
             <StackPanel
                 x:Name="GlobalActions"
                 Grid.Column="4"
@@ -1310,9 +1316,8 @@
                 <VisualState x:Name="SearchUnfocused" />
                 <VisualState x:Name="SearchFocused">
                     <VisualState.Setters>
-                        <Setter Target="SearchArea.Background" Value="{ThemeResource ControlFillColorInputActiveBrush}" />
-                        <Setter Target="SearchArea.BorderBrush" Value="{ThemeResource TextControlBorderBrushFocused}" />
-                        <Setter Target="SearchArea.BorderThickness" Value="{ThemeResource TextControlBorderThemeThicknessFocused}" />
+                        <Setter Target="SearchFrame.Background" Value="{ThemeResource TextControlBackgroundFocused}" />
+                        <Setter Target="SearchFrame.BorderThickness" Value="0,0,0,2" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>

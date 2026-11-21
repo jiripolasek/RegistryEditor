@@ -13,7 +13,7 @@ namespace JPSoftworks.Omnibox.Sample;
 public partial class App : Application
 {
     internal static readonly OmniboxItem Workspace = new("Workspace", "space:home") { HasChildren = true };
-    internal static readonly OmniboxItem Projects = new("Projects", "space:projects") { HasChildren = true };
+    internal static readonly OmniboxItem Projects = new("Projects", "space:projects") { HasChildren = true, IconGlyph = "\uE8B7" };
     internal static readonly OmniboxItem Notes = new("Notes", "space:notes") { HasChildren = false };
 
     internal static readonly OmniboxItem Component = new(
@@ -92,6 +92,19 @@ public partial class App : Application
         return new AddressControl
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            AddressPlaceholder = "Enter a location or type #",
+            Scopes = (OmniboxScope[])
+            [
+                new("#pinned", "Pinned", "Search pinned locations", text => new[]
+                {
+                    Projects with { Group = "Work", IconGlyph = "\uE8B7" },
+                    Component with { Group = "Work", IconGlyph = "\uE8B7" },
+                    Notes with { Group = "Personal", IconGlyph = "\uE70F" }
+                }.Where(item => item.Label.Contains(text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray(), "%")
+                {
+                    GroupPreviewCounts = new Dictionary<string, int> { ["Work"] = 1 }
+                }
+            ],
             ChildrenProvider = ChildrenAsync,
             SuggestionProvider = (text, token) => Task.FromResult<IReadOnlyList<OmniboxItem>>(
                 Paths.Values.Select(path => path[^1]).Where(item =>

@@ -164,6 +164,12 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
         set => this.Update(this.ShowRefreshButton, value, s => s.ShowRefreshButton = value);
     }
 
+    public bool ShowSearchBox
+    {
+        get => settings.ShowSearchBox;
+        set => this.Update(this.ShowSearchBox, value, s => s.ShowSearchBox = value);
+    }
+
     public ToolbarButtons ToolbarButtons => settings.ToolbarButtons;
 
     public bool PanelTabsAtBottom
