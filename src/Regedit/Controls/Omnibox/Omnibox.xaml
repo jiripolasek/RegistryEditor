@@ -17,7 +17,7 @@
         <Style x:Key="ChildLocationsFlyoutStyle" TargetType="FlyoutPresenter">
             <Setter Property="Padding" Value="4" />
         </Style>
-        <x:Double x:Key="InputMinHeight">34</x:Double>
+        <x:Double x:Key="InputMinHeight">32</x:Double>
         <x:Double x:Key="SuggestionRowMinHeight">38</x:Double>
         <x:Double x:Key="SuggestionColumnSpacing">8</x:Double>
         <Thickness x:Key="SuggestionPopupBorderThickness">1</Thickness>
