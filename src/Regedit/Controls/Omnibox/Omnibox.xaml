@@ -369,6 +369,7 @@
                     SuggestionChosen="Editor_SuggestionChosen"
                     Template="{StaticResource SuggestionEditorTemplate}"
                     TextChanged="Editor_TextChanged"
+                    UpdateTextOnSelect="False"
                     Visibility="Collapsed" />
                 <Grid x:Name="EditorAccessories" VerticalAlignment="Top">
                     <FontIcon

@@ -53,6 +53,8 @@ public sealed partial class Omnibox : UserControl
     private Border? _suggestionsPanel;
     private Action? _detachSuggestionLayout;
     private OmniboxScope? _scope;
+    private string _queryText = string.Empty;
+    private OmniboxItem? _previewItem;
     private readonly double _addressTextInset;
     private ListView? _suggestionsList;
     private IReadOnlyList<OmniboxItem> _suggestions = [];
@@ -257,7 +259,9 @@ public sealed partial class Omnibox : UserControl
         contextMenu?.Hide();
         this.CancelSuggestions();
         this.SetScope(scope);
-        this.Editor.Text = scope is null ? this.Address : string.Empty;
+        this._previewItem = null;
+        this._queryText = scope is null ? this.Address : string.Empty;
+        this.Editor.Text = this._queryText;
         if (!this.EditorPopup.IsOpen)
         {
             this.EditPlaceholder.MinWidth = this.DisplayPath.DesiredSize.Width;
@@ -358,7 +362,6 @@ public sealed partial class Omnibox : UserControl
         AutomationProperties.SetName(this.Editor, scope?.Placeholder ?? "Address");
         this.Editor.QueryIcon = scope is null ? new SymbolIcon(Symbol.Forward) : null;
         this.ClearInputButton.Margin = new Thickness(0, 0, scope is null ? 36 : 2, 0);
-        this.Editor.UpdateTextOnSelect = scope is null;
         this.UpdateInputPadding();
     }
 
@@ -376,6 +379,8 @@ public sealed partial class Omnibox : UserControl
         }
 
         this.SetScope(scope);
+        this._previewItem = null;
+        this._queryText = query;
         this.Editor.Text = query;
         this.DispatcherQueue.TryEnqueue(this.FocusEditor);
     }
@@ -642,14 +647,35 @@ public sealed partial class Omnibox : UserControl
         this._suggestionGroups.Clear();
     }
 
+    private string? PreviewText => this._previewItem?.Scope?.Keyword ?? this._previewItem?.Address;
+
     private async void Editor_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
-        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput || this.Editor.Visibility != Visibility.Visible)
+        if (this.Editor.Visibility != Visibility.Visible)
         {
             return;
         }
 
         var text = sender.Text;
+        if (this._previewItem is { } preview && text == this.PreviewText)
+        {
+            // WinUI can clear the selection while processing queued preview changes.
+            if (text != this._queryText && this.IsSuggestionListOpen &&
+                this._suggestionsList is { SelectedIndex: -1 } list && list.Items.Contains(preview))
+            {
+                list.SelectedItem = preview;
+            }
+
+            return;
+        }
+
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+        {
+            return;
+        }
+
+        this._previewItem = null;
+        this._queryText = text;
         if (this._scope is { } scope)
         {
             this.ShowScopedSuggestions(scope, text);
@@ -738,8 +764,9 @@ public sealed partial class Omnibox : UserControl
 
     private void Editor_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
     {
-        if (sender.UpdateTextOnSelect && args.SelectedItem is OmniboxItem item)
+        if (this._scope is null && args.SelectedItem is OmniboxItem item)
         {
+            this._previewItem = item;
             sender.Text = item.Scope?.Keyword ?? item.Address;
         }
     }
@@ -825,7 +852,9 @@ public sealed partial class Omnibox : UserControl
                  !IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Menu))
         {
             var backwards = IsKeyDown(VirtualKey.Shift);
-            if (!backwards && this._scope is null && this.FindTabScope(this.Editor.Text) is { } scope)
+            var text = this.Editor.Text;
+            var query = text == this.PreviewText ? this._queryText : text;
+            if (!backwards && this._scope is null && this.FindTabScope(query) is { } scope)
             {
                 this.ChangeScope(scope, string.Empty);
                 args.Handled = true;
@@ -864,17 +893,13 @@ public sealed partial class Omnibox : UserControl
             return false;
         }
 
-        var updateTextOnSelect = this.Editor.UpdateTextOnSelect;
-        this.Editor.UpdateTextOnSelect = false;
-        try
+        if (index < 0 && this._scope is null)
         {
-            list.SelectedIndex = index;
-        }
-        finally
-        {
-            this.Editor.UpdateTextOnSelect = updateTextOnSelect;
+            this._previewItem = null;
+            this.Editor.Text = this._queryText;
         }
 
+        list.SelectedIndex = index;
         return true;
     }
 

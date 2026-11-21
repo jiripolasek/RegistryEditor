@@ -177,9 +177,22 @@ try {
     Test-Omnibox 'Subkey suggestions can be chosen with the keyboard' {
         Edit-Address
         Invoke-Ui @('send-keys', 'HKCU\Softw', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
-        Start-Sleep -Milliseconds 500
-        Invoke-Ui @('send-keys', 'Down', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
-        Wait-State { param($elements) @($elements | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' -and $_.value -eq 'HKEY_CURRENT_USER\Software' }).Count -eq 1 }
+        Wait-State { param($elements) $elements.automationId -contains 'OmniboxSuggestionFooter' }
+        foreach ($key in @('Tab', 'Down')) {
+            Invoke-Ui @('send-keys', $key, '--via', 'send-input') | Out-Null
+            Wait-State {
+                param($elements)
+                @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq 'HKEY_CURRENT_USER\Software' }).Count -eq 1
+            }
+            Expect-KeyboardFocus 'OmniboxInput'
+            if ($key -eq 'Tab') {
+                Invoke-Ui @('send-keys', 'shift+Tab', '--via', 'send-input') | Out-Null
+                Wait-State {
+                    param($elements)
+                    @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq 'HKCU\Softw' }).Count -eq 1
+                }
+            }
+        }
         Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
         Expect-Location 'HKEY_CURRENT_USER\Software'
         if (@((Read-Ui) | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0) { throw 'Successful navigation did not clear the old error.' }
@@ -193,7 +206,7 @@ try {
         $popups = @(& winapp ui list-windows -a $AppPid --json --on $Target | ConvertFrom-Json | Where-Object { $_.label -eq 'popup' })
         if ($LASTEXITCODE -ne 0 -or $popups.Count -gt 0) { throw 'A suggestion popup remained after cancelling.' }
     }
-    Test-Omnibox 'Tab selects contexts while the textbox keeps focus and its query' {
+    Test-Omnibox 'Tab previews contexts while the textbox keeps focus' {
         Edit-Address
         Invoke-Ui @('send-keys', '@', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
         Wait-State {
@@ -206,17 +219,29 @@ try {
             Invoke-Ui @('send-keys', 'Tab', '--via', 'send-input') | Out-Null
             Expect-SuggestionSelection $context.selector
             Expect-KeyboardFocus 'OmniboxInput'
+            Wait-State {
+                param($elements)
+                @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq $context.name }).Count -eq 1
+            }
         }
         Invoke-Ui @('send-keys', 'Tab', '--via', 'send-input') | Out-Null
         Expect-SuggestionSelection $contexts[-1].selector $false
+        Wait-State {
+            param($elements)
+            @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq '@' }).Count -eq 1
+        }
         Invoke-Ui @('send-keys', 'shift+Tab', '--via', 'send-input') | Out-Null
         Expect-SuggestionSelection $contexts[-1].selector
+        Wait-State {
+            param($elements)
+            @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq $contexts[-1].name }).Count -eq 1
+        }
         Invoke-Ui @('send-keys', 'Tab Tab Tab shift+Tab', '--via', 'send-input') | Out-Null
         Expect-SuggestionSelection $contexts[0].selector
         Expect-KeyboardFocus 'OmniboxInput'
         Wait-State {
             param($elements)
-            @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq '@' }).Count -eq 1
+            @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq '@favorites' }).Count -eq 1
         }
         Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input') | Out-Null
         Expect-Scope 'Favorites' 'Find favorites'
