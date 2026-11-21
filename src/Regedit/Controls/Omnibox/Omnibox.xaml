@@ -17,8 +17,219 @@
         <Style x:Key="ChildLocationsFlyoutStyle" TargetType="FlyoutPresenter">
             <Setter Property="Padding" Value="4" />
         </Style>
+        <x:Double x:Key="InputMinHeight">32</x:Double>
+        <x:Double x:Key="SuggestionRowMinHeight">38</x:Double>
+        <x:Double x:Key="SuggestionColumnSpacing">8</x:Double>
+        <Thickness x:Key="SuggestionPopupBorderThickness">1</Thickness>
+        <Thickness x:Key="SuggestionListMargin">3,3,3,4</Thickness>
+        <Thickness x:Key="SuggestionRowPadding">16,0,12,0</Thickness>
+        <Style x:Key="SuggestionIconStyle" TargetType="FontIcon">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
+        </Style>
+        <Style
+            x:Key="SuggestionItemStyle"
+            BasedOn="{StaticResource DefaultListViewItemStyle}"
+            TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="MinHeight" Value="{StaticResource SuggestionRowMinHeight}" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style x:Key="SuggestionHeaderContainerStyle" TargetType="ListViewHeaderItem">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewHeaderItem">
+                        <ContentPresenter
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SuggestionHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <DataTemplate x:Key="SuggestionResultTemplate" x:DataType="local:OmniboxItem">
+            <Grid
+                Padding="{StaticResource SuggestionRowPadding}"
+                ColumnDefinitions="Auto,*,Auto"
+                ColumnSpacing="{StaticResource SuggestionColumnSpacing}"
+                ToolTipService.ToolTip="{x:Bind local:Omnibox.SuggestionToolTip(Label, Detail)}">
+                <FontIcon
+                    Glyph="{x:Bind IconGlyph}"
+                    Style="{StaticResource SuggestionIconStyle}" />
+                <TextBlock
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    TextTrimming="CharacterEllipsis">
+                    <Run Text="{x:Bind Label}" />
+                    <Run Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind local:Omnibox.InlineDetail(Detail)}" />
+                </TextBlock>
+                <TextBlock
+                    Grid.Column="2"
+                    MaxWidth="108"
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{x:Bind RightText}"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="{x:Bind local:Omnibox.DescriptionVisibility(RightText)}" />
+            </Grid>
+        </DataTemplate>
+        <DataTemplate x:Key="SuggestionPreviewHeaderTemplate" x:DataType="local:OmniboxItem">
+            <Button
+                MinHeight="{StaticResource SuggestionRowMinHeight}"
+                Padding="{StaticResource SuggestionRowPadding}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                AllowFocusOnInteraction="False"
+                AutomationProperties.AutomationId="OmniboxShowMore"
+                AutomationProperties.Name="{x:Bind local:Omnibox.ShowMoreName(Label)}"
+                Click="ShowMore_Click"
+                Style="{StaticResource SubtleButtonStyle}"
+                Tag="{x:Bind}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Style="{StaticResource SuggestionHeaderTextStyle}" Text="{x:Bind Label}" />
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                        Text="Show more" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+        <local:OmniboxSuggestionTemplateSelector
+            x:Key="SuggestionTemplateSelector"
+            PreviewHeader="{StaticResource SuggestionPreviewHeaderTemplate}"
+            Result="{StaticResource SuggestionResultTemplate}" />
+        <ControlTemplate x:Key="SuggestionEditorTemplate" TargetType="AutoSuggestBox">
+            <Grid x:Name="LayoutRoot">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup x:Name="Orientation">
+                        <VisualState x:Name="Landscape" />
+                        <VisualState x:Name="Portrait" />
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Grid x:Name="InputRow" MinHeight="{TemplateBinding MinHeight}">
+                    <Border
+                        x:Name="InputChrome"
+                        Background="{ThemeResource TextControlBackgroundFocused}"
+                        BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                        BorderThickness="0,0,0,2"
+                        IsHitTestVisible="False" />
+                    <TextBox
+                        x:Name="TextBox"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        DesiredCandidateWindowAlignment="BottomEdge"
+                        FontFamily="{TemplateBinding FontFamily}"
+                        FontSize="{TemplateBinding FontSize}"
+                        FontStretch="{TemplateBinding FontStretch}"
+                        FontWeight="{TemplateBinding FontWeight}"
+                        Foreground="{TemplateBinding Foreground}"
+                        PlaceholderText="{TemplateBinding PlaceholderText}"
+                        ScrollViewer.BringIntoViewOnFocusChange="False"
+                        Style="{TemplateBinding TextBoxStyle}"
+                        UseSystemFocusVisuals="False">
+                        <TextBox.Resources>
+                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                            <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+                        </TextBox.Resources>
+                    </TextBox>
+                </Grid>
+                <Border
+                    x:Name="SuggestionsContainer"
+                    Grid.Row="1"
+                    Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
+                    BorderBrush="{ThemeResource AutoSuggestBoxSuggestionsListBorderBrush}"
+                    BorderThickness="{StaticResource SuggestionPopupBorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    Translation="0,0,32"
+                    Visibility="Collapsed">
+                    <Border.Shadow>
+                        <ThemeShadow />
+                    </Border.Shadow>
+                    <Grid RowDefinitions="*,Auto">
+                        <ListView
+                            x:Name="SuggestionsList"
+                            Margin="{StaticResource SuggestionListMargin}"
+                            ContainerContentChanging="SuggestionsList_ContainerContentChanging"
+                            IsItemClickEnabled="True"
+                            IsSynchronizedWithCurrentItem="False"
+                            ItemContainerStyle="{TemplateBinding ItemContainerStyle}"
+                            ItemTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                            SingleSelectionFollowsFocus="False"
+                            TabFocusNavigation="Local">
+                            <ListView.Resources>
+                                <!-- Disabled rows are status messages and need the same text contrast as results. -->
+                                <x:Double x:Key="ListViewItemDisabledThemeOpacity">1</x:Double>
+                            </ListView.Resources>
+                            <ListView.GroupStyle>
+                                <GroupStyle HeaderContainerStyle="{StaticResource SuggestionHeaderContainerStyle}">
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate x:DataType="local:OmniboxSuggestionGroup">
+                                            <Grid
+                                                MinHeight="{StaticResource SuggestionRowMinHeight}"
+                                                Padding="{StaticResource SuggestionRowPadding}"
+                                                Visibility="{x:Bind local:Omnibox.DescriptionVisibility(Label), Mode=OneWay}">
+                                                <TextBlock
+                                                    AutomationProperties.HeadingLevel="Level2"
+                                                    Style="{StaticResource SuggestionHeaderTextStyle}"
+                                                    Text="{x:Bind Label, Mode=OneWay}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ListView.GroupStyle>
+                            <ListView.ItemContainerTransitions>
+                                <TransitionCollection />
+                            </ListView.ItemContainerTransitions>
+                        </ListView>
+                        <Border
+                            Grid.Row="1"
+                            Padding="11,6"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0">
+                            <ContentPresenter Content="{TemplateBinding Description}">
+                                <ContentPresenter.ContentTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock
+                                            AutomationProperties.AutomationId="OmniboxSuggestionFooter"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind}"
+                                            TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ContentPresenter.ContentTemplate>
+                            </ContentPresenter>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </ControlTemplate>
     </UserControl.Resources>
-    <Grid MinHeight="36">
+    <Grid x:Name="AddressHost" MinHeight="{StaticResource InputMinHeight}" SizeChanged="AddressHost_SizeChanged">
         <Grid.ContextFlyout>
             <MenuFlyout Placement="BottomEdgeAlignedLeft">
                 <MenuFlyoutItem
@@ -34,8 +245,6 @@
         <Grid
             x:Name="DisplayPath"
             Background="{ThemeResource ControlFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-            BorderThickness="1"
             CornerRadius="4"
             PreviewKeyDown="DisplayPath_PreviewKeyDown"
             Tapped="DisplayPath_Tapped">
@@ -136,34 +345,87 @@
                 Grid.Column="4"
                 VerticalContentAlignment="Center" />
         </Grid>
-        <AutoSuggestBox
-            x:Name="Editor"
-            MinHeight="36"
-            VerticalAlignment="Stretch"
-            VerticalContentAlignment="Center"
-            AutomationProperties.Name="Address"
-            LostFocus="Editor_LostFocus"
-            MaxSuggestionListHeight="320"
-            PlaceholderText="Enter an address"
-            PreviewKeyDown="Editor_PreviewKeyDown"
-            QueryIcon="Forward"
-            QuerySubmitted="Editor_QuerySubmitted"
-            SuggestionChosen="Editor_SuggestionChosen"
-            TextChanged="Editor_TextChanged"
-            Visibility="Collapsed">
-            <AutoSuggestBox.ItemTemplate>
-                <DataTemplate x:DataType="local:OmniboxItem">
-                    <StackPanel Padding="0,4" Spacing="2">
-                        <TextBlock Text="{x:Bind Label}" TextTrimming="CharacterEllipsis" />
+        <Border x:Name="EditPlaceholder" Visibility="Collapsed" />
+        <Popup
+            x:Name="EditorPopup"
+            DesiredPlacement="BottomEdgeAlignedLeft"
+            ShouldConstrainToRootBounds="False">
+            <Grid x:Name="EditorSurface">
+                <AutoSuggestBox
+                    x:Name="Editor"
+                    MinHeight="{StaticResource InputMinHeight}"
+                    VerticalAlignment="Stretch"
+                    VerticalContentAlignment="Center"
+                    AutomationProperties.Name="Address"
+                    BorderThickness="0"
+                    CornerRadius="4"
+                    ItemContainerStyle="{StaticResource SuggestionItemStyle}"
+                    ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}"
+                    LostFocus="Editor_LostFocus"
+                    MaxSuggestionListHeight="280"
+                    PreviewKeyDown="Editor_PreviewKeyDown"
+                    QueryIcon="Forward"
+                    QuerySubmitted="Editor_QuerySubmitted"
+                    SuggestionChosen="Editor_SuggestionChosen"
+                    Template="{StaticResource SuggestionEditorTemplate}"
+                    TextChanged="Editor_TextChanged"
+                    UpdateTextOnSelect="False"
+                    Visibility="Collapsed" />
+                <Grid x:Name="EditorAccessories" VerticalAlignment="Top">
+                    <FontIcon
+                        x:Name="AddressEditorIcon"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Glyph="&#xE8B7;"
+                        IsHitTestVisible="False"
+                        Style="{StaticResource SuggestionIconStyle}"
+                        Visibility="{x:Bind local:Omnibox.AddressEditorIconVisibility(Editor.Visibility, ScopeToken.Visibility), Mode=OneWay}" />
+                    <Button
+                        x:Name="ScopeToken"
+                        MaxWidth="112"
+                        MinHeight="24"
+                        Margin="5,0,0,0"
+                        Padding="8,1"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="OmniboxScopeToken"
+                        Background="{ThemeResource ListViewItemBackgroundSelected}"
+                        BorderThickness="0"
+                        Click="ScopeToken_Click"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        Foreground="{ThemeResource ListViewItemForegroundSelected}"
+                        LostFocus="Editor_LostFocus"
+                        PreviewKeyDown="Editor_PreviewKeyDown"
+                        SizeChanged="ScopeToken_SizeChanged"
+                        Visibility="Collapsed">
                         <TextBlock
+                            x:Name="ScopeLabel"
+                            VerticalAlignment="Center"
                             FontSize="12"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{x:Bind Address}"
-                            TextTrimming="CharacterEllipsis"
-                            Visibility="{x:Bind local:Omnibox.DescriptionVisibility(Label, Address)}" />
-                    </StackPanel>
-                </DataTemplate>
-            </AutoSuggestBox.ItemTemplate>
-        </AutoSuggestBox>
+                            TextTrimming="CharacterEllipsis" />
+                    </Button>
+                    <Button
+                        x:Name="ClearInputButton"
+                        Width="32"
+                        Height="28"
+                        Padding="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        AllowFocusOnInteraction="False"
+                        AutomationProperties.Name="Clear text"
+                        Click="ClearInputButton_Click"
+                        IsTabStop="False"
+                        LostFocus="Editor_LostFocus"
+                        PreviewKeyDown="Editor_PreviewKeyDown"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        Visibility="{x:Bind local:Omnibox.DescriptionVisibility(Editor.Text), Mode=OneWay}">
+                        <FontIcon
+                            FontSize="{ThemeResource AutoSuggestBoxIconFontSize}"
+                            Foreground="{ThemeResource TextControlButtonForeground}"
+                            Glyph="&#xE894;" />
+                    </Button>
+                </Grid>
+            </Grid>
+        </Popup>
     </Grid>
 </UserControl>

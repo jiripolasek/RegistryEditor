@@ -349,29 +349,76 @@ internal static class ComponentChecks
             var input = (TextBox)FocusManager.GetFocusedElement(first.XamlRoot);
             input.Text = "p";
             await WaitAsync(() => suggestionRequests.Count == 1);
-            suggestionRequests[0].Result.SetResult((OmniboxItem[])[App.Projects]);
+            suggestionRequests[0].Result.SetResult((OmniboxItem[])[App.Projects, App.Notes]);
             await WaitAsync(
                 () => editor.IsSuggestionListOpen,
                 () =>
                     $"Suggestions: text={editor.Text}, items={editor.Items.Count}, visibility={editor.Visibility}, focus={FocusManager.GetFocusedElement(first.XamlRoot)?.GetType().Name}");
+            var addressIcon = (FontIcon)first.FindName("AddressEditorIcon");
+            var addressPadding = input.Padding.Left;
+            var editorPopup = (Popup)first.FindName("EditorPopup");
+            var editorSurface = (Grid)editorPopup.Child;
+            var inputRow = (Grid)VisualTreeHelper.GetParent(input);
+            var inputChrome = inputRow.Children.OfType<Border>().Single();
+            var suggestionPanel = ((Grid)VisualTreeHelper.GetParent(inputRow)).Children.OfType<Border>().Single();
+            var suggestionLayout = (Grid)suggestionPanel.Child;
+            var addressList = suggestionLayout.Children.OfType<ListView>().Single();
+            await WaitAsync(() => addressList.ContainerFromIndex(0) is ListViewItem { ContentTemplateRoot: Grid },
+                () => $"Address rows={addressList.Items.Count}, editor rows={editor.Items.Count}, panel={suggestionPanel.Visibility}, list height={addressList.ActualHeight}");
+            Check(editorPopup.IsOpen && editorSurface.Children.Contains(editor),
+                "The input and suggestion list share one popup");
+            Check(suggestionPanel.Shadow is ThemeShadow && editorSurface.Shadow is null,
+                "The suggestions panel casts the shadow");
+            var inputOrigin = input.TransformToVisual(first).TransformPoint(default);
+            Check(Math.Abs(inputOrigin.X) <= 0.5 && Math.Abs(inputOrigin.Y) <= 0.5 && Math.Abs(input.ActualWidth - first.ActualWidth) <= 0.5,
+                $"The popup input covers the address row (origin {inputOrigin}, widths {input.ActualWidth} and {first.ActualWidth})");
+            Check(addressList.ItemContainerTransitions is { Count: 0 },
+                "Suggestion rows have no collection transitions");
+            var addressContainer = (ListViewItem)addressList.ContainerFromIndex(0);
+            var addressRow = (Grid)addressContainer.ContentTemplateRoot;
+            var labelX = addressRow.Children.OfType<TextBlock>().First().TransformToVisual(input).TransformPoint(default).X;
+            var textX = input.BorderThickness.Left + input.Padding.Left;
+            var iconX = addressIcon.TransformToVisual(input).TransformPoint(default).X;
+            var suggestionIconX = addressRow.Children.OfType<FontIcon>().Single().TransformToVisual(input).TransformPoint(default).X;
+            Check(addressIcon.Visibility == Visibility.Visible && !addressIcon.IsHitTestVisible &&
+                  Math.Abs(textX - labelX) <= 1 && Math.Abs(iconX - suggestionIconX) <= 1,
+                $"The default editor aligns its icon and text with autocomplete (input {iconX},{textX}; row {suggestionIconX},{labelX})");
+            var inputBackground = inputChrome.Background;
+            var inputBorder = inputChrome.BorderBrush;
+            var inputCorners = inputChrome.CornerRadius;
+            var clearButton = Button(editorPopup.Child, "ClearInputButton");
+            var clearVisibility = clearButton.Visibility;
+            Check(clearVisibility == Visibility.Visible, "The popup offers a clear button for the query");
+            Check(addressContainer.Focus(FocusState.Keyboard), "A suggestion can take keyboard focus within the editor popup");
+            await Task.Delay(50);
+            Check(ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), addressContainer) && editorPopup.IsOpen &&
+                  suggestionPanel.Visibility == Visibility.Visible && inputOrigin.Equals(input.TransformToVisual(first).TransformPoint(default)) &&
+                  Equals(inputBackground, inputChrome.Background) && Equals(inputBorder, inputChrome.BorderBrush) &&
+                  inputCorners.Equals(inputChrome.CornerRadius) && clearButton.Visibility == clearVisibility,
+                "The input outline, clear button, and position stay steady while a suggestion has focus");
+            input.Focus(FocusState.Keyboard);
+            await WaitAsync(() => editor.IsSuggestionListOpen);
             var dismissed = false;
             var openCallback = editor.RegisterPropertyChangedCallback(
                 AutoSuggestBox.IsSuggestionListOpenProperty, (_, _) => dismissed |= !editor.IsSuggestionListOpen);
             input.Text = "pr";
             await WaitAsync(() => suggestionRequests.Count == 2);
             Check(
-                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Projects]),
+                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Projects, App.Notes]),
                 "Typing preserves the open suggestion list during debounce and loading");
             input.Text = "pro";
             await WaitAsync(() => suggestionRequests.Count == 3);
             Check(suggestionRequests[1].Token.IsCancellationRequested, "Typing cancels the previous suggestion request");
-            suggestionRequests[2].Result.SetResult((OmniboxItem[])[App.Component]);
-            await WaitAsync(() => editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Component]));
+            suggestionRequests[2].Result.SetResult((OmniboxItem[])[App.Projects with { }, App.Component]);
+            await WaitAsync(() => editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Projects, App.Component]));
             suggestionRequests[1].Result.SetResult((OmniboxItem[])[App.Notes]);
             await Task.Delay(50);
             Check(
-                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Component]),
+                !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Projects, App.Component]),
                 "Replacement suggestions stay open and ignore cancelled results");
+            Check(ReferenceEquals(editor.Items[0], App.Projects) &&
+                  ReferenceEquals(addressContainer, addressList.ContainerFromIndex(0)),
+                "Refreshing address suggestions retains unchanged rows and their containers");
             editor.UnregisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, openCallback);
             input.Text = "missing";
             await WaitAsync(() => suggestionRequests.Count == 4);
@@ -394,6 +441,114 @@ internal static class ComponentChecks
                 suggestionRequests[5].Token.IsCancellationRequested && !editor.IsSuggestionListOpen && editor.Items.Count == 0,
                 "Leaving edit mode cancels suggestions and prevents delayed reopening");
             first.SuggestionProvider = originalProvider;
+
+            first.BeginEdit();
+            await WaitAsync(() => ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input));
+            input.Text = "#";
+            await WaitAsync(() => editor.IsSuggestionListOpen && editor.Items.OfType<OmniboxItem>().Any(item => item.Label == "#pinned"));
+            Check(true, "The standalone control suggests the host's custom prefix");
+            var popupDismissed = false;
+            var panelToken = suggestionPanel.RegisterPropertyChangedCallback(
+                UIElement.VisibilityProperty, (_, _) => popupDismissed |= suggestionPanel.Visibility == Visibility.Collapsed);
+            input.Text = "%notes";
+            var tokenButton = (Button)first.FindName("ScopeToken");
+            await WaitAsync(() => tokenButton.Visibility == Visibility.Visible &&
+                                  editorPopup.IsOpen && suggestionPanel.Visibility == Visibility.Visible &&
+                                  editor.Items.OfType<OmniboxItem>().SingleOrDefault()?.Address == App.Notes.Address);
+            suggestionPanel.UnregisterPropertyChangedCallback(UIElement.VisibilityProperty, panelToken);
+            Check(!popupDismissed, "Confirming a prefix keeps the same popup open as grouped results replace the prefix");
+            Check(editor.PlaceholderText == "Search pinned locations" && input.Text == "notes" && addressIcon.Visibility == Visibility.Collapsed &&
+                  input.Padding.Left > tokenButton.ActualWidth, "The alias activates the host's context and keeps the query beside the token");
+            var suggestions = suggestionLayout.Children.OfType<ListView>().Single();
+            var footer = suggestionLayout.Children.OfType<Border>().Single();
+            await WaitAsync(() => suggestionPanel.ActualHeight > 0 && editorPopup.ActualPlacement != PopupPlacementMode.Auto &&
+                                  suggestions.Items.Count == 1 && ContainsText(suggestions, "Personal") && ContainsText(footer, "Enter Choose"),
+                () => $"Rows={suggestions.Items.Count}, group={ContainsText(suggestions, "Personal")}, footer={ContainsText(footer, "Enter Choose")}");
+            Check(true, "Groups and footer leave the suggestion list's item count unchanged");
+            var inputPeer = new TextBoxAutomationPeer(input);
+            var listPeer = new ListViewAutomationPeer(suggestions);
+            var above = listPeer.GetBoundingRectangle().Y < inputPeer.GetBoundingRectangle().Y;
+            var rounded = editor.CornerRadius;
+            var roundedTop = new CornerRadius(rounded.TopLeft, rounded.TopRight, 0, 0);
+            var roundedBottom = new CornerRadius(0, 0, rounded.BottomRight, rounded.BottomLeft);
+            Check(rounded.TopLeft > 0 && rounded.TopRight > 0 && rounded.BottomRight > 0 && rounded.BottomLeft > 0 &&
+                  inputChrome.CornerRadius.Equals(above ? roundedBottom : roundedTop) &&
+                  suggestionPanel.CornerRadius.Equals(above ? roundedTop : roundedBottom),
+                $"Only the adjoining input and result corners are square (input {inputChrome.CornerRadius}, results {suggestionPanel.CornerRadius})");
+            var popupTop = suggestionPanel.TransformToVisual(input).TransformPoint(default).Y;
+            Check(above || Math.Abs(popupTop - input.ActualHeight) <= 0.5,
+                $"The dropdown starts below the accent border (popup top {popupTop}, input bottom {input.ActualHeight})");
+            editor.IsSuggestionListOpen = false;
+            await WaitAsync(() => editorPopup.IsOpen && suggestionPanel.Visibility == Visibility.Collapsed && inputChrome.CornerRadius.Equals(rounded) &&
+                                  suggestionPanel.CornerRadius.Equals(rounded),
+                () => $"Results {suggestionPanel.Visibility}, input {inputChrome.CornerRadius}, results {suggestionPanel.CornerRadius}");
+            Check(true, "Hiding results restores the input's rounded corners");
+
+            input.Text = "e";
+            await WaitAsync(() => suggestionPanel.Visibility == Visibility.Visible && Find(suggestions, "OmniboxShowMore") is { ActualHeight: > 0 } &&
+                                  ContainsText(suggestions, "Personal"));
+            var showMore = Button(suggestions, "OmniboxShowMore");
+            var projectsResult = suggestions.Items.OfType<OmniboxItem>().Single(item => item.Address == App.Projects.Address);
+            var resultRow = (ListViewItem)suggestions.ContainerFromItem(projectsResult);
+            var plainHeader = suggestions.ItemsPanelRoot.Children.OfType<ListViewHeaderItem>()
+                .Single(header => ContainsText(header, "Personal"));
+            Check(AutomationProperties.GetName(showMore) == "Show more from Work" &&
+                  !editor.Items.OfType<OmniboxItem>().Any(item => item.Address == App.Component.Address),
+                "Only a group with hidden results has a Show more action");
+            Check(resultRow.ActualHeight >= 38 && Math.Abs(plainHeader.ActualHeight - resultRow.ActualHeight) < 0.5 &&
+                  Math.Abs(showMore.ActualHeight - resultRow.ActualHeight) < 0.5,
+                $"Group header heights match result rows (plain {plainHeader.ActualHeight}, action {showMore.ActualHeight}, result {resultRow.ActualHeight})");
+            popupDismissed = false;
+            panelToken = suggestionPanel.RegisterPropertyChangedCallback(
+                UIElement.VisibilityProperty, (_, _) => popupDismissed |= suggestionPanel.Visibility == Visibility.Collapsed);
+            Invoke(showMore);
+            await WaitAsync(() => suggestions.SelectedItem is OmniboxItem item && item.Address == App.Component.Address,
+                () => $"Results {suggestionPanel.Visibility}, selected={suggestions.SelectedItem}, " +
+                      $"results={string.Join(", ", suggestions.Items.OfType<OmniboxItem>().Select(item => item.Label))}");
+            suggestionPanel.UnregisterPropertyChangedCallback(UIElement.VisibilityProperty, panelToken);
+            Check(!popupDismissed && input.Text == "e" && editor.Items.OfType<OmniboxItem>().All(item => item.FirstHiddenResult is null),
+                "Show more keeps the popup and query in place and selects the first revealed result");
+            await WaitAsync(() => suggestions.ContainerFromItem(suggestions.SelectedItem) is ListViewItem row &&
+                                  VisualTreeHelper.GetChildrenCount(row) > 0);
+            var selectedRow = (ListViewItem)suggestions.ContainerFromItem(suggestions.SelectedItem);
+            Check(VisualTreeHelper.GetChild(selectedRow, 0) is ListViewItemPresenter { CornerRadius: var rowCorners } &&
+                  rowCorners.TopLeft > 0 && rowCorners.TopRight > 0 && rowCorners.BottomRight > 0 && rowCorners.BottomLeft > 0,
+                "The selected suggestion has rounded corners");
+
+            input.Text = "o";
+            await WaitAsync(() => editor.Items.OfType<OmniboxItem>()
+                .Any(item => item.FirstHiddenResult?.Address == App.Component.Address));
+            Check(true, "A new query starts from the configured preview again");
+            Check(ReferenceEquals(resultRow, suggestions.ContainerFromItem(projectsResult)),
+                "Updating a group preview retains the unchanged result container");
+            input.Text = "notes";
+            await WaitAsync(() => editor.Items.Count == 1 && editor.Items[0] is OmniboxItem item &&
+                                  item.Address == App.Notes.Address);
+            Invoke(tokenButton);
+            await WaitAsync(() => ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input) &&
+                                  tokenButton.Visibility == Visibility.Collapsed && !editor.IsSuggestionListOpen);
+            Check(editor.PlaceholderText == first.AddressPlaceholder && input.Text == "notes" &&
+                  addressIcon.Visibility == Visibility.Visible && input.Padding.Left == addressPadding,
+                "Clearing a context restores the address prompt and keeps the query");
+            input.Text = "#pinned";
+            await WaitAsync(() => suggestionPanel.Visibility == Visibility.Visible && editor.Items.OfType<OmniboxItem>().Any(item => item.Label == "#pinned"));
+            popupDismissed = false;
+            panelToken = suggestionPanel.RegisterPropertyChangedCallback(
+                UIElement.VisibilityProperty, (_, _) => popupDismissed |= suggestionPanel.Visibility == Visibility.Collapsed);
+            input.Text = "#pinned ";
+            await WaitAsync(() => suggestionPanel.Visibility == Visibility.Visible && tokenButton.Visibility == Visibility.Visible &&
+                                  input.Text.Length == 0 && editor.Items.OfType<OmniboxItem>().Any(item => item.Address == App.Projects.Address));
+            suggestionPanel.UnregisterPropertyChangedCallback(UIElement.VisibilityProperty, panelToken);
+            Check(!popupDismissed, "Confirming the keyword with Space keeps the popup open with an empty query");
+            input.Text = "notes";
+            await WaitAsync(() => clearButton.Visibility == Visibility.Visible && editor.Items.Count == 1 &&
+                                  suggestions.ContainerFromIndex(0) is ListViewItem);
+            ((ListViewItem)suggestions.ContainerFromIndex(0)).Focus(FocusState.Keyboard);
+            Invoke(clearButton);
+            await WaitAsync(() => input.Text.Length == 0 && clearButton.Visibility == Visibility.Collapsed &&
+                                  ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input));
+            Check(true, "Clear resets the query and returns focus from the results to the input");
+            first.SetLocation(App.Workspace.Address, App.Paths[App.Workspace.Address]);
 
             first.IsTextMode = true;
             var addressText = (TextBlock)first.FindName("AddressText");
@@ -449,6 +604,24 @@ internal static class ComponentChecks
     private static ListView Locations(Flyout menu)
     {
         return ((Grid)menu.Content).Children.OfType<ListView>().Single();
+    }
+
+    private static bool ContainsText(DependencyObject element, string text)
+    {
+        if (element is TextBlock block && block.Text.Contains(text, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+        {
+            if (ContainsText(VisualTreeHelper.GetChild(element, index), text))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static TextBlock Status(Flyout menu)

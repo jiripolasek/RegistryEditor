@@ -18,6 +18,8 @@ namespace JPSoftworks.Regedit.Persistence;
 
 public sealed partial class AppSettings
 {
+    private const int RecentSearchLimit = 20;
+
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
     private JsonObject _baseline;
     private string? _loadedContent;
@@ -36,7 +38,8 @@ public sealed partial class AppSettings
                 this.ToolbarButtons, this.PanelTabsAtBottom,
                 new Dictionary<string, ColumnLayout>(this.ColumnLayouts, StringComparer.Ordinal), this.ShowBackButton,
                 this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop,
-                this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl, this.RegistryFileLayout, this.EditorFont),
+                this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl, this.RegistryFileLayout, this.EditorFont,
+                this.RecentSearches.ToArray(), this.ShowSearchBox),
             SettingsJsonContext.Default.SavedSettings)!.AsObject();
     }
 
@@ -94,7 +97,25 @@ public sealed partial class AppSettings
         }
     }
 
-    private void SaveCore(string filePath, bool captureSession = false, bool replaceRestored = true)
+    internal bool RecordSearch(string query, string filePath)
+    {
+        if (this.LoadError is not null || string.IsNullOrWhiteSpace(query))
+        {
+            return false;
+        }
+
+        this.SaveCore(filePath, recentSearch: query);
+        return true;
+    }
+
+    internal static string[] NormalizeRecentSearches(IEnumerable<string> queries)
+    {
+        return queries.Where(query => !string.IsNullOrWhiteSpace(query)).Distinct(StringComparer.Ordinal)
+            .Take(RecentSearchLimit).ToArray();
+    }
+
+    private void SaveCore(
+        string filePath, bool captureSession = false, bool replaceRestored = true, string? recentSearch = null)
     {
         var local = this.Capture();
         var sessions = this._sessions;
@@ -141,6 +162,12 @@ public sealed partial class AppSettings
             merged[name] = MergeValue(name, this._baseline[name], value, latest[name])?.DeepClone();
         }
 
+        if (recentSearch is not null)
+        {
+            merged[nameof(RecentSearches)] = JsonSerializer.SerializeToNode(
+                NormalizeRecentSearches(current.RecentSearches.Prepend(recentSearch)), SettingsJsonContext.Default.StringArray);
+        }
+
         var saved = merged.Deserialize(SettingsJsonContext.Default.SavedSettings)!;
         saved = saved with { Tabs = saved.WindowSessions!.SelectMany(session => session.Tabs).ToList() };
         try
@@ -184,6 +211,8 @@ public sealed partial class AppSettings
             }
 
             // Keep this window's baseline; unseen changes from other windows are not local deletions.
+            this.RecentSearches = saved.RecentSearches ?? [];
+            local[nameof(RecentSearches)] = merged[nameof(RecentSearches)]?.DeepClone();
             this._baseline = local;
             this._sessions = sessions;
             this._loadedContent = text;

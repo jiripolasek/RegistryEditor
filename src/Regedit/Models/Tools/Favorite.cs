@@ -11,9 +11,14 @@ public sealed record Favorite(string Name, string Address, bool Is32Bit = false,
 {
     public string Id { get; init; } = Id ?? Guid.NewGuid().ToString("N");
 
+    internal RegistryLocation GetLocation()
+    {
+        return RegistryLocation.Parse(this.Address, this.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
+    }
+
     public bool Matches(RegistryLocation location)
     {
-        var saved = RegistryLocation.Parse(this.Address, this.Is32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
+        var saved = this.GetLocation();
         return saved.Hive == location.Hive
                && saved.View == location.View
                && saved.SubKey.Equals(location.SubKey, StringComparison.OrdinalIgnoreCase)

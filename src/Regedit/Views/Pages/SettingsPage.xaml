@@ -228,6 +228,17 @@
                             </toolkit:SettingsCard>
                         </toolkit:SettingsExpander.Items>
                     </toolkit:SettingsExpander>
+                    <toolkit:SettingsCard
+                        Description="When hidden, Ctrl+F opens Search in the omnibox."
+                        Header="Separate search box">
+                        <toolkit:SettingsCard.HeaderIcon>
+                            <SymbolIcon Symbol="Find" />
+                        </toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch
+                            AutomationProperties.AutomationId="ShowSearchBoxSwitch"
+                            AutomationProperties.Name="Separate search box"
+                            IsOn="{x:Bind ViewModel.ShowSearchBox, Mode=TwoWay}" />
+                    </toolkit:SettingsCard>
                     <TextBlock
                         Margin="0,24,0,8"
                         AutomationProperties.HeadingLevel="Level2"

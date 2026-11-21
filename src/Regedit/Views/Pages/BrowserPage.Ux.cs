@@ -21,7 +21,14 @@ public sealed partial class BrowserPage
 {
     internal void FocusSearch()
     {
-        this.QuickSearch.Focus(FocusState.Keyboard);
+        if (this.Settings.ShowSearchBox)
+        {
+            this.QuickSearch.Focus(FocusState.Keyboard);
+        }
+        else
+        {
+            this.AddressBar.BeginEdit(this.AddressBar.Scopes.First(scope => scope.Keyword == SearchScopeKeyword));
+        }
     }
 
     internal IEnumerable<(FrameworkElement Root, Action Focus)> GetFocusPanes()
@@ -185,9 +192,38 @@ public sealed partial class BrowserPage
         VisualStateManager.GoToState(this, focused ? "SearchFocused" : "SearchUnfocused", false);
     }
 
+    private void QuickSearch_GotFocus(object sender, RoutedEventArgs args)
+    {
+        this.UpdateQuickSearchSuggestions(this.QuickSearch, string.Empty);
+    }
+
+    private void QuickSearch_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+        {
+            this.UpdateQuickSearchSuggestions(sender, sender.Text.Trim());
+        }
+    }
+
+    private void UpdateQuickSearchSuggestions(AutoSuggestBox sender, string query)
+    {
+        var suggestions = this.SuggestRecentSearches(query);
+        if (sender.ItemsSource is not string[] previous || !previous.SequenceEqual(suggestions))
+        {
+            sender.ItemsSource = suggestions;
+        }
+
+        sender.IsSuggestionListOpen = suggestions.Length > 0;
+    }
+
     private void QuickSearch_Submitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
     {
-        this.ViewModel.Search.Query = args.QueryText;
+        this.RunQuickSearch(args.ChosenSuggestion as string ?? args.QueryText);
+    }
+
+    private void RunQuickSearch(string query)
+    {
+        this.ViewModel.Search.Query = query;
         this.ViewModel.Search.QuickSearchCommand.Execute(null);
     }
 

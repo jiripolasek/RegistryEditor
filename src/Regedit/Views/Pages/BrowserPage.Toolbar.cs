@@ -40,6 +40,10 @@ public sealed partial class BrowserPage
               || this.Settings.ShowRefreshButton
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        var showSearch = this.Settings.ShowSearchBox;
+        this.SearchArea.Visibility = this.SearchSplitter.Visibility = showSearch ? Visibility.Visible : Visibility.Collapsed;
+        this.SearchColumn.MinWidth = showSearch ? 180 : 0;
+        this.SearchColumn.MaxWidth = showSearch ? double.PositiveInfinity : 0;
         this.ToolbarShortcuts.Visibility = this.Settings.ToolbarButtons == ToolbarButtons.None ? Visibility.Collapsed : Visibility.Visible;
         this.ToolbarShortcuts.MaxWidth = Math.Clamp(this.LayoutRoot.ActualWidth - 700, 40, 360);
         const double buttonWidth = 36;

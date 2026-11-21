@@ -10,5 +10,6 @@
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxItem.cs" Link="Controls\OmniboxItem.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxNavigationRequestedEventArgs.cs" Link="Controls\OmniboxNavigationRequestedEventArgs.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxLayout.cs" Link="Controls\OmniboxLayout.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxScope.cs" Link="Controls\OmniboxScope.cs" />
   </ItemGroup>
 </Project>

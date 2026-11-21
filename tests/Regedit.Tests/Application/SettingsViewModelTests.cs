@@ -151,39 +151,41 @@ internal static class SettingsViewModelTests
             check(
                 AppSettings.Load(path).ToolbarButtons == ToolbarButtons.Notes && !model.IsSaveErrorOpen,
                 "Retrying Hide from toolbar persists the removal and clears the save error");
-            var navigation = new (string Name, Func<bool> Get, Action<bool> Set, Func<AppSettings, bool> Saved)[]
+            var toolbar = new (string Name, Func<bool> Get, Action<bool> Set, Func<AppSettings, bool> Saved)[]
             {
                 ("Back", () => model.ShowBackButton, value => model.ShowBackButton = value, value => value.ShowBackButton),
                 ("Forward", () => model.ShowForwardButton, value => model.ShowForwardButton = value, value => value.ShowForwardButton),
                 ("Up", () => model.ShowUpButton, value => model.ShowUpButton = value, value => value.ShowUpButton),
-                ("Refresh", () => model.ShowRefreshButton, value => model.ShowRefreshButton = value, value => value.ShowRefreshButton)
+                ("Refresh", () => model.ShowRefreshButton, value => model.ShowRefreshButton = value, value => value.ShowRefreshButton),
+                ("separate search box", () => model.ShowSearchBox, value => model.ShowSearchBox = value,
+                    value => value.ShowSearchBox)
             };
-            check(navigation.All(button => button.Get()), "Navigation buttons remain visible by default");
-            foreach (var button in navigation)
+            check(toolbar.All(item => item.Get()), "Navigation buttons and the separate search box are visible by default");
+            foreach (var item in toolbar)
             {
                 var writesBefore = writes;
-                button.Set(true);
-                check(writes == writesBefore, $"Initializing the {button.Name} toggle performs no writes");
-                button.Set(false);
-                var navigationSaved = AppSettings.Load(path);
+                item.Set(true);
+                check(writes == writesBefore, $"Initializing the {item.Name} toggle performs no writes");
+                item.Set(false);
+                var toolbarSaved = AppSettings.Load(path);
                 check(
-                    !button.Get()
-                    && !button.Saved(navigationSaved)
-                    && navigation.Count(item => !item.Saved(navigationSaved)) == 1
-                    && navigationSaved.ToolbarButtons == ToolbarButtons.Notes,
-                    $"Hiding {button.Name} persists independently and preserves other toolbar choices");
+                    !item.Get()
+                    && !item.Saved(toolbarSaved)
+                    && toolbar.Count(choice => !choice.Saved(toolbarSaved)) == 1
+                    && toolbarSaved.ToolbarButtons == ToolbarButtons.Notes,
+                    $"Hiding {item.Name} persists independently and preserves other toolbar choices");
                 using (File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    button.Set(true);
+                    item.Set(true);
                     check(
-                        !button.Get() && !button.Saved(AppSettings.Load(path)) && model.IsSaveErrorOpen,
-                        $"A failed {button.Name} visibility save restores the last committed choice");
+                        !item.Get() && !item.Saved(AppSettings.Load(path)) && model.IsSaveErrorOpen,
+                        $"A failed {item.Name} visibility save restores the last committed choice");
                 }
 
-                button.Set(true);
+                item.Set(true);
                 check(
-                    button.Get() && button.Saved(AppSettings.Load(path)) && !model.IsSaveErrorOpen,
-                    $"Retry can restore the {button.Name} toolbar button");
+                    item.Get() && item.Saved(AppSettings.Load(path)) && !model.IsSaveErrorOpen,
+                    $"Retry can restore {item.Name} in the toolbar");
             }
 
             check(!model.AlwaysShowAddressAsText, "Address breadcrumbs remain the default");
@@ -208,7 +210,9 @@ internal static class SettingsViewModelTests
             File.WriteAllText(legacy, "{}");
             check(!AppSettings.Load(legacy).AlwaysShowAddressAsText, "Legacy settings retain breadcrumbs");
             check(AppSettings.Load(legacy).ToolbarButtons == ToolbarButtons.None, "Existing settings keep every new toolbar button off");
-            check(navigation.All(button => button.Saved(AppSettings.Load(legacy))), "Legacy settings keep every navigation button visible");
+            check(
+                toolbar.All(item => item.Saved(AppSettings.Load(legacy))),
+                "Legacy settings show navigation buttons and the separate search box");
             File.WriteAllText(legacy, "{\"ToolbarButtons\":1025}");
             check(
                 AppSettings.Load(legacy).ToolbarButtons == ToolbarButtons.Favorites,

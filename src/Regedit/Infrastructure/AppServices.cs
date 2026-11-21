@@ -27,6 +27,8 @@ internal static class AppServices
         services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
         services.AddSingleton<Func<AppSettings>>(_ => () => AppSettings.Load(settingsPath));
         services.AddScoped(provider => provider.GetRequiredService<Func<AppSettings>>()());
+        services.AddSingleton(provider => new SearchHistoryStore(
+            provider.GetRequiredService<Func<AppSettings>>(), settingsPath, provider.GetRequiredService<ILogger<SearchHistoryStore>>()));
         services.AddSingleton<IJumpListBackend>(jumpListBackend);
         services.AddSingleton(provider => new JumpListService(
             provider.GetRequiredService<Func<AppSettings>>(), provider.GetRequiredService<IJumpListBackend>(), settingsPath,
@@ -72,7 +74,8 @@ internal static class AppServices
             provider.GetRequiredService<AppSettings>(), provider.GetRequiredService<InvestigationStore>(),
             provider.GetRequiredService<RegistryService>(), provider.GetRequiredService<Func<RegistryLocation, BrowserViewModel>>(),
             provider.GetRequiredService<ILogger<MainWindowViewModel>>(), provider.GetRequiredService<NotesStore>(),
-            provider.GetRequiredService<RegistryHistoryBroadcaster>(), provider.GetRequiredService<JournalViewModel>()));
+            provider.GetRequiredService<RegistryHistoryBroadcaster>(), provider.GetRequiredService<JournalViewModel>(),
+            provider.GetRequiredService<SearchHistoryStore>()));
         services.AddTransient(provider => new WatchSurfaceViewModel(provider.GetRequiredService<MainWindowViewModel>()));
         services.AddScoped<Func<WatchSurfaceViewModel>>(provider => provider.GetRequiredService<WatchSurfaceViewModel>);
         return services;

@@ -27,6 +27,7 @@
     <Compile Include="..\..\src\Regedit\Infrastructure\Input\PaneResize.cs" Link="Infrastructure\Input\PaneResize.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxLayout.cs" Link="Controls\Omnibox\OmniboxLayout.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxItem.cs" Link="Controls\Omnibox\OmniboxItem.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxScope.cs" Link="Controls\Omnibox\OmniboxScope.cs" />
     <Compile Include="..\..\src\Regedit\Infrastructure\Collections\IRangeList.cs" Link="Infrastructure\Collections\IRangeList.cs" />
     <Compile Include="..\..\src\Regedit\Infrastructure\Collections\RangeObservableCollection.cs" Link="Infrastructure\Collections\RangeObservableCollection.cs" />
     <Compile Include="..\..\src\Regedit\Models\**\*.cs" Exclude="..\..\src\Regedit\Models\Tools\ToolRowGroup.cs" Link="Models\%(RecursiveDir)%(Filename)%(Extension)" />
