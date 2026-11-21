@@ -834,6 +834,13 @@ public sealed partial class Omnibox : UserControl
             {
                 args.Handled = this.MoveSuggestionSelection(list, backwards);
             }
+            else if (this.XamlRoot?.Content is { } root)
+            {
+                // Resume tab navigation from the Edit address button.
+                this.EndEdit(true);
+                var direction = backwards ? FocusNavigationDirection.Previous : FocusNavigationDirection.Next;
+                args.Handled = FocusManager.TryMoveFocus(direction, new FindNextElementOptions { SearchRoot = root });
+            }
         }
     }
 

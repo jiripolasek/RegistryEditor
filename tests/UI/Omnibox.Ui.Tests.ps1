@@ -142,6 +142,25 @@ try {
             Expect-Location 'HKEY_CURRENT_USER'
         }
     }
+    Test-Omnibox 'Alt+D follows toolbar Tab order when suggestions are closed' {
+        foreach ($key in @('Tab', 'shift+Tab')) {
+            Invoke-Ui @('send-keys', $key, '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+            $expected = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element.automationId
+            if (-not $expected -or $expected -eq 'EditAddressButton') { throw "Could not find the $key target from Edit address." }
+
+            Invoke-Ui @('send-keys', 'alt+d', '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+            Wait-State {
+                param($elements)
+                $elements.automationId -contains 'OmniboxInput' -and $elements.automationId -notcontains 'OmniboxSuggestionFooter'
+            }
+            Expect-KeyboardFocus 'OmniboxInput'
+            Invoke-Ui @('send-keys', $key, '--via', 'send-input') | Out-Null
+            $actual = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element.automationId
+            if ($actual -ne $expected) { throw "$key from the omnibox focused '$actual'. Expected '$expected'." }
+            Expect-Location 'HKEY_CURRENT_USER'
+        }
+    }
+
     Test-Omnibox 'Invalid paths retain the draft and current key' {
         $missing = 'HKCU\Software\__Omnibox_Test_' + [guid]::NewGuid().ToString('N')
         Edit-Address
