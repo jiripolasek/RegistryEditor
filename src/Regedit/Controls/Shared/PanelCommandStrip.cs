@@ -138,13 +138,19 @@ public sealed partial class PanelCommandStrip : StackPanel
             toggle.IsChecked = command.IsChecked;
         }
 
-        if (!ReferenceEquals(button.Command, command.Command))
+        if (button is Button pushButton)
         {
-            button.Command = command.Command;
+            pushButton.Flyout = command.Flyout;
+        }
+
+        var action = command.Flyout is null ? command.Command : null;
+        if (!ReferenceEquals(button.Command, action))
+        {
+            button.Command = action;
         }
 
         button.CommandParameter = command.CommandParameter;
-        if (command.Command is null)
+        if (action is null)
         {
             button.IsEnabled = command.IsEnabled;
         }
@@ -168,9 +174,9 @@ public sealed partial class PanelCommandStrip : StackPanel
             item.Icon = command.IconSource is { } source
                 ? new IconSourceElement { IconSource = source }
                 : new FontIcon { Glyph = SymbolGlyphs.Get(command.Symbol) };
-            item.Command = command.Command;
+            item.Command = command.Flyout is null ? command.Command : null;
             item.CommandParameter = command.CommandParameter;
-            if (command.Command is null)
+            if (item.Command is null)
             {
                 item.IsEnabled = command.IsEnabled;
             }

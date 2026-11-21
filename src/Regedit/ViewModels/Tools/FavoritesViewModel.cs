@@ -236,11 +236,18 @@ internal sealed partial class FavoritesViewModel(
         return this.RunAsync(
             "New folder", async () =>
             {
-                if (await dialogs.NewFolderAsync(this.Store.FolderChoices(), this.FolderId) is { } folder)
+                if (await CreateFolderAsync(this.Store, dialogs, this.FolderId) is { } id)
                 {
-                    this.OpenFolder(this.Store.AddFolder(folder.Name, folder.ParentId));
+                    this.OpenFolder(id);
                 }
             });
+    }
+
+    internal static async Task<string?> CreateFolderAsync(FavoritesStore store, IFavoriteDialogs dialogs, string? parent)
+    {
+        return await dialogs.NewFolderAsync(store.FolderChoices(), parent) is { } folder
+            ? store.AddFolder(folder.Name, folder.ParentId)
+            : null;
     }
 
     [RelayCommand(CanExecute = nameof(CanUseSingleItem))]
@@ -275,36 +282,36 @@ internal sealed partial class FavoritesViewModel(
     private Task RenameAsync()
     {
         return this.RunAsync(
-            "Rename", async () =>
-            {
-                if (this.Selected is not [var item])
-                {
-                    return;
-                }
+            "Rename", () => this.Selected is [var item]
+                ? RenameItemAsync(this.Store, dialogs, item)
+                : Task.CompletedTask);
+    }
 
-                var name = item.IsFolder
-                    ? this.Store.Folders.First(folder => folder.Id == item.Id).Name
-                    : this.Store.Bookmark(item.Id).Name;
-                if (await dialogs.RenameAsync(name, item.IsFolder) is { } renamed)
-                {
-                    this.Store.Rename(item, renamed);
-                }
-            });
+    internal static async Task RenameItemAsync(FavoritesStore store, IFavoriteDialogs dialogs, FavoriteItemId item)
+    {
+        var name = item.IsFolder ? store.Folders.First(folder => folder.Id == item.Id).Name : store.Bookmark(item.Id).Name;
+        if (await dialogs.RenameAsync(name, item.IsFolder) is { } renamed)
+        {
+            store.Rename(item, renamed);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanUseSelection))]
     private Task MoveToFolderAsync()
     {
         return this.RunAsync(
-            "Move to folder", async () =>
-            {
-                var items = this.Selected;
-                var excluded = this.Store.Subtree(FavoritesStore.FolderIds(items));
-                if (items.Count > 0 && await dialogs.ChooseFolderAsync(this.Store.FolderChoices(excluded), this.FolderId) is { } folder)
-                {
-                    this.Store.Move(items, folder.Id.Length == 0 ? null : folder.Id);
-                }
-            });
+            "Move to folder", () => MoveItemsToFolderAsync(this.Store, dialogs, this.Selected, this.FolderId));
+    }
+
+    internal static async Task MoveItemsToFolderAsync(
+        FavoritesStore store, IFavoriteDialogs dialogs, IReadOnlyList<FavoriteItemId> items, string? parent)
+    {
+        if (items.Count > 0 &&
+            await dialogs.ChooseFolderAsync(store.FolderChoices(store.Subtree(FavoritesStore.FolderIds(items))), parent)
+                is { } folder)
+        {
+            store.Move(items, folder.Id.Length == 0 ? null : folder.Id);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanMoveUp))]
@@ -321,14 +328,15 @@ internal sealed partial class FavoritesViewModel(
 
     private Task ReorderAsync(int offset)
     {
-        return this.RunAsync(
-            offset < 0 ? "Move up" : "Move down", () =>
-            {
-                if (this.CanMove(offset))
-                {
-                    this.Store.Reorder(this.Selected[0], offset);
-                }
+        return this.CanMove(offset) ? this.ReorderAsync(this.Selected[0], offset) : Task.CompletedTask;
+    }
 
+    internal Task ReorderAsync(FavoriteItemId item, int offset)
+    {
+        return this.RunAsync(
+            "Reorder favorites", () =>
+            {
+                this.Store.Reorder(item, offset);
                 return Task.CompletedTask;
             });
     }
@@ -336,24 +344,25 @@ internal sealed partial class FavoritesViewModel(
     [RelayCommand(CanExecute = nameof(CanUseSelection))]
     private Task RemoveAsync()
     {
-        return this.RunAsync(
-            "Remove selected", async () =>
-            {
-                var items = this.Selected;
-                if (items.Count == 0)
-                {
-                    return;
-                }
+        return this.RunAsync("Remove selected", () => RemoveItemsAsync(this.Store, dialogs, this.Selected));
+    }
 
-                var folders = this.Store.Subtree(FavoritesStore.FolderIds(items));
-                var bookmarks = items.Where(item => !item.IsFolder).Select(item => item.Id).ToHashSet();
-                var count = this.Store.Favorites.Count(item =>
-                    bookmarks.Contains(item.Id) || item.FolderId is { } id && folders.Contains(id));
-                if (await dialogs.ConfirmRemoveAsync(count, folders.Count))
-                {
-                    this.Store.Remove(items);
-                }
-            });
+    internal static async Task RemoveItemsAsync(
+        FavoritesStore store, IFavoriteDialogs dialogs, IReadOnlyList<FavoriteItemId> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var folders = store.Subtree(FavoritesStore.FolderIds(items));
+        var bookmarks = items.Where(item => !item.IsFolder).Select(item => item.Id).ToHashSet();
+        var count = store.Favorites.Count(item =>
+            bookmarks.Contains(item.Id) || item.FolderId is { } id && folders.Contains(id));
+        if (await dialogs.ConfirmRemoveAsync(count, folders.Count))
+        {
+            store.Remove(items);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(Available))]
@@ -420,13 +429,7 @@ internal sealed partial class FavoritesViewModel(
             return false;
         }
 
-        var parent = selected.IsFolder
-            ? this.Store.Folders.FirstOrDefault(folder => folder.Id == selected.Id)?.ParentId
-            : this.Store.Favorites.FirstOrDefault(item => item.Id == selected.Id)?.FolderId;
-        var siblings = selected.IsFolder
-            ? this.Store.Folders.Where(folder => folder.ParentId == parent).Select(folder => folder.Id)
-            : this.Store.Favorites.Where(item => item.FolderId == parent).Select(item => item.Id);
-        var ids = siblings.ToArray();
+        var ids = this.Store.SiblingIds(selected);
         var index = Array.IndexOf(ids, selected.Id);
         return index >= 0 && index + offset >= 0 && index + offset < ids.Length;
     }

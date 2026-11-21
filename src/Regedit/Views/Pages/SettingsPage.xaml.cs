@@ -54,6 +54,7 @@ public sealed partial class SettingsPage : Page
             ("Rename the selected registry item or favorite", "F2"), ("Delete selected registry items or remove favorites", "Delete"));
         this.AddShortcutGroup(
             "Tools and favorites", ("Open / close the right sidebar", "F9"), ("Open / close the bottom panel", "Ctrl+J"),
+            ("Show or hide the Favorites bar", "Ctrl+Shift+B"), ("Open Favorites in the sidebar", "Ctrl+Shift+O"),
             ("Add or remove the selected key or current location in Favorites", "Ctrl+D"), ("Save the current note in Notes", "Ctrl+S"));
         this.AddShortcutGroup(
             "Registry file editor", ("Open the File menu", "Alt+F"), ("Open / save a registry file", "Ctrl+O / Ctrl+S"),

@@ -172,6 +172,18 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
 
     public ToolbarButtons ToolbarButtons => settings.ToolbarButtons;
 
+    public bool ShowFavoritesBar
+    {
+        get => settings.ShowFavoritesBar;
+        set => this.Update(this.ShowFavoritesBar, value, s => s.ShowFavoritesBar = value);
+    }
+
+    public bool OpenFavoritesMenu
+    {
+        get => settings.OpenFavoritesMenu;
+        set => this.Update(this.OpenFavoritesMenu, value, s => s.OpenFavoritesMenu = value);
+    }
+
     public bool PanelTabsAtBottom
     {
         get => settings.PanelTabsAtBottom;

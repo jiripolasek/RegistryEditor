@@ -79,6 +79,8 @@ public sealed partial class MainWindow
     private void InitializeTools()
     {
         this.InitializeToolbarCommands();
+        this.Favorites.Changed += this.Favorites_Changed;
+        this.Closed += (_, _) => this.Favorites.Changed -= this.Favorites_Changed;
         if (this.ViewModel.SelectedTool is not (ToolKind.Favorites or ToolKind.Notes))
         {
             this.ViewModel.SelectedTool = ToolKind.Favorites;
@@ -107,6 +109,11 @@ public sealed partial class MainWindow
             this.Favorites, this.Dialogs, compact, this.ViewModel.NavigateFromToolsAsync, this.ViewModel.OpenInBackground,
             this.ShowToolInPanel, this.Logger, this.Notifications, this.ColumnLayouts);
         view.MenuButton.Click += this.ApplicationMenu_Click;
+        if (compact)
+        {
+            this.AddFavoritesMenuActions(view.FolderActionsMenu, view);
+        }
+
         view.ApplyListSpacing(this.Settings.ListRowPadding);
         return view;
     }

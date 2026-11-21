@@ -62,6 +62,12 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         AutomationProperties.SetName(this.Results, "Tool items");
         AutomationProperties.SetAutomationId(this.Results, "Results");
         this.Results.DoubleTapped += this.Results_DoubleTapped;
+        this.Results.CanDragItems = true;
+        this.Results.AllowDrop = true;
+        this.Results.DragItemsStarting += this.Results_DragItemsStarting;
+        this.Results.DragItemsCompleted += (_, _) => this._itemDrag.Clear();
+        this.Results.DragOver += this.Results_DragOver;
+        this.Results.Drop += this.Results_Drop;
         this.Results.PreviewKeyDown += this.Results_KeyDown;
         this.Results.SelectionChanged += this.Selection_Changed;
         this.Search.KeyDown += this.Search_KeyDown;
@@ -145,6 +151,8 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     public Button MenuButton => this.PageHeader.MenuButton;
 
     public IReadOnlyList<ToolCommand> PanelCommands { get; }
+
+    internal MenuFlyout FolderActionsMenu => this.ItemMenu;
 
     void IToolSurface.CopyContextFrom(IToolSurface source)
     {
@@ -290,6 +298,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private void ItemsChanged(object? sender, EventArgs args)
     {
+        this._itemDrag.Clear();
         this._syncing = true;
         try
         {
@@ -594,14 +603,14 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
             return;
         }
 
-        if (!this.ViewModel.Compact && row.Key.IsFolder)
-        {
-            this.ViewModel.OpenFolder(row.Key.Id);
-        }
-        else if (this.ViewModel.Compact && !row.Key.IsFolder)
+        if (this.ViewModel.Compact && !row.Key.IsFolder)
         {
             this.ViewModel.SelectTree(row.Key);
             TryExecute(this.ViewModel.OpenCommand);
+        }
+        else if (!this.ViewModel.Compact && row.Key.IsFolder && this.ViewModel.Query.Length > 0)
+        {
+            this.ViewModel.SelectTree(row.Key);
         }
     }
 
@@ -619,7 +628,8 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     {
         ICommand? command = args.Key switch
         {
-            VirtualKey.Enter when ReferenceEquals(sender, this.Results) => this.ViewModel.OpenCommand,
+            VirtualKey.Enter when ReferenceEquals(sender, this.Results) || !this.ViewModel.Compact
+                => this.ViewModel.OpenCommand,
             VirtualKey.F2 => this.ViewModel.RenameCommand,
             VirtualKey.Delete => this.ViewModel.RemoveCommand,
             _ => null

@@ -41,7 +41,8 @@ public sealed partial class ToolCommand : ObservableObject
     public bool IsToggle { get; init; }
 
     /// <summary>Flyout shared by every generated button; only one bar shows it at a time.</summary>
-    public FlyoutBase? Flyout { get; init; }
+    [ObservableProperty]
+    public partial FlyoutBase? Flyout { get; set; }
 
     /// <summary>Extra per-button wiring such as middle-click handlers.</summary>
     public Action<FrameworkElement>? Attach { get; init; }

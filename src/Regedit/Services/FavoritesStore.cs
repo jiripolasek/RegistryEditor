@@ -113,6 +113,37 @@ internal sealed class FavoritesStore
         });
     }
 
+    internal string[] SiblingIds(FavoriteItemId item)
+    {
+        if (item.IsFolder)
+        {
+            var parent = this.Folders.FirstOrDefault(folder => folder.Id == item.Id)?.ParentId;
+            return this.Folders.Where(folder => folder.ParentId == parent).Select(folder => folder.Id).ToArray();
+        }
+
+        var folderId = this.Favorites.FirstOrDefault(favorite => favorite.Id == item.Id)?.FolderId;
+        return this.Favorites.Where(favorite => favorite.FolderId == folderId).Select(favorite => favorite.Id).ToArray();
+    }
+
+    internal int ReorderOffset(FavoriteItemId item, FavoriteItemId anchor, bool after)
+    {
+        if (item.IsFolder != anchor.IsFolder || item == anchor)
+        {
+            return 0;
+        }
+
+        var siblings = this.SiblingIds(item);
+        var source = Array.IndexOf(siblings, item.Id);
+        var target = Array.IndexOf(siblings, anchor.Id);
+        if (source < 0 || target < 0)
+        {
+            return 0;
+        }
+
+        var insertion = after ? target + 1 : target;
+        return insertion - source - (source < insertion ? 1 : 0);
+    }
+
     internal static string[] FolderIds(IEnumerable<FavoriteItemId> items)
     {
         return items.Where(item => item.IsFolder).Select(item => item.Id).ToArray();

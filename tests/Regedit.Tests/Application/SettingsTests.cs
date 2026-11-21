@@ -27,6 +27,9 @@ internal static class SettingsTests
             var settings = AppSettings.Load(file);
             check(settings.AutoSyncTree, "Legacy settings retain automatic tree tracking when the preference is absent");
             check(
+                !settings.ShowFavoritesBar && !settings.OpenFavoritesMenu,
+                "Legacy settings keep both favorites access options off");
+            check(
                 settings.Theme == "Default"
                 && settings.FontFamily == "Segoe UI Variable"
                 && settings.FontSize == 14
@@ -43,9 +46,12 @@ internal static class SettingsTests
                     value.ShowStatusBar = false;
                     value.ShowKeysInList = value.ShowParentKeyInList = value.ShowValuePreview = true;
                     value.AutoSyncTree = false;
+                    value.ShowFavoritesBar = value.OpenFavoritesMenu = true;
                 }, file);
             var loaded = AppSettings.Load(file);
             check(!loaded.AutoSyncTree, "Disabled automatic tree tracking survives saving and loading");
+            check(
+                loaded.ShowFavoritesBar && loaded.OpenFavoritesMenu, "Favorites access options survive saving and loading");
             check(
                 loaded.LoadError is null
                 && loaded.Theme == "Dark"
@@ -107,6 +113,7 @@ internal static class SettingsTests
                             value.ShowStatusBar = true;
                             value.ShowKeysInList = value.ShowParentKeyInList = value.ShowValuePreview = false;
                             value.AutoSyncTree = true;
+                            value.ShowFavoritesBar = value.OpenFavoritesMenu = false;
                         }, file);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -125,6 +132,8 @@ internal static class SettingsTests
                 && settings.ShowParentKeyInList
                 && settings.ShowValuePreview
                 && !settings.AutoSyncTree
+                && settings.ShowFavoritesBar
+                && settings.OpenFavoritesMenu
                 && saved.SequenceEqual(File.ReadAllBytes(file)),
                 "Failed settings writes restore every preference without replacing the file");
             check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "Failed preference writes leave no temporary settings files");

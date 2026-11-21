@@ -94,7 +94,7 @@
                     </toolkit:SettingsCard>
                     <toolkit:SettingsExpander
                         x:Name="ToolbarButtonsExpander"
-                        Description="Choose which navigation buttons and tool shortcuts appear in the main toolbar."
+                        Description="Choose which buttons appear in the main toolbar and how you access Favorites."
                         Header="Toolbar buttons">
                         <toolkit:SettingsExpander.HeaderIcon>
                             <PathIcon Data="F0 M3,0 H11 A3,3 0 0 1 14,3 V11 A3,3 0 0 1 11,14 H3 A3,3 0 0 1 0,11 V3 A3,3 0 0 1 3,0 Z M3,1 A2,2 0 0 0 1,3 V11 A2,2 0 0 0 3,13 H11 A2,2 0 0 0 13,11 V3 A2,2 0 0 0 11,1 Z M3.5,3 H10.5 A0.5,0.5 0 0 1 10.5,4 H3.5 A0.5,0.5 0 0 1 3.5,3 Z" />
@@ -148,6 +148,28 @@
                                     IsOn="{x:Bind ToolbarButtonChecked(ViewModel.ToolbarButtons, settings:ToolbarButtons.Favorites), Mode=OneWay}"
                                     Tag="{x:Bind settings:ToolbarButtons.Favorites}"
                                     Toggled="ToolbarButton_Toggled" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard
+                                Description="Show bookmarks and folders under the address bar."
+                                Header="Favorites bar">
+                                <toolkit:SettingsCard.Resources>
+                                    <x:Double x:Key="SettingsCardLeftIndention">54</x:Double>
+                                </toolkit:SettingsCard.Resources>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="FavoritesBarOption"
+                                    AutomationProperties.Name="Favorites bar"
+                                    IsOn="{x:Bind ViewModel.ShowFavoritesBar, Mode=TwoWay}" />
+                            </toolkit:SettingsCard>
+                            <toolkit:SettingsCard
+                                Description="Open a dropdown from the Favorites toolbar button."
+                                Header="Favorites dropdown menu">
+                                <toolkit:SettingsCard.Resources>
+                                    <x:Double x:Key="SettingsCardLeftIndention">54</x:Double>
+                                </toolkit:SettingsCard.Resources>
+                                <ToggleSwitch
+                                    AutomationProperties.AutomationId="FavoritesMenuOption"
+                                    AutomationProperties.Name="Favorites dropdown menu"
+                                    IsOn="{x:Bind ViewModel.OpenFavoritesMenu, Mode=TwoWay}" />
                             </toolkit:SettingsCard>
                             <toolkit:SettingsCard Header="Notes">
                                 <toolkit:SettingsCard.HeaderIcon>

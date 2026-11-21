@@ -292,8 +292,16 @@
                     <TreeView.ItemTemplate>
                         <DataTemplate x:DataType="TreeViewNode">
                             <Grid
+                                AllowDrop="True"
                                 AutomationProperties.Name="{x:Bind ((vm:FavoriteRow)Content).Title, Mode=OneWay}"
+                                Background="Transparent"
+                                CanDrag="True"
                                 ColumnSpacing="8"
+                                DoubleTapped="FavoriteFolder_DoubleTapped"
+                                DragOver="FavoriteRow_DragOver"
+                                DragStarting="FavoriteRow_DragStarting"
+                                Drop="FavoriteRow_Drop"
+                                DropCompleted="FavoriteRow_DropCompleted"
                                 ToolTipService.ToolTip="{x:Bind ((vm:FavoriteRow)Content).Path, Mode=OneWay}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="20" />

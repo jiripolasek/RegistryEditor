@@ -197,6 +197,8 @@ Choose **Application menu > Keyboard shortcuts** to open the grouped reference i
 | Ctrl+Alt+F | Filter the current key's list |
 | F9 | Open or close the right sidebar |
 | Ctrl+J | Open or close the bottom panel |
+| Ctrl+Shift+B | Show or hide the Favorites bar |
+| Ctrl+Shift+O | Open Favorites in the right sidebar |
 | Esc in the tool panel | Close the panel and return focus |
 | Ctrl+S in Notes | Save the current note immediately or retry a failed save |
 | F5 / F6 | Refresh / cycle focus through the tree, list, open detail panel, right sidebar, and bottom panel |

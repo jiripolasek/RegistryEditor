@@ -6,6 +6,7 @@ using System.Text.Json;
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.Persistence;
+using JPSoftworks.Regedit.Services;
 using Microsoft.Win32;
 
 namespace JPSoftworks.Regedit.Tests.Application;
@@ -14,6 +15,15 @@ internal static class FavoriteFolderTests
 {
     public static void Run(Action<bool, string> check, Action<Action, string> reject)
     {
+        check(FavoritesBarLayout.VisibleCount([], 32, 2, 34) == 0, "An empty bar has no items to fit");
+        check(FavoritesBarLayout.VisibleCount([50, 60, 70], 184, 2, 34) == 3,
+            "An exact fit does not reserve space for the overflow button");
+        check(FavoritesBarLayout.VisibleCount([50, 60, 70], 148, 2, 34) == 2 &&
+              FavoritesBarLayout.VisibleCount([50, 60, 70], 147, 2, 34) == 1,
+            "A fitting prefix accounts for spacing and the overflow button");
+        check(FavoritesBarLayout.VisibleCount([90, 20], 100, 2, 34) == 0,
+            "A long first item goes into overflow along with the items after it");
+
         var directory = Path.Combine(Path.GetTempPath(), "Regedit.Favorites.Tests." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         var file = Path.Combine(directory, "settings.json");
@@ -136,6 +146,27 @@ internal static class FavoriteFolderTests
             check(
                 order.FavoriteFolders.Where(folder => folder.ParentId is null).SequenceEqual([secondFolder, firstFolder])
                 && nested.ParentId == firstFolder.Id, "Folder reordering stays within its parent");
+
+            var orderFile = Path.Combine(directory, "order.json");
+            var store = new FavoritesStore(order, () => order.Save(orderFile));
+            var firstId = new FavoriteItemId(first.Id, false);
+            var secondId = new FavoriteItemId(second.Id, false);
+            var firstFolderId = new FavoriteItemId(firstFolder.Id, true);
+            var secondFolderId = new FavoriteItemId(secondFolder.Id, true);
+            check(store.ReorderOffset(secondId, firstId, false) == 0 &&
+                  store.ReorderOffset(firstId, secondId, true) == 0, "Adjacent drop positions can leave the order unchanged");
+            check(store.ReorderOffset(firstId, secondId, false) == -1 &&
+                  store.ReorderOffset(secondId, firstId, true) == 1, "Drop offsets account for removing the source item");
+            check(store.ReorderOffset(firstId, new FavoriteItemId(unrelated.Id, false), false) == 0 &&
+                  store.ReorderOffset(firstId, firstFolderId, false) == 0 &&
+                  store.ReorderOffset(firstId, new FavoriteItemId("missing", false), false) == 0,
+                "Reordering only targets existing siblings of the same kind");
+            store.Reorder(firstFolderId, store.ReorderOffset(firstFolderId, secondFolderId, false));
+            store.Reorder(firstId, store.ReorderOffset(firstId, secondId, false));
+            loaded = AppSettings.Load(orderFile);
+            check(loaded.FavoriteFolders.Where(folder => folder.ParentId is null).SequenceEqual([firstFolder, secondFolder]) &&
+                  loaded.Favorites.Where(favorite => favorite.FolderId == firstFolder.Id).SequenceEqual([first, second]),
+                "Bookmark and folder order after dropping survives a reload");
 
             var invalidCases = new (Favorite[] Favorites, FavoriteFolder[] Folders)[]
             {
