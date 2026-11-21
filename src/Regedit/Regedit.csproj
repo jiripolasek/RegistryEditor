@@ -46,6 +46,18 @@
     <ProjectReference Include="..\Regedit.Core\Regedit.Core.csproj" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(RegeditExperimentalTerminal)' == 'true'">
+    <DefineConstants>$(DefineConstants);REGEDIT_EXPERIMENTAL_TERMINAL</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(RegeditExperimentalTerminal)' == 'true'">
+    <PackageReference Include="EasyWindowsTerminalControl.WinUI" />
+    <PackageReference Include="CI.Microsoft.Terminal.WinUI3.Unofficial" ExcludeAssets="all" GeneratePathProperty="true" />
+    <ProjectReference Include="..\..\third_party\Microsoft.Terminal.WinUI3\Microsoft.Terminal.WinUI3.csproj" />
+    <None Include="$(PkgCI_Microsoft_Terminal_WinUI3_Unofficial)\runtimes\$(RuntimeIdentifier)\native\Microsoft.Terminal.Control.dll"
+          Link="Microsoft.Terminal.Control.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\NOTICE.Terminal.md" Link="NOTICE.Terminal.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <Content Include="Assets\Fonts\FluentSystemIcons-Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Fonts\FluentSystemIcons-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />

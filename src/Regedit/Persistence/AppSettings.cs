@@ -89,6 +89,10 @@ public sealed partial class AppSettings
 
     public RegistryFileLayout RegistryFileLayout { get; set; } = RegistryFileLayout.Split;
 
+    public string PowerShellPath { get; set; } = string.Empty;
+
+    public bool OfferWindowsPowerShellFallback { get; set; } = true;
+
     public bool ShowListToolbar { get; set; } = true;
 
     /// <summary>Places the bottom panel tab strip below its content instead of above it.</summary>
@@ -214,6 +218,8 @@ public sealed partial class AppSettings
                     ? editorFont with { Family = editorFont.Family.Trim() }
                     : DefaultEditorFont;
             settings.RegistryFileLayout = Enum.IsDefined(saved.RegistryFileLayout) ? saved.RegistryFileLayout : RegistryFileLayout.Split;
+            settings.PowerShellPath = saved.PowerShellPath?.Trim() ?? string.Empty;
+            settings.OfferWindowsPowerShellFallback = saved.OfferWindowsPowerShellFallback;
             settings.ShowListToolbar = saved.ShowListToolbar;
             settings.PanelTabsAtBottom = saved.PanelTabsAtBottom;
             settings.ToolbarButtons = saved.ToolbarButtons & ToolbarButtons.All;
@@ -288,7 +294,8 @@ public sealed partial class AppSettings
             this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
             this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton,
             this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
-            this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu);
+            this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
+            this.PowerShellPath, this.OfferWindowsPowerShellFallback);
         try
         {
             change(this);
@@ -352,7 +359,8 @@ public sealed partial class AppSettings
                 this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
                 this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton,
                 this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl,
-                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu) = previous;
+                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
+                this.PowerShellPath, this.OfferWindowsPowerShellFallback) = previous;
             throw;
         }
     }
@@ -401,5 +409,7 @@ public sealed partial class AppSettings
         string[]? RecentSearches = null,
         bool ShowSearchBox = true,
         bool ShowFavoritesBar = false,
-        bool OpenFavoritesMenu = false);
+        bool OpenFavoritesMenu = false,
+        string? PowerShellPath = null,
+        bool OfferWindowsPowerShellFallback = true);
 }

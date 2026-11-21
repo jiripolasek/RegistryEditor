@@ -158,12 +158,14 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         }
 
         this.IsDialogOpen = true;
+        this.OnPropertyChanged(nameof(this.IsDialogOpen));
         return true;
     }
 
     internal void EndDialog()
     {
         this.IsDialogOpen = false;
+        this.OnPropertyChanged(nameof(this.IsDialogOpen));
     }
 
     internal void Initialize(RegistryLocation? initialLocation)

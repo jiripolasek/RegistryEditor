@@ -110,6 +110,18 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
         }
     }
 
+    public string PowerShellPath
+    {
+        get => settings.PowerShellPath;
+        set => this.Update(this.PowerShellPath, value.Trim(), s => s.PowerShellPath = value.Trim());
+    }
+
+    public bool OfferWindowsPowerShellFallback
+    {
+        get => settings.OfferWindowsPowerShellFallback;
+        set => this.Update(this.OfferWindowsPowerShellFallback, value, s => s.OfferWindowsPowerShellFallback = value);
+    }
+
     public int EditorLayoutIndex
     {
         get => (int)settings.RegistryFileLayout;

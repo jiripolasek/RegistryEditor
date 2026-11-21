@@ -549,6 +549,7 @@ AddAsync("snapshot", () => SnapshotTests.RunAsync(Check, args.Contains("--regist
 AddAsync("search-lifecycle", () => SearchLifecycleTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("workspace-restore", () => WorkspaceRestoreTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("investigation", () => InvestigationTests.RunAsync(Check, args.Contains("--registry")));
+AddAsync("powershell-run", () => PowerShellRunTests.RunAsync(Check));
 AddAsync("tool-state", () => ToolStateTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("runner-self-test", () => TestSuiteRunnerTests.RunAsync(Check));
 
