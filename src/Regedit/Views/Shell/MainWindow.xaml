@@ -152,6 +152,14 @@
                 Invoked="BottomPane_Invoked"
                 Modifiers="Control" />
             <KeyboardAccelerator
+                Key="B"
+                Invoked="FavoritesBar_Invoked"
+                Modifiers="Control,Shift" />
+            <KeyboardAccelerator
+                Key="O"
+                Invoked="FavoritesSidebar_Invoked"
+                Modifiers="Control,Shift" />
+            <KeyboardAccelerator
                 Key="T"
                 Invoked="NewTab_Invoked"
                 Modifiers="Control" />

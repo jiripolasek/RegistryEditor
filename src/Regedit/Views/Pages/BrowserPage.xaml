@@ -491,6 +491,14 @@
                 </MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
         </MenuFlyout>
+        <Style
+            x:Key="FavoritesBarButtonStyle"
+            BasedOn="{StaticResource SubtleButtonStyle}"
+            TargetType="Button">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
     </Page.Resources>
     <Grid
         x:Name="LayoutRoot"
@@ -499,6 +507,7 @@
         SizeChanged="Page_SizeChanged"
         Style="{StaticResource TabSurfaceStyle}">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -758,7 +767,44 @@
                 </Button>
             </StackPanel>
         </Grid>
-        <Grid x:Name="ContentGrid" Grid.Row="1">
+        <Border
+            x:Name="FavoritesBar"
+            Grid.Row="1"
+            Margin="8,0,8,4"
+            Padding="0,0,0,4"
+            Background="Transparent"
+            Visibility="Collapsed">
+            <Grid
+                x:Name="FavoriteBarHost"
+                AutomationProperties.AutomationId="FavoritesBar"
+                AutomationProperties.Name="Favorites bar"
+                SizeChanged="FavoriteBarHost_SizeChanged">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel
+                    x:Name="FavoriteBarItems"
+                    Orientation="Horizontal"
+                    Spacing="2" />
+                <Button
+                    x:Name="FavoriteBarOverflowButton"
+                    Grid.Column="1"
+                    Width="32"
+                    Margin="2,0,0,0"
+                    AutomationProperties.AutomationId="FavoriteBarOverflowButton"
+                    AutomationProperties.Name="More favorites"
+                    Style="{StaticResource FavoritesBarButtonStyle}"
+                    ToolTipService.ToolTip="More favorites"
+                    Visibility="Collapsed">
+                    <FontIcon
+                        FontSize="12"
+                        Glyph="&#xE76C;"
+                        MirroredWhenRightToLeft="True" />
+                </Button>
+            </Grid>
+        </Border>
+        <Grid x:Name="ContentGrid" Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition
                     x:Name="TreeColumn"
@@ -768,11 +814,15 @@
                 <ColumnDefinition x:Name="SplitterColumn" Width="6" />
                 <ColumnDefinition Width="*" MinWidth="240" />
             </Grid.ColumnDefinitions>
-            <Grid
-                x:Name="NavigationPane"
-                Margin="0,8,0,0"
-                Background="Transparent">
-                <browser:RegistryTreePane x:Name="TreePane" />
+            <Grid x:Name="NavigationPane" Background="Transparent">
+                <Border
+                    Margin="8,0,8,0"
+                    VerticalAlignment="Top"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    IsHitTestVisible="False"
+                    Visibility="{x:Bind FavoritesBar.Visibility, Mode=OneWay}" />
+                <browser:RegistryTreePane x:Name="TreePane" Margin="0,8,0,0" />
             </Grid>
             <shared:ResizeThumb
                 x:Name="PaneSplitter"

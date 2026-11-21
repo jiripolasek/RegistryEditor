@@ -17,11 +17,13 @@ namespace JPSoftworks.Regedit.Views.Shell;
 public sealed partial class MainWindow
 {
     private readonly List<(ToolCommand Command, ToggleMenuFlyoutItem Item)> _toolMenuToggles = [];
+    private MenuFlyout _favoritesMenu = null!;
 
     internal (ToolbarButtons Button, ToolCommand Command)[] ToolbarCommands { get; private set; } = [];
 
     private void InitializeToolbarCommands()
     {
+        this._favoritesMenu = this.CreateFavoritesMenu();
         this.ToolbarCommands =
         [
             (ToolbarButtons.Favorites,
@@ -109,6 +111,14 @@ public sealed partial class MainWindow
         foreach (var (button, command) in this.ToolbarCommands)
         {
             command.IsVisible = (this.Settings.ToolbarButtons & button) != 0;
+            if (button == ToolbarButtons.Favorites)
+            {
+                command.Flyout = this.Settings.OpenFavoritesMenu ? this._favoritesMenu : null;
+                command.ToolTip = this.Settings.OpenFavoritesMenu
+                    ? "Show favorites menu"
+                    : "Open Favorites in the right sidebar";
+            }
+
             command.IsChecked = button switch
             {
                 ToolbarButtons.Sidebar => this.ViewModel.IsPaneOpen,
@@ -137,7 +147,8 @@ public sealed partial class MainWindow
 
             MenuFlyoutItem item = command.IsToggle ? new ToggleMenuFlyoutItem { IsChecked = command.IsChecked } : new MenuFlyoutItem();
             item.Text = command.Label;
-            item.KeyboardAcceleratorTextOverride = command.ShortcutText ?? string.Empty;
+            item.KeyboardAcceleratorTextOverride =
+                button == ToolbarButtons.Favorites ? "Ctrl+Shift+O" : command.ShortcutText ?? string.Empty;
             item.Icon = command.IconSource is { } source
                 ? new IconSourceElement { IconSource = source }
                 : new FontIcon { Glyph = SymbolGlyphs.Get(command.Symbol) };
@@ -170,6 +181,25 @@ public sealed partial class MainWindow
         {
             toolbarButton.CornerRadius = new CornerRadius(8);
         }
+
+        if (button == ToolbarButtons.Favorites && control is Button favoriteButton)
+        {
+            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+            var star = (IconElement)favoriteButton.Content;
+            var chevron = new FontIcon { Glyph = "\uE70D", FontSize = 8 };
+            favoriteButton.Content = content;
+            favoriteButton.Padding = new Thickness(4);
+            content.Children.Add(star);
+            content.Children.Add(chevron);
+
+            void UpdateChevron()
+            {
+                chevron.Visibility = favoriteButton.Flyout is null ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            favoriteButton.RegisterPropertyChangedCallback(Button.FlyoutProperty, (_, _) => UpdateChevron());
+            UpdateChevron();
+        }
     }
 
     internal MenuFlyout CreateToolbarContextMenu(ToolbarButtons button = ToolbarButtons.None)
@@ -189,6 +219,11 @@ public sealed partial class MainWindow
             };
             hide.Click += (_, _) => this.DispatcherQueue.TryEnqueue(() => (this.SelectedTabContent as BrowserPage)?.FocusToolsButton());
             menu.Items.Add(hide);
+        }
+
+        if (button == ToolbarButtons.Favorites)
+        {
+            this.AddFavoritesMenuActions(menu);
         }
 
         return menu;

@@ -511,6 +511,7 @@ public sealed partial class MainWindow : Window
         {
             this.Tabs.SelectedItem = tab;
             this.ActiveTabContent.Content = this.GetView(tab);
+            (this.SelectedTabContent as BrowserPage)?.RefreshFavoritesBar();
             this.ConfigureDockedView(this.ActiveTabContent.Content, false);
             this.UpdateToolContext();
         }

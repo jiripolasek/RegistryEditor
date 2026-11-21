@@ -22,6 +22,9 @@ public sealed partial class BrowserPage
         this.ToolbarShortcuts.SetCommands(this._window.ToolbarCommands.Select(item => item.Command));
         var contextMenu = this._window.CreateToolbarContextMenu();
         this.PathRow.ContextFlyout = this.ToolbarShortcuts.ContextFlyout = this.ToolsButton.ContextFlyout = contextMenu;
+        this.FavoritesBar.ContextFlyout = this._favoriteBarContextMenu;
+        this._favoriteBarContextMenu.Opening += (_, _) => this.PopulateFavoriteBarContextMenu();
+        this.FavoriteBarOverflowButton.Flyout = this._window.CreateFavoritesMenu(rootItems: this.OverflowFavoriteItems);
         this.UpdateToolbar();
     }
 
@@ -29,6 +32,17 @@ public sealed partial class BrowserPage
     {
         this._window.UpdateToolbarCommands();
         this.UpdateToolsMenuPins();
+        var favoritesBarVisibility = this.Settings.ShowFavoritesBar ? Visibility.Visible : Visibility.Collapsed;
+        if (this.FavoritesBar.Visibility != favoritesBarVisibility)
+        {
+            this.FavoritesBar.Visibility = favoritesBarVisibility;
+            this.InvalidateFavoritesBar();
+            if (this.IsLoaded)
+            {
+                this.RefreshFavoritesBar();
+            }
+        }
+
         this.BackButton.Visibility = this.Settings.ShowBackButton ? Visibility.Visible : Visibility.Collapsed;
         this.ForwardButton.Visibility = this.Settings.ShowForwardButton ? Visibility.Visible : Visibility.Collapsed;
         this.UpButton.Visibility = this.Settings.ShowUpButton ? Visibility.Visible : Visibility.Collapsed;

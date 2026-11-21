@@ -106,6 +106,10 @@ public sealed partial class AppSettings
 
     public ToolbarButtons ToolbarButtons { get; set; }
 
+    public bool ShowFavoritesBar { get; set; }
+
+    public bool OpenFavoritesMenu { get; set; }
+
     internal RegistrySortColumn[] ListColumns { get; set; } = RegistryColumns.Defaults();
 
     /// <summary>
@@ -213,6 +217,8 @@ public sealed partial class AppSettings
             settings.ShowListToolbar = saved.ShowListToolbar;
             settings.PanelTabsAtBottom = saved.PanelTabsAtBottom;
             settings.ToolbarButtons = saved.ToolbarButtons & ToolbarButtons.All;
+            settings.ShowFavoritesBar = saved.ShowFavoritesBar;
+            settings.OpenFavoritesMenu = saved.OpenFavoritesMenu;
             settings.ShowBackButton = saved.ShowBackButton;
             settings.ShowForwardButton = saved.ShowForwardButton;
             settings.ShowUpButton = saved.ShowUpButton;
@@ -282,7 +288,7 @@ public sealed partial class AppSettings
             this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
             this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton,
             this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
-            this.EditorFont, this.ShowSearchBox);
+            this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu);
         try
         {
             change(this);
@@ -346,7 +352,7 @@ public sealed partial class AppSettings
                 this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
                 this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton,
                 this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl,
-                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox) = previous;
+                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu) = previous;
             throw;
         }
     }
@@ -393,5 +399,7 @@ public sealed partial class AppSettings
         RegistryFileLayout RegistryFileLayout = RegistryFileLayout.Split,
         RegistryFont? EditorFont = null,
         string[]? RecentSearches = null,
-        bool ShowSearchBox = true);
+        bool ShowSearchBox = true,
+        bool ShowFavoritesBar = false,
+        bool OpenFavoritesMenu = false);
 }
