@@ -21,6 +21,10 @@ internal static class InvestigationTests
     {
         var root = RegistryLocation.Parse("HKCU\\Software\\JournalTest");
         check(
+            RegistryScripts.PowerShellLocation(root.Child("a'’[b]")) ==
+            "Set-Location -LiteralPath 'Registry::HKEY_CURRENT_USER\\Software\\JournalTest\\a''’’[b]'",
+            "PowerShell location uses a literal registry provider path and escapes ASCII and smart quotes");
+        check(
             RegistryJournal.Overlaps(new JournalScope(root), new JournalScope(root.Child("Child"), ["v"])),
             "Journal branch scope includes descendants");
         check(

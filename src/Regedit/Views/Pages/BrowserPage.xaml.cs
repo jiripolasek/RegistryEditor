@@ -397,6 +397,10 @@ public sealed partial class BrowserPage : Page
         this._treeContextLocation = this.TreePane.SelectContextNode(((MenuFlyout)sender).Target);
         UpdateHiveSwitchMenu(this.TreeSwitchHiveMenu, this._treeContextLocation);
         this.TreeWebSearchMenu.IsEnabled = this._treeContextLocation is { IsComputer: false };
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        this.TreePowerShellMenu.Visibility = Visibility.Visible;
+        this.TreePowerShellMenu.IsEnabled = this._treeContextLocation is { IsComputer: false, Machine: null };
+#endif
         this.TreeExportMenu.CommandParameter = this.TreePermissionsMenu.CommandParameter = this._treeContextLocation;
         this.TreeRenameMenu.CommandParameter = this.TreeDeleteMenu.CommandParameter = this._treeContextLocation;
         if (this._treeContextLocation is not { } location)
@@ -693,6 +697,16 @@ public sealed partial class BrowserPage : Page
     private void TreeWebSearch_Click(object sender, RoutedEventArgs args)
     {
         this.ViewModel.SearchWebCommand.Execute((this._treeContextLocation, null));
+    }
+
+    private void TreeOpenPowerShell_Click(object sender, RoutedEventArgs args)
+    {
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        if (this._treeContextLocation is { } location)
+        {
+            this._window.OpenPowerShell(location);
+        }
+#endif
     }
 
     private void CurrentWebSearch_Click(object sender, RoutedEventArgs args)

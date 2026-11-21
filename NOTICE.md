@@ -106,6 +106,10 @@ Copyright © Serilog Contributors
 
 Apache License, Version 2.0. The full license is included in [LICENSE.txt](LICENSE.txt).
 
+## Experimental PowerShell terminal
+
+Builds with the experimental terminal include [NOTICE.Terminal.md](NOTICE.Terminal.md).
+
 ## Microsoft Windows App SDK
 
 **Source**: https://github.com/microsoft/WindowsAppSDK/

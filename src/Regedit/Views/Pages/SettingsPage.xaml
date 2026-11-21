@@ -520,6 +520,27 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="Changes are saved automatically and apply to all registry tabs."
                         TextWrapping="Wrap" />
+                    <StackPanel Spacing="4" Visibility="{x:Bind TerminalSettingsVisibility}">
+                        <TextBlock
+                            Margin="0,24,0,4"
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="Terminal" />
+                        <toolkit:SettingsCard Description="Leave blank to detect PowerShell 7 in its standard installation folder." Header="PowerShell 7 executable">
+                            <TextBox
+                                x:Name="PowerShellPathBox"
+                                Width="240"
+                                AutomationProperties.Name="PowerShell 7 executable"
+                                PlaceholderText="Automatic"
+                                Text="{x:Bind ViewModel.PowerShellPath, Mode=TwoWay}" />
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard Description="Offer 5.1 in the bottom panel when PowerShell 7 cannot start." Header="Offer Windows PowerShell 5.1">
+                            <ToggleSwitch
+                                x:Name="PowerShellFallbackSwitch"
+                                AutomationProperties.Name="Offer Windows PowerShell 5.1"
+                                IsOn="{x:Bind ViewModel.OfferWindowsPowerShellFallback, Mode=TwoWay}" />
+                        </toolkit:SettingsCard>
+                    </StackPanel>
                     <TextBlock
                         Margin="0,24,0,8"
                         AutomationProperties.HeadingLevel="Level2"
