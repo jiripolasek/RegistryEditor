@@ -250,6 +250,15 @@
                 Icon="Save"
                 Text="Export…" />
             <MenuFlyoutItem
+                x:Name="EntryUsageMenu"
+                AutomationProperties.AutomationId="EntryRegistryUsage"
+                Click="EntryUsage_Click"
+                Text="Registry Usage">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xEB05;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
                 x:Name="EntryPermissionsMenu"
                 Command="{x:Bind ViewModel.Branches.PermissionsCommand}"
                 CommandParameter="{x:Bind ViewModel.SelectedEntry.Key, Mode=OneWay}"
@@ -353,6 +362,15 @@
                 Command="{x:Bind ViewModel.Branches.ExportCommand}"
                 Icon="Save"
                 Text="Export…" />
+            <MenuFlyoutItem
+                x:Name="TreeUsageMenu"
+                AutomationProperties.AutomationId="TreeRegistryUsage"
+                Click="TreeUsage_Click"
+                Text="Registry Usage">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xEB05;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
             <MenuFlyoutItem
                 x:Name="TreePermissionsMenu"
                 Command="{x:Bind ViewModel.Branches.PermissionsCommand}"

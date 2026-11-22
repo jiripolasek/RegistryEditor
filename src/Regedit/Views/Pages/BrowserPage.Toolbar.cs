@@ -73,7 +73,8 @@ public sealed partial class BrowserPage
     private void ToolsMenu_Opening(object sender, object args)
     {
         this._toolsMenuPins.Clear();
-        this._window.FillToolsMenu(((MenuFlyout)sender).Items, this.AttachToolsMenuPin);
+        var menu = (MenuFlyout)sender;
+        this._window.FillToolsMenu(menu, menu.Items, this.AttachToolsMenuPin);
         this.UpdateToolsMenuPins();
     }
 

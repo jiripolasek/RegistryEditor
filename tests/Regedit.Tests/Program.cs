@@ -116,6 +116,7 @@ AddAsync("registry-file", () => RegistryFileTests.RunAsync(Check, args.Contains(
 AddAsync("registry-file-view-model", () => RegistryFilePreviewViewModelTests.RunAsync(Check));
 AddAsync("large-value", () => LargeValueTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("registry-export", () => RegistryExportTests.RunAsync(Check, args.Contains("--registry")));
+Add("registry-usage", () => RegistryUsageTests.Run(Check, Throws<OperationCanceledException>, args.Contains("--registry")));
 AddAsync("clipboard-routing", () => ClipboardRoutingTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("notes-view-model", () => NotesViewModelTests.RunAsync(Check));
 AddAsync("notes-store", () => NotesStoreTests.RunAsync(Check));

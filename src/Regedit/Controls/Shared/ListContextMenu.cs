@@ -11,7 +11,7 @@ namespace JPSoftworks.Regedit.Controls.Shared;
 
 internal static class ListContextMenu
 {
-    internal static void Attach(ListView list, Func<MenuFlyout> create)
+    internal static void Attach(ListView list, Func<MenuFlyout?> create)
     {
         list.ContextRequested += (_, args) =>
         {
@@ -31,7 +31,11 @@ internal static class ListContextMenu
                 list.SelectedItems.Clear();
             }
 
-            var menu = create();
+            if (create() is not { } menu)
+            {
+                return;
+            }
+
             if (hasPosition)
             {
                 menu.ShowAt(list, new FlyoutShowOptions { Position = point });

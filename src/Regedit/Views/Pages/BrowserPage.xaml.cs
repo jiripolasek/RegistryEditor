@@ -397,6 +397,7 @@ public sealed partial class BrowserPage : Page
         this._treeContextLocation = this.TreePane.SelectContextNode(((MenuFlyout)sender).Target);
         UpdateHiveSwitchMenu(this.TreeSwitchHiveMenu, this._treeContextLocation);
         this.TreeWebSearchMenu.IsEnabled = this._treeContextLocation is { IsComputer: false };
+        this.TreeUsageMenu.IsEnabled = this.TreeWebSearchMenu.IsEnabled;
 #if REGEDIT_EXPERIMENTAL_TERMINAL
         this.TreePowerShellMenu.Visibility = Visibility.Visible;
         this.TreePowerShellMenu.IsEnabled = this._treeContextLocation is { IsComputer: false, Machine: null };
@@ -551,7 +552,8 @@ public sealed partial class BrowserPage : Page
         this.EntryRevealMenu.Visibility = Visible(valueActions && this.ViewModel.RevealFileCommand.CanExecute(null));
         this.EntryDuplicateMenu.Visibility = Visible(valueActions && entry.Value is not null);
         this.EntryOpenTargetMenu.Visibility = Visible(valueActions && entry.IsLink);
-        this.EntryFavoriteMenu.Visibility = this.EntryExportMenu.Visibility = this.EntryPermissionsMenu.Visibility = Visible(keyActions);
+        this.EntryFavoriteMenu.Visibility = this.EntryExportMenu.Visibility = this.EntryPermissionsMenu.Visibility
+            = this.EntryUsageMenu.Visibility = Visible(keyActions);
         this.EntryFavoriteMenu.Text = entry.Key is { } key && this._window.Favorites.Contains(key)
             ? "Remove from favorites"
             : "Add to favorites…";
@@ -705,6 +707,24 @@ public sealed partial class BrowserPage : Page
         this.CopyText(this.ViewModel.Location.Address);
     }
 
+    private void EntryUsage_Click(object sender, RoutedEventArgs args)
+    {
+        if (this.ViewModel.SelectedEntry?.Key is { } location)
+        {
+            this._window.RunAfterMenuCloses(
+                (MenuFlyout)this.Resources["RegistryEntryMenu"], () => this._window.ViewModel.OpenRegistryUsage(location));
+        }
+    }
+
+    private void TreeUsage_Click(object sender, RoutedEventArgs args)
+    {
+        if (this._treeContextLocation is { } location)
+        {
+            this._window.RunAfterMenuCloses(
+                (MenuFlyout)this.Resources["RegistryTreeMenu"], () => this._window.ViewModel.OpenRegistryUsage(location));
+        }
+    }
+
     private void EntryWebSearch_Click(object sender, RoutedEventArgs args)
     {
         if (this.ViewModel.SelectedEntries.Count == 1 && this.ViewModel.SelectedEntry is { } entry)
@@ -803,27 +823,7 @@ public sealed partial class BrowserPage : Page
 
     private void OpenTabAfterMenuCloses(MenuFlyout menu, RegistryLocation location, string? value = null)
     {
-        // Removing a page with a focused flyout item makes WinUI traverse the outgoing tree to restore focus.
-        if (menu.IsOpen)
-        {
-            menu.Closed += Closed;
-            menu.Hide();
-        }
-        else
-        {
-            QueueOpen();
-        }
-
-        void Closed(object? sender, object args)
-        {
-            menu.Closed -= Closed;
-            QueueOpen();
-        }
-
-        void QueueOpen()
-        {
-            this.DispatcherQueue.TryEnqueue(() => this._window.ViewModel.OpenBrowser(location, value));
-        }
+        this._window.RunAfterMenuCloses(menu, () => this._window.ViewModel.OpenBrowser(location, value));
     }
 
     private void TreeCopyPath_Click(object sender, RoutedEventArgs args)

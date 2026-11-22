@@ -8,6 +8,7 @@ using JPSoftworks.Regedit.Models.Settings;
 using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.Views.Pages;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
@@ -133,7 +134,8 @@ public sealed partial class MainWindow
         }
     }
 
-    internal void FillToolsMenu(IList<MenuFlyoutItemBase> items, Action<ToolbarButtons, ToolCommand, MenuFlyoutItem>? attach = null)
+    internal void FillToolsMenu(
+        MenuFlyout menu, IList<MenuFlyoutItemBase> items, Action<ToolbarButtons, ToolCommand, MenuFlyoutItem>? attach = null)
     {
         this.UpdateToolbarCommands();
         items.Clear();
@@ -142,6 +144,19 @@ public sealed partial class MainWindow
         {
             if (button == ToolbarButtons.Sidebar)
             {
+                var usage = new MenuFlyoutItem
+                {
+                    Text = "Registry Usage",
+                    Icon = new FontIcon { Glyph = "\uEB05" },
+                    IsEnabled = this.ViewModel.ContextLocation is { IsComputer: false }
+                };
+                AutomationProperties.SetAutomationId(usage, "ToolsRegistryUsage");
+                usage.Click += (_, _) =>
+                {
+                    var location = this.ViewModel.ContextLocation;
+                    this.RunAfterMenuCloses(menu, () => this.ViewModel.OpenRegistryUsage(location));
+                };
+                items.Add(usage);
 #if REGEDIT_EXPERIMENTAL_TERMINAL
                 items.Add(this.CreatePowerShellMenuItem());
 #endif

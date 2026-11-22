@@ -437,6 +437,10 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         {
             investigation.Close();
         }
+        else if (tab is RegistryUsageTab usage)
+        {
+            usage.ScanCommand.Cancel();
+        }
 
         this.TabClosed?.Invoke(tab);
     }
@@ -471,6 +475,18 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         {
             this.OpenToolTab(tool);
         }
+    }
+
+    internal void OpenRegistryUsage(RegistryLocation? location)
+    {
+        if (this.IsClosing || location is not { IsComputer: false })
+        {
+            return;
+        }
+
+        var tab = new RegistryUsageTab(this._registry, location);
+        this.SelectTab(tab);
+        tab.ScanCommand.Execute(location);
     }
 
     internal void OpenToolTab(ToolKind tool, bool fromPanel = false)

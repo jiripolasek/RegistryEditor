@@ -71,6 +71,17 @@ internal static partial class RegistryNative
         nint data,
         nint dataLength);
 
+[LibraryImport("advapi32.dll", EntryPoint = "RegEnumValueW")]
+    internal static partial int EnumValueSize(
+        SafeRegistryHandle key,
+        uint index,
+        [Out] char[] name,
+        ref uint length,
+        nint reserved,
+        nint type,
+        nint data,
+        out uint dataLength);
+
     [LibraryImport("advapi32.dll", EntryPoint = "RegSetValueExW", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial int SetValue(SafeRegistryHandle key, string name, uint reserved, uint type, byte[] data, uint size);
 

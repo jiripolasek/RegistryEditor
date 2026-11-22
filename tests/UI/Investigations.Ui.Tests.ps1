@@ -2574,6 +2574,15 @@ try {
             Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq $root }).Count -eq 1 -and $items.name -contains $first }
             Assert-TreeSelection $root
         }
+        Measure-TreeAction 'registryUsageMs' {
+            $menu = Context-Menu (Pick 'TreeItem' $root).selector
+            $usage = Pick 'MenuItem' 'Registry Usage' -Window $menu.Window
+            Ui @('invoke', $usage.selector, '--action', 'invoke') -Window $menu.Window | Out-Null
+            Wait-Ui { param($items) $items.automationId -contains 'RegistryUsageSubkeys' }
+        }
+        Open-Menu 'Close tab'
+        Wait-Ui { param($items) $items.name -contains $first }
+        Assert-TreeSelection $root
         if ([Math]::Abs((Pick 'TreeItem' $first).y - $position) -gt 2) { throw 'Opening another tab moved the source tree.' }
         Ui @('invoke', (Pick 'TreeItem' $root).selector, '--action', 'collapse') | Out-Null
         $wide = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("$subKey\WideTree")
@@ -2606,6 +2615,41 @@ try {
         $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)
         try { $key.DeleteSubKeyTree('WideTree') } finally { $key.Dispose() }
         Press 'Refresh'
+    }
+
+    Test-Ui 'Registry Usage row context menu opens the target subkey' {
+        Browser
+        $scope = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("$subKey\UsageMenu")
+        try {
+            foreach ($fixture in @(@{ Name = 'Usage Alpha'; Bytes = 2 }, @{ Name = 'Usage Beta'; Bytes = 5 })) {
+                $key = $scope.CreateSubKey($fixture.Name)
+                try { $key.SetValue('Data', [byte[]]::new($fixture.Bytes), [Microsoft.Win32.RegistryValueKind]::Binary) }
+                finally { $key.Dispose() }
+            }
+        } finally { $scope.Dispose() }
+
+        Go-ToKey "$address\UsageMenu"
+        Open-Menu 'Registry Usage' 'Tools'
+        Wait-Ui { param($items) $items.automationId -contains 'RegistryUsageSummary' -and $items.name -contains '3 keys · 2 values · 7 bytes of value data' }
+
+        Select-Row 'Usage Alpha' | Out-Null
+        $row = Pick 'ListItem' 'Usage Beta, 5 bytes, 1 key, 1 value'
+        $menu = Context-Menu $row.selector
+        Ui @('invoke', (Pick 'MenuItem' 'Open subkey' -Window $menu.Window).selector) -Window $menu.Window | Out-Null
+        Wait-Ui { param($items) $items.name -contains '1 key · 1 value · 5 bytes of value data' }
+
+        Ui @('invoke', 'RegistryUsageUp') | Out-Null
+        Wait-Ui { param($items) $items.name -contains '3 keys · 2 values · 7 bytes of value data' }
+        $row = Pick 'ListItem' 'Usage Alpha, 2 bytes, 1 key, 1 value'
+        $menu = Context-Menu $row.selector -Keyboard
+        Ui @('invoke', (Pick 'MenuItem' 'Open in browser' -Window $menu.Window).selector) -Window $menu.Window | Out-Null
+        Assert-TreeSelection "$address\UsageMenu\Usage Alpha"
+
+        Open-Menu 'Close tab'
+        Wait-Ui { param($items) $items.automationId -contains 'RegistryUsageSubkeys' }
+        Open-Menu 'Close tab'
+        Wait-Ui { param($items) $items.name -contains 'Registry keys and values' }
+        Go-ToKey $address
     }
 
     Test-Ui 'Baseline sibling edits preserve tree anchor viewport' {
