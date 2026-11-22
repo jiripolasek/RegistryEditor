@@ -169,7 +169,7 @@ public sealed partial class MainWindow : Window
         this.Shell.KeyboardAccelerators.Add(settingsShortcut);
         this.Shell.PreviewKeyDown += this.Shortcuts_KeyDown;
         this.Dialogs = new WindowDialogPresenter(
-            this.Shell, this.ViewModel,
+            this, this.Shell, this.ViewModel,
             () => this.ShowApplicationNotice(
                 viewModel.IsDialogOpen ? "Finish the open dialog first" : "The window is closing",
                 viewModel.IsDialogOpen

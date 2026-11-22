@@ -8,8 +8,12 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace JPSoftworks.Regedit.Dialogs;
 
-public sealed partial class RegistryEditDialog : ContentDialog
+public sealed partial class RegistryEditDialog : UserControl
 {
+    private static readonly Uri ValueTypeHelp = new("https://learn.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types");
+    private readonly DialogLayout _layout;
+    private readonly double _maxWidth = 548;
+
     public RegistryEditPrompt Prompt { get; }
 
     private RegistryEditDialog(RegistryEditPrompt prompt)
@@ -19,48 +23,58 @@ public sealed partial class RegistryEditDialog : ContentDialog
         switch (prompt)
         {
             case RegistryNamePrompt name:
-                var (title, header, primary) = name.Operation switch
+                var (title, subject, header, primary) = name.Operation switch
                 {
-                    RegistryNameOperation.CreateKey => ("New key", "Key name", "Create"),
-                    RegistryNameOperation.Rename => ("Rename", "New name", "Rename"),
-                    RegistryNameOperation.Paste => ("Paste into " + name.PasteDestination, "Name of the copy", "Paste"),
-                    RegistryNameOperation.DuplicateValue => ("Duplicate value", "Name of the copy", "Duplicate"),
+                    RegistryNameOperation.CreateKey => ("New key", null, "Key name", "Create"),
+                    RegistryNameOperation.Rename => ("Rename", null, "New name", "Rename"),
+                    RegistryNameOperation.Paste => ("Paste into", name.PasteDestination, "Name of the copy", "Paste"),
+                    RegistryNameOperation.DuplicateValue => ("Duplicate value", null, "Name of the copy", "Duplicate"),
                     _ => throw new ArgumentOutOfRangeException(nameof(prompt))
                 };
-                this.Title = title;
-                this.PrimaryButtonText = primary;
                 this.NameBox.Header = header;
                 this.NameBox.Text = name.Name;
                 this.NameBox.Visibility = Visibility.Visible;
-                this.Opened += (_, _) =>
+                this._layout = new DialogLayout(title, this, primary, subject: subject)
                 {
-                    this.NameBox.Focus(FocusState.Keyboard);
-                    this.NameBox.SelectAll();
+                    OnOpened = () =>
+                    {
+                        this.NameBox.Focus(FocusState.Keyboard);
+                        this.NameBox.SelectAll();
+                    },
+                    Accept = () =>
+                    {
+                        name.Name = this.NameBox.Text;
+                        return true;
+                    }
                 };
-                this.PrimaryButtonClick += (_, _) => name.Name = this.NameBox.Text;
                 break;
             case RegistryValueEditorViewModel editor:
-                this.Title = editor.Title;
-                this.PrimaryButtonText = editor.IsCreating ? "Create" : "Save";
                 var content = new RegistryValueEditor(editor);
                 this.ValueEditorHost.Content = content;
                 this.ValueEditorHost.Visibility = Visibility.Visible;
+                this._layout = new DialogLayout(
+                    editor.Title, this, editor.IsCreating ? "Create" : "Save",
+                    subject: editor.IsCreating ? null : editor.DisplayName, subtitle: editor.TypeName, help: ValueTypeHelp)
+                {
+                    OnOpened = content.FocusEditor,
+                    Accept = editor.Validate
+                };
                 if (editor.IsRaw)
                 {
                     // Room for 16 bytes per row plus the ASCII column in the hex preview.
-                    WidenForHexView(this, this.ContentPanel);
+                    this.ContentPanel.MinWidth = this.ContentPanel.MaxWidth = Controls.Shared.HexView.DialogWidth;
+                    this._maxWidth = Controls.Shared.HexView.DialogWidth + 80;
+                    this._layout.EnableHorizontalScrolling();
                 }
 
-                this.Opened += (_, _) => content.FocusEditor();
-                this.PrimaryButtonClick += (_, args) => args.Cancel = !editor.Validate();
                 break;
             case RegistryDeletePrompt delete:
-                this.Title = delete.Title;
-                this.PrimaryButtonText = "Delete";
-                this.DefaultButton = ContentDialogButton.Close;
                 this.DeleteMessage.Text = delete.Message;
                 this.DeleteMessage.Visibility = Visibility.Visible;
+                this._layout = new DialogLayout(delete.Title, this, "Delete", defaultButton: ContentDialogButton.Close, warning: true);
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(prompt));
         }
 
         if (prompt.Recovery is { } recovery)
@@ -75,7 +89,8 @@ public sealed partial class RegistryEditDialog : ContentDialog
 
     internal static async Task<bool> ShowAsync(WindowDialogPresenter dialogs, RegistryEditPrompt prompt)
     {
-        return await dialogs.ShowAsync(new RegistryEditDialog(prompt)) == ContentDialogResult.Primary;
+        var editor = new RegistryEditDialog(prompt);
+        return await dialogs.ShowAsync(editor._layout, editor._maxWidth) == ContentDialogResult.Primary;
     }
 
     /// <summary>Widens a dialog so a <see cref="Controls.Shared.HexView"/> can show 16 bytes per row.</summary>

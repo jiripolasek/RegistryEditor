@@ -88,11 +88,13 @@ public sealed partial class ValueInspector : UserControl
             return;
         }
 
-        var view = new HexView { Bytes = this.ViewModel.Bytes, Width = HexView.DialogWidth, Height = 360 };
+        var view = new HexView { Bytes = this.ViewModel.Bytes, MinWidth = HexView.DialogWidth };
         AutomationProperties.SetAutomationId(view, "ExpandedValueHexView");
         AutomationProperties.SetName(view, "Raw bytes");
         view.Loaded += (_, _) => this.HighlightBytes(view);
-        await this._dialogs.ShowAsync(new AppDialog("Raw bytes", view, "Close", string.Empty));
+        var layout = new DialogLayout("Raw bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading, fillBody: true);
+        layout.EnableHorizontalScrolling();
+        await this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 16, 588));
     }
 
     private void CopyReadout_Loaded(object sender, RoutedEventArgs args)

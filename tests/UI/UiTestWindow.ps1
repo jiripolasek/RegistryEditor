@@ -89,6 +89,11 @@ public static class UxTestWindow {
     private static extern nint GetWindow(nint hwnd, uint command);
 
     [DllImport("user32.dll")]
+    public static extern bool IsWindowEnabled(nint hwnd);
+
+    public static bool IsOwnedBy(nint window, nint owner) => GetWindow(window, 4) == owner;
+
+    [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
