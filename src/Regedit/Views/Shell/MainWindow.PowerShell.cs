@@ -77,11 +77,18 @@ public sealed partial class MainWindow
         shellDetails += $"{Environment.NewLine}{Environment.NewLine}Starting key{Environment.NewLine}{tab.Location.Address}";
 
         string? commandLine = null;
+        PowerShellLocationFeed? locationFeed = null;
         if (executable is not null)
         {
             var openKey = RegistryScripts.PowerShellLocation(tab.Location);
             var openDefault = RegistryScripts.PowerShellLocation(DefaultPowerShellLocation);
             var command = $"try {{ {openKey} -ErrorAction Stop }} catch {{ Write-Warning $_.Exception.Message; {openDefault} }}";
+            if (!tab.UseWindowsPowerShell)
+            {
+                locationFeed = new PowerShellLocationFeed(use32Bit ? RegistryView.Registry32 : RegistryView.Registry64);
+                command += Environment.NewLine + locationFeed.StartupCommand;
+            }
+
             if (tab.Run is { } run)
             {
                 command += Environment.NewLine + run.StartupCommand;
@@ -91,7 +98,9 @@ public sealed partial class MainWindow
             commandLine = $"\"{executable}\" -NoLogo -NoProfile -NoExit -EncodedCommand {encoded}";
         }
 
-        return new PowerShellView(shellName, shellDetails, commandLine, error, tab.Run, CreateRecoveryActions);
+        return new PowerShellView(shellName, shellDetails, commandLine, error, tab.Run,
+            this.Settings.TerminalFontFamily, this.Settings.TerminalFontSize,
+            locationFeed, this.NavigateFromPowerShellAsync, this.ShowKeyInPowerShellAsync, CreateRecoveryActions);
 
         FrameworkElement CreateRecoveryActions()
         {
@@ -128,6 +137,68 @@ public sealed partial class MainWindow
             var button = new Button { Content = label };
             button.Click += (_, _) => action();
             return button;
+        }
+    }
+
+    internal bool CanShowKeyInPowerShell(RegistryLocation? location) =>
+        this.BottomContent.Content is PowerShellView terminal && terminal.CanSetRegistryLocation(location);
+
+    internal async Task ShowKeyInPowerShellAsync(RegistryLocation? location)
+    {
+        if (location is null || this.ViewModel.IsClosing || this.Dialogs.IsOpen ||
+            this.BottomContent.Content is not PowerShellView terminal || !terminal.CanSetRegistryLocation(location))
+        {
+            return;
+        }
+
+        try
+        {
+            var request = terminal.SetRegistryLocationAsync(location);
+            this.ViewModel.IsBottomPaneOpen = true;
+            if (await request is { } error && !this.ViewModel.IsClosing &&
+                ReferenceEquals(this.BottomContent.Content, terminal))
+            {
+                this.ShowApplicationNotice("Could not open key in PowerShell", error, NoticeKind.Error);
+            }
+        }
+        catch (Exception error) when (error is IOException or InvalidOperationException)
+        {
+            if (!this.ViewModel.IsClosing)
+            {
+                this.ShowApplicationNotice("Could not open key in PowerShell", error.Message, NoticeKind.Error);
+            }
+        }
+    }
+
+    private async Task NavigateFromPowerShellAsync(PowerShellView terminal, RegistryLocation location, bool manual)
+    {
+        if (!ReferenceEquals(this.BottomContent.Content, terminal) || !this.ViewModel.IsBottomPaneOpen ||
+            this.ViewModel.IsClosing || this.Dialogs.IsOpen)
+        {
+            return;
+        }
+
+        try
+        {
+            if (this.ViewModel.VisibleBrowser is { Location.Machine: null } browser)
+            {
+                if (!browser.Location.IsSameLocation(location))
+                {
+                    await browser.NavigateAsync(location);
+                }
+            }
+            else if (manual)
+            {
+                this.ViewModel.OpenBrowser(location);
+            }
+        }
+        catch (Exception error)
+        {
+            this.Logger.LogFailure(LogLevel.Warning, "Navigate to PowerShell registry location", error);
+            if (manual)
+            {
+                this.ShowApplicationNotice("Could not show PowerShell key in browser", error.Message, NoticeKind.Error);
+            }
         }
     }
 

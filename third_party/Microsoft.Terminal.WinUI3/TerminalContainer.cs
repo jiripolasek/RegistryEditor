@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
-using WinUIEx.Messaging;
+using Windows.Win32;
 using Microsoft.UI.Xaml.Input;
 using System.Windows.Interop;
 using Microsoft.UI.Xaml.Automation.Peers;
@@ -33,7 +33,6 @@ namespace Microsoft.Terminal.WinUI3 {
 		/// </summary>
 		public TerminalContainer() {
 
-			this.MessageHook += this.TerminalContainer_MessageHook;
 			this.GettingFocus += TerminalContainer_GettingFocus;
 			this.IsTabStop=false;
 		}
@@ -231,22 +230,6 @@ namespace Microsoft.Terminal.WinUI3 {
 			}
 		}
 
-		/// <summary>
-		/// WPF's HwndHost likes to mark the WM_GETOBJECT message as handled to
-		/// force the usage of the WPF automation peer. We explicitly mark it as
-		/// not handled and don't return an automation peer in "OnCreateAutomationPeer" below.
-		/// This forces the message to go down to the HwndTerminal where we return terminal's UiaProvider.
-		/// </summary>
-		/// <inheritdoc/>
-		protected override void WndProc(WindowMessageEventArgs e) {
-			if ((WindowsMessages)e.Message.MessageId == WindowsMessages.GETOBJECT) {
-				e.Handled = false;
-				return;
-			}
-
-			base.WndProc(e);
-		}
-
 		/// <inheritdoc/>
 		protected override AutomationPeer OnCreateAutomationPeer() {
 			return null;
@@ -299,46 +282,50 @@ namespace Microsoft.Terminal.WinUI3 {
 		}
 
 
-		private void TerminalContainer_MessageHook(object sender, WindowMessageEventArgs e) {
-			var msg = e.Message;
-			var hwnd = msg.Hwnd;
-			var wParam = (nint)msg.WParam;
-			var lParam = msg.LParam;
-			if (hwnd == this.hwnd) {
-				switch ((WindowsMessages)e.Message.MessageId) {
-					case WindowsMessages.SETFOCUS:
+		protected override nint? WndProc(HWND window, uint message, WPARAM key, LPARAM data) {
+			// Let the native terminal supply its UI Automation provider.
+			if (message == PInvoke.WM_GETOBJECT) {
+				return null;
+			}
+
+			var result = base.WndProc(window, message, key, data);
+			var wParam = (nint)key.Value;
+			var lParam = data.Value;
+			if (window == this.hwnd && this.terminal != IntPtr.Zero && result is null) {
+				switch (message) {
+					case PInvoke.WM_SETFOCUS:
                         NativeMethods.TerminalSetFocused(this.terminal, true);
 						break;
-					case WindowsMessages.KILLFOCUS:
+					case PInvoke.WM_KILLFOCUS:
                         NativeMethods.TerminalSetFocused(this.terminal, false);
 						break;
-					case WindowsMessages.MOUSEACTIVATE:
+					case PInvoke.WM_MOUSEACTIVATE:
 						this.Focus(FocusState.Pointer);
 						NativeMethods.SetFocus(this.hwnd);
 						break;
-					case WindowsMessages.SYSKEYDOWN: // fallthrough
-					case WindowsMessages.KeyDown: {
+					case PInvoke.WM_SYSKEYDOWN:
+					case PInvoke.WM_KEYDOWN: {
 							UnpackKeyMessage(wParam, lParam, out ushort vkey, out ushort scanCode, out ushort flags);
 							NativeMethods.TerminalSendKeyEvent(this.terminal, vkey, scanCode, flags, true);
 							break;
 						}
 
-					case WindowsMessages.SYSKEYUP: // fallthrough
-					case WindowsMessages.KeyUp: {
+					case PInvoke.WM_SYSKEYUP:
+					case PInvoke.WM_KEYUP: {
 							// WM_KEYUP lParam layout documentation: https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-keyup
 							UnpackKeyMessage(wParam, lParam, out ushort vkey, out ushort scanCode, out ushort flags);
 							NativeMethods.TerminalSendKeyEvent(this.terminal, (ushort)wParam, scanCode, flags, false);
 							break;
 						}
 
-					case WindowsMessages.Char: {
+					case PInvoke.WM_CHAR: {
 							// WM_CHAR lParam layout documentation: https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-char
 							UnpackCharMessage(wParam, lParam, out char character, out ushort scanCode, out ushort flags);
 							NativeMethods.TerminalSendCharEvent(this.terminal, character, scanCode, flags);
 							break;
 						}
 
-					case WindowsMessages.WINDOWPOSCHANGED:
+					case PInvoke.WM_WINDOWPOSCHANGED:
 						var windowpos = Marshal.PtrToStructure<NativeMethods.WINDOWPOS>(lParam);
 						if (((NativeMethods.SetWindowPosFlags)windowpos.flags).HasFlag(NativeMethods.SetWindowPosFlags.SWP_NOSIZE)
 							|| (windowpos.cx == 0 && windowpos.cy == 0)) {
@@ -365,14 +352,14 @@ namespace Microsoft.Terminal.WinUI3 {
 						this.Connection?.Resize((uint)dimensions.Y, (uint)dimensions.X);
 						break;
 
-					case WindowsMessages.MOUSEWHEEL:
+					case PInvoke.WM_MOUSEWHEEL:
 						var delta = (short)(((long)wParam) >> 16);
 						this.UserScrolled?.Invoke(this, delta);
 						break;
 				}
 			}
 
-			//e.re IntPtr.Zero;
+			return result;
 		}
 
 		private void Connection_TerminalOutput(object sender, TerminalOutputEventArgs e) {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Interop;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Windows.System;
-using WinUIEx.Messaging;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Microsoft.Terminal.WinUI3.WPFImports {
 	public struct DpiScale {
@@ -86,7 +86,7 @@ namespace Microsoft.Terminal.WinUI3.WPFImports {
 		public DpiScale NewDpi { get; private set; }
 	}
 	public delegate void DpiChangedEventHandler(object sender, DpiChangedEventArgs e);
-	public interface IKeyboardInputSite {
+	internal interface IKeyboardInputSite {
 		/// <summary>Unregisters a child keyboard input sink from this site. </summary>
 		// Token: 0x060010B4 RID: 4276
 		void Unregister();
@@ -103,7 +103,7 @@ namespace Microsoft.Terminal.WinUI3.WPFImports {
 		// Token: 0x060010B6 RID: 4278
 		bool OnNoMoreTabStops(TraversalRequest request);
 	}
-	public interface IKeyboardInputSink {
+	internal interface IKeyboardInputSink {
 		/// <summary>Registers the <see cref="T:System.Windows.Interop.IKeyboardInputSink" /> interface of a contained component. </summary>
 		/// <param name="sink">The <see cref="T:System.Windows.Interop.IKeyboardInputSink" /> sink of the contained component.</param>
 		/// <returns>The <see cref="T:System.Windows.Interop.IKeyboardInputSite" /> site of the contained component.</returns>
@@ -116,7 +116,7 @@ namespace Microsoft.Terminal.WinUI3.WPFImports {
 		/// <returns>
 		///     <see langword="true" /> if the message was handled by the method implementation; otherwise, <see langword="false" />.</returns>
 		// Token: 0x060010AD RID: 4269
-		bool TranslateAccelerator(ref Message msg, VirtualKeyModifiers modifiers);
+		bool TranslateAccelerator(ref MSG msg, VirtualKeyModifiers modifiers);
 
 		/// <summary>Sets focus on either the first tab stop or the last tab stop of the sink. </summary>
 		/// <param name="request">Specifies whether focus should be set to the first or the last tab stop.</param>
@@ -138,7 +138,7 @@ namespace Microsoft.Terminal.WinUI3.WPFImports {
 		/// <returns>
 		///     <see langword="true" /> if the message was handled; otherwise, <see langword="false" />.</returns>
 		// Token: 0x060010B1 RID: 4273
-		bool OnMnemonic(ref Message msg, VirtualKeyModifiers modifiers);
+		bool OnMnemonic(ref MSG msg, VirtualKeyModifiers modifiers);
 
 		/// <summary>Processes WM_CHAR, WM_SYSCHAR, WM_DEADCHAR, and WM_SYSDEADCHAR input messages before <see cref="M:System.Windows.Interop.IKeyboardInputSink.OnMnemonic(System.Windows.Interop.MSG@,System.Windows.Input.ModifierKeys)" /> is called. </summary>
 		/// <param name="msg">The message and associated data. Do not modify this structure. It is passed by reference for performance reasons only.</param>
@@ -146,7 +146,7 @@ namespace Microsoft.Terminal.WinUI3.WPFImports {
 		/// <returns>
 		///     <see langword="true" /> if the message was processed and <see cref="M:System.Windows.Interop.IKeyboardInputSink.OnMnemonic(System.Windows.Interop.MSG@,System.Windows.Input.ModifierKeys)" /> should not be called; otherwise, <see langword="false" />.</returns>
 		// Token: 0x060010B2 RID: 4274
-		bool TranslateChar(ref Message msg, VirtualKeyModifiers modifiers);
+		bool TranslateChar(ref MSG msg, VirtualKeyModifiers modifiers);
 
 		/// <summary>Gets a value that indicates whether the sink or one of its contained components has focus. </summary>
 		/// <returns>

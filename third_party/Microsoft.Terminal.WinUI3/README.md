@@ -9,7 +9,8 @@ The WinUI sources come from [EasyWindowsTerminalControl revision 0741a4b](https:
 The terminal interop contracts come from its [pinned Terminal submodule](https://github.com/mitchcapper/Terminal/tree/922beefb83764646331662d6d15d70107d556402).
 Regedit's changes enable CsWinRT code generation and Native AOT marshalling,
 prevent recursive UI Automation peer creation, and guard the HWND lifetime
-during teardown. See [the terminal notices](../../NOTICE.Terminal.md) for attribution.
+during teardown. The host uses Win32 subclass callbacks for keyboard, DPI,
+and child window messages. See [the terminal notices](../../NOTICE.Terminal.md) for attribution.
 
 From the repository root on Windows, publish the experimental x64 build with
 Native AOT enabled.
@@ -20,5 +21,9 @@ Start-Process -FilePath .\artifacts\regedit-terminal\regedit2.exe
 ```
 
 Open PowerShell with **Ctrl+;** or **Tools → PowerShell**. PowerShell 7 can be
-configured in **Settings → Terminal**. Launching Regedit through the Windows
-shell avoids inheriting redirected streams from a command runner.
+configured in **Settings → Terminal**.
+
+Add `-p:RegeditUseSystemConPty=true` to the publish command to test the Windows
+ConPTY backend. Use a separate output directory when comparing builds. The
+default experimental build uses bundled ConPTY. Launching that build through
+the Windows shell avoids inheriting redirected streams from a command runner.

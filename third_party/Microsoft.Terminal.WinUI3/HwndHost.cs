@@ -3,7 +3,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Win32;
 using Windows.Win32.Foundation;
-using WinUIEx.Messaging;
 using Windows.System;
 using Windows.Win32.UI.WindowsAndMessaging;
 using Microsoft.UI.Xaml.Automation.Peers;
@@ -93,19 +92,13 @@ namespace System.Windows.Interop {
 			lock (this) {
 				if (rootHwnd == _XAMLParentWindow)
 					return;
-				if (!_XAMLParentWindow.IsNull) {
-					xamlParentMessageMonitor.WindowMessageReceived -= xamlParentWndProc;
-					xamlParentMessageMonitor.Dispose();
-					xamlParentMessageMonitor = null;
-
-				}
+				_parentSubclass?.Dispose();
+				_parentSubclass = null;
+				_lastKeyboardMessage = null;
 				_XAMLParentWindow = rootHwnd;
-				if (rootHwnd != HWND.Null) {
-
-
-					var inputWindow = UWPHelpers.GetInputHwnd(rootHwnd);
-					xamlParentMessageMonitor = new WindowMessageMonitor(inputWindow);
-					xamlParentMessageMonitor.WindowMessageReceived += xamlParentWndProc;
+				if (!rootHwnd.IsNull) {
+					var inputWindow = new HWND(UWPHelpers.GetInputHwnd(rootHwnd));
+					_parentSubclass = WindowSubclass.Attach(inputWindow, ParentWndProc);
 				}
 			}
 			OnSourceChanged(this);
@@ -128,33 +121,27 @@ namespace System.Windows.Interop {
 			}
 		}
 		private DpiScale _curDPI;
-		private void xamlParentWndProc(object sender, WindowMessageEventArgs e) {
-			switch ((WindowsMessages)e.Message.MessageId) {
-				case WindowsMessages.DPICHANGED:
+		private nint? ParentWndProc(HWND window, uint message, WPARAM wParam, LPARAM lParam) {
+			switch (message) {
+				case PInvoke.WM_DPICHANGED:
 					var oldDPI = curDPI;
 					UpdateCurDPI();
-					OnDpiChanged(oldDPI, curDPI); ;
+					OnDpiChanged(oldDPI, curDPI);
 					break;
-				case WindowsMessages.KeyDown:
-				case WindowsMessages.KeyUp:
-				case WindowsMessages.SYSKEYDOWN:
-				case WindowsMessages.IME_KEYDOWN:
-				case WindowsMessages.SYSKEYUP:
-				case WindowsMessages.IME_KEYUP:
-					LastKeyboardMessage = e;
-
+				case PInvoke.WM_KEYDOWN:
+				case PInvoke.WM_KEYUP:
+				case PInvoke.WM_SYSKEYDOWN:
+				case PInvoke.WM_IME_KEYDOWN:
+				case PInvoke.WM_SYSKEYUP:
+				case PInvoke.WM_IME_KEYUP:
+					_lastKeyboardMessage = new MSG { hwnd = window, message = message, wParam = wParam, lParam = lParam };
 					break;
 			}
+			return null;
 		}
-		private WindowMessageEventArgs LastKeyboardMessage;
-
-		protected WindowMessageMonitor xamlParentMessageMonitor;
-		protected WindowMessageMonitor _hwndSubclassHook;
-		/// <summary>
-		///     An event that is notified of all unhandled messages received
-		///     by the hosted window.
-		/// </summary>
-		public event EventHandler<WindowMessageEventArgs> MessageHook;
+		private MSG? _lastKeyboardMessage;
+		private WindowSubclass _parentSubclass;
+		private WindowSubclass _childSubclass;
 
 		/// <summary>
 		///     This event is raised after the DPI of the screen on which the HwndHost is displayed, changes.
@@ -207,12 +194,11 @@ namespace System.Windows.Interop {
 		/// </summary>
 		/// <param name="e"></param>
 		protected void OnKeyDown(object sender, KeyRoutedEventArgs e) {
-			if (LastKeyboardMessage == null)
+			if (_lastKeyboardMessage is not MSG msg)
 				return;
 
 			var modifiers = GetCurrentModifierKeys();
 
-			var msg = LastKeyboardMessage.Message;
 			bool handled = ((IKeyboardInputSink)this).TranslateAccelerator(ref msg, modifiers);
 
 			if (handled)
@@ -222,11 +208,10 @@ namespace System.Windows.Interop {
 		}
 
 		protected void OnKeyUp(object sender, KeyRoutedEventArgs e) {
-			if (LastKeyboardMessage == null)
+			if (_lastKeyboardMessage is not MSG msg)
 				return;
 			var modifiers = GetCurrentModifierKeys();
 
-			var msg = LastKeyboardMessage.Message;
 			bool handled = ((IKeyboardInputSink)this).TranslateAccelerator(ref msg, modifiers);
 
 			if (handled)
@@ -275,12 +260,12 @@ namespace System.Windows.Interop {
 		///     modify the MSG structure, it's passed by reference only as
 		///     a performance optimization.
 		/// </summary>
-		protected virtual bool TranslateAcceleratorCore(ref Message msg, VirtualKeyModifiers modifiers) {
+		protected virtual bool TranslateAcceleratorCore(ref MSG msg, VirtualKeyModifiers modifiers) {
 
 			return false;
 		}
 
-		bool IKeyboardInputSink.TranslateAccelerator(ref Message msg, VirtualKeyModifiers modifiers) {
+		bool IKeyboardInputSink.TranslateAccelerator(ref MSG msg, VirtualKeyModifiers modifiers) {
 			return TranslateAcceleratorCore(ref msg, modifiers);
 		}
 
@@ -313,11 +298,11 @@ namespace System.Windows.Interop {
 		///     If this component contains child components, the container
 		///     OnMnemonic will need to call the child's OnMnemonic method.
 		/// </summary>
-		protected virtual bool OnMnemonicCore(ref Message msg, VirtualKeyModifiers modifiers) {
+		protected virtual bool OnMnemonicCore(ref MSG msg, VirtualKeyModifiers modifiers) {
 			return false;
 		}
 
-		bool IKeyboardInputSink.OnMnemonic(ref Message msg, VirtualKeyModifiers modifiers) {
+		bool IKeyboardInputSink.OnMnemonic(ref MSG msg, VirtualKeyModifiers modifiers) {
 			return OnMnemonicCore(ref msg, modifiers);
 		}
 
@@ -329,11 +314,11 @@ namespace System.Windows.Interop {
 		///     It is illegal to modify the MSG structure, it's passed by reference
 		///     only as a performance optimization.
 		/// </summary>
-		protected virtual bool TranslateCharCore(ref Message msg, VirtualKeyModifiers modifiers) {
+		protected virtual bool TranslateCharCore(ref MSG msg, VirtualKeyModifiers modifiers) {
 			return false;
 		}
 
-		bool IKeyboardInputSink.TranslateChar(ref Message msg, VirtualKeyModifiers modifiers) {
+		bool IKeyboardInputSink.TranslateChar(ref MSG msg, VirtualKeyModifiers modifiers) {
 			return TranslateCharCore(ref msg, modifiers);
 		}
 
@@ -479,23 +464,10 @@ namespace System.Windows.Interop {
 
 
 			if (disposing) {
-				// Verify the thread has access to the context.
-#pragma warning suppress 6519
-
-
-
-				// Remove our subclass.  Even if this fails, it will be forcably removed
-				// when the window is destroyed.
-				if (_hwndSubclassHook != null) {
-					// Check if it is trusted (WebOC and AddInHost), call CriticalDetach to avoid the Demand.
-					_hwndSubclassHook.Dispose();
-
-					_hwndSubclassHook = null;
-				}
-
-
-				// We no longer need to know about the source changing.
-				//PresentationSource.RemoveSourceChangedHandler(this, new SourceChangedEventHandler(OnSourceChanged));
+				_parentSubclass?.Dispose();
+				_parentSubclass = null;
+				_childSubclass?.Dispose();
+				_childSubclass = null;
 			}
 
 			if (_weakEventDispatcherShutdown != null) // Can be null if the static ctor failed ... see WebBrowser.
@@ -545,20 +517,18 @@ namespace System.Windows.Interop {
 		///     hosted child window.
 		/// </summary>
 		///<remarks> Not available in Internet zone</remarks>
-		protected virtual void WndProc(WindowMessageEventArgs e) {
-			Debug.WriteLine($"Child got message {(WindowsMessages)e.Message.MessageId}: {e.Message}");
+		protected virtual nint? WndProc(HWND window, uint message, WPARAM wParam, LPARAM lParam) {
 			DemandIfUntrusted();
-			var msg = e.Message;
 
-			switch ((WindowsMessages)e.Message.MessageId) {
-				case WindowsMessages.NCDESTROY:
+			switch (message) {
+				case PInvoke.WM_NCDESTROY:
 					_hwnd = HWND.Null;
 					break;
 
 				// When layout happens, we first calculate the right size/location then call SetWindowPos.
 				// We only allow the changes that are coming from Avalon layout. The hwnd is not allowed to change by itself.
 				// So the size of the hwnd should always be RenderSize and the position be where layout puts it.
-				case WindowsMessages.WINDOWPOSCHANGING:
+				case PInvoke.WM_WINDOWPOSCHANGING:
 
 					if (!XAMLParentWindow.IsNull && this.Parent != null) {
 						// Get the rect assigned by layout to us.
@@ -570,7 +540,7 @@ namespace System.Windows.Interop {
 						// modifying this structure during WM_WINDOWPOSCHANGING
 						// will change what happens to the window.
 						unsafe {
-							WINDOWPOS* windowPos = (WINDOWPOS*)msg.LParam;
+							WINDOWPOS* windowPos = (WINDOWPOS*)lParam.Value;
 
 							// Always force the size of the window to be the
 							// size of our assigned rectangle.  Note that we
@@ -602,12 +572,11 @@ namespace System.Windows.Interop {
 					break;
 
 
-				case WindowsMessages.GETOBJECT:
-					e.Handled = true;
-					e.Result = OnWmGetObject((nint)msg.WParam, msg.LParam);
-					break;
+				case PInvoke.WM_GETOBJECT:
+					return OnWmGetObject((nint)wParam.Value, lParam.Value);
 			}
 
+			return null;
 		}
 
 		#region Automation
@@ -882,8 +851,7 @@ namespace System.Windows.Interop {
 
 			if ((idWindowThread == PInvoke.GetCurrentThreadId()) &&
 				(idWindowProcess == Environment.ProcessId)) {
-				_hwndSubclassHook = new WindowMessageMonitor(_hwnd);
-				_hwndSubclassHook.WindowMessageReceived += SubclassWndProc;
+				_childSubclass = WindowSubclass.Attach(_hwnd, WndProc);
 			}
 
 			// Initially make sure the window is hidden.  We will show it later during rendering.
@@ -940,12 +908,6 @@ namespace System.Windows.Interop {
 			DestroyWindow();
 			return null;
 		}
-		private void SubclassWndProc(object sender, WindowMessageEventArgs e) {
-			WndProc(e);
-			if (!e.Handled)
-				MessageHook?.Invoke(sender, e);
-		}
-
 
 
 

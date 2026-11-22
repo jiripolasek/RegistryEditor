@@ -400,6 +400,8 @@ public sealed partial class BrowserPage : Page
 #if REGEDIT_EXPERIMENTAL_TERMINAL
         this.TreePowerShellMenu.Visibility = Visibility.Visible;
         this.TreePowerShellMenu.IsEnabled = this._treeContextLocation is { IsComputer: false, Machine: null };
+        this.TreeUseKeyInPowerShellMenu.Visibility = Visibility.Visible;
+        this.TreeUseKeyInPowerShellMenu.IsEnabled = this._window.CanShowKeyInPowerShell(this._treeContextLocation);
 #endif
         this.TreeExportMenu.CommandParameter = this.TreePermissionsMenu.CommandParameter = this._treeContextLocation;
         this.TreeRenameMenu.CommandParameter = this.TreeDeleteMenu.CommandParameter = this._treeContextLocation;
@@ -706,6 +708,13 @@ public sealed partial class BrowserPage : Page
         {
             this._window.OpenPowerShell(location);
         }
+#endif
+    }
+
+    private void TreeUseKeyInPowerShell_Click(object sender, RoutedEventArgs args)
+    {
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        _ = this._window.ShowKeyInPowerShellAsync(this._treeContextLocation);
 #endif
     }
 

@@ -232,6 +232,10 @@ public sealed partial class SettingsPage : Page
         {
             this.ViewModel.EditorFontFamily = family;
         }
+        else if (selector == this.TerminalFontSelector)
+        {
+            this.ViewModel.TerminalFontFamily = family;
+        }
         else
         {
             this.ViewModel.DataFontFamily = family;

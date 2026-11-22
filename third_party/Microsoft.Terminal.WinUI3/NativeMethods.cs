@@ -218,8 +218,32 @@ namespace Microsoft.Terminal.Wpf
         [DllImport("Microsoft.Terminal.Control.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.StdCall, PreserveSig = true)]
         public static extern void TerminalSendCharEvent(IntPtr terminal, char ch, ushort scanCode, ushort flags);
 
-        [DllImport("Microsoft.Terminal.Control.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.StdCall, PreserveSig = true)]
-        public static extern void TerminalSetTheme(IntPtr terminal, [MarshalAs(UnmanagedType.Struct)] TerminalTheme theme, string fontFamily, short fontSize, int newDpi);
+        public static unsafe void TerminalSetTheme(IntPtr terminal, TerminalTheme theme, string fontFamily, short fontSize, int newDpi)
+        {
+            // Marshal the inline COLORREF table explicitly for Native AOT.
+            var nativeTheme = new NativeTerminalTheme
+            {
+                DefaultBackground = theme.DefaultBackground,
+                DefaultForeground = theme.DefaultForeground,
+                DefaultSelectionBackground = theme.DefaultSelectionBackground,
+                CursorStyle = theme.CursorStyle,
+            };
+            theme.ColorTable.AsSpan().CopyTo(new Span<uint>(nativeTheme.ColorTable, 16));
+            TerminalSetThemeNative(terminal, nativeTheme, fontFamily, fontSize, newDpi);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private unsafe struct NativeTerminalTheme
+        {
+            public uint DefaultBackground;
+            public uint DefaultForeground;
+            public uint DefaultSelectionBackground;
+            public CursorStyle CursorStyle;
+            public fixed uint ColorTable[16];
+        }
+
+        [DllImport("Microsoft.Terminal.Control.dll", EntryPoint = "TerminalSetTheme", ExactSpelling = true, CharSet = CharSet.Unicode, CallingConvention = CallingConvention.StdCall)]
+        private static extern void TerminalSetThemeNative(IntPtr terminal, NativeTerminalTheme theme, string fontFamily, int fontSize, int newDpi);
 
         [DllImport("Microsoft.Terminal.Control.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.StdCall, PreserveSig = true)]
         public static extern void TerminalSetFocused(IntPtr terminal, bool focused);

@@ -67,6 +67,11 @@ public sealed partial class MainWindow
         this.UpdateToolLayout();
 #if REGEDIT_EXPERIMENTAL_TERMINAL
         this.UpdateTerminalVisibility();
+        if (view is PowerShellView visibleTerminal)
+        {
+            visibleTerminal.SetBrowserLocation(this.ViewModel.VisibleBrowser?.Location);
+            _ = visibleTerminal.FollowCurrentRegistryLocationAsync();
+        }
 #endif
     }
 

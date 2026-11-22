@@ -302,6 +302,16 @@
                 </MenuFlyoutItem.Icon>
             </MenuFlyoutItem>
             <MenuFlyoutItem
+                x:Name="TreeUseKeyInPowerShellMenu"
+                AutomationProperties.AutomationId="TreeUseKeyInPowerShell"
+                Click="TreeUseKeyInPowerShell_Click"
+                Text="Use this key in PowerShell"
+                Visibility="Collapsed">
+                <MenuFlyoutItem.Icon>
+                    <FontIcon Glyph="&#xE74B;" />
+                </MenuFlyoutItem.Icon>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem
                 x:Name="TreeSwitchHiveMenu"
                 AutomationProperties.AutomationId="TreeSwitchHive"
                 Command="{x:Bind ViewModel.SwitchHiveCommand}"

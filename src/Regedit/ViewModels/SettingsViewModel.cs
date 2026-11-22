@@ -122,6 +122,31 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
         set => this.Update(this.OfferWindowsPowerShellFallback, value, s => s.OfferWindowsPowerShellFallback = value);
     }
 
+    public string TerminalFontFamily
+    {
+        get => settings.TerminalFontFamily;
+        set
+        {
+            var family = value.Trim();
+            this.Update(this.TerminalFontFamily, family, s => s.TerminalFontFamily = family);
+        }
+    }
+
+    public double TerminalFontSize
+    {
+        get => settings.TerminalFontSize;
+        set
+        {
+            var points = value is >= 8 and <= 32 ? (int)Math.Round(value) : AppSettings.DefaultTerminalFontSize;
+            if (points == settings.TerminalFontSize && value != points)
+            {
+                this.OnPropertyChanged(nameof(this.TerminalFontSize));
+            }
+
+            this.Update(settings.TerminalFontSize, points, s => s.TerminalFontSize = points);
+        }
+    }
+
     public int EditorLayoutIndex
     {
         get => (int)settings.RegistryFileLayout;

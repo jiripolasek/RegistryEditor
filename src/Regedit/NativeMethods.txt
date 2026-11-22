@@ -2,3 +2,13 @@ CoTaskMemFree
 CredUIPromptForWindowsCredentials
 CredUnPackAuthenticationBuffer
 LogonUser
+CreatePseudoConsole
+ResizePseudoConsole
+ClosePseudoConsole
+InitializeProcThreadAttributeList
+UpdateProcThreadAttribute
+DeleteProcThreadAttributeList
+PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
+CreateProcessW
+STARTUPINFOEXW
+TerminateProcess

@@ -3,9 +3,16 @@
 // ------------------------------------------------------------
 
 #if REGEDIT_EXPERIMENTAL_TERMINAL
+using CommunityToolkit.Mvvm.Input;
+#if !REGEDIT_SYSTEM_CONPTY
 using EasyWindowsTerminalControl;
+#endif
+using JPSoftworks.Regedit.Controls.Shared;
+using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Infrastructure;
+using JPSoftworks.Regedit.Persistence;
 using JPSoftworks.Regedit.Services;
+using JPSoftworks.Regedit.Views.Shell;
 using Microsoft.Terminal.Wpf;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -15,9 +22,13 @@ using Microsoft.UI.Xaml.Media;
 
 namespace JPSoftworks.Regedit.Views.Tools;
 
-internal sealed partial class PowerShellView : UserControl, IDisposable
+internal sealed partial class PowerShellView : UserControl, IDisposable, IPanelView
 {
+#if REGEDIT_SYSTEM_CONPTY
+    private readonly SystemConPtySession _session = new();
+#else
     private readonly TermPTY _session = new();
+#endif
     private readonly TaskCompletionSource<bool> _connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly InfoBar _status = new() { IsOpen = true, IsClosable = false };
     private readonly ScrollViewer _headerScroll = new();
@@ -27,9 +38,32 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
         Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 12, 12, 12)),
         RequestedTheme = ElementTheme.Dark
     };
+
+    // TerminalSetTheme requires the complete native theme when changing the font.
+    private static readonly TerminalTheme DefaultTheme = new()
+    {
+        DefaultBackground = 0x0C0C0C,
+        DefaultForeground = 0xCCCCCC,
+        DefaultSelectionBackground = uint.MaxValue,
+        CursorStyle = CursorStyle.BlinkingBlockDefault,
+        ColorTable =
+        [
+            0x0C0C0C, 0x1F0FC5, 0x0EA113, 0x009CC1, 0xDA3700, 0x981788, 0xDD963A, 0xCCCCCC,
+            0x767676, 0x5648E7, 0x0CC616, 0xA5F1F9, 0xFF783B, 0x9E00B4, 0xD6D661, 0xF2F2F2
+        ]
+    };
+
     private readonly Func<FrameworkElement> _createRecoveryActions;
+    private readonly Func<PowerShellView, RegistryLocation, bool, Task> _navigateFromPowerShell;
+    private readonly PowerShellLocationFeed? _locationFeed;
+    private readonly ToolCommand[] _registryCommands = [];
+    private readonly ToolCommand? _followPowerShell;
+    private readonly AsyncRelayCommand? _showPowerShellKey;
+    private readonly AsyncRelayCommand? _showBrowserKey;
     private readonly bool _isScript;
     private TerminalControl? _terminal;
+    private RegistryLocation? _registryLocation;
+    private RegistryLocation? _browserLocation;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _disposed;
     private bool _sessionRunning;
@@ -39,14 +73,66 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
 
     internal string ShellDetails { get; }
 
+    string IPanelView.PanelCommandsId => "PowerShellActions";
+    IReadOnlyList<ToolCommand> IPanelView.PanelCommands => this._registryCommands;
+    PanelSearch? IPanelView.PanelSearch => null;
+    void IPanelView.SetDocked(bool docked) { }
+
     internal PowerShellView(
         string shellName, string shellDetails, string? commandLine, string? error, PowerShellRun? run,
-        Func<FrameworkElement> createRecoveryActions)
+        string fontFamily, int fontSize,
+        PowerShellLocationFeed? locationFeed, Func<PowerShellView, RegistryLocation, bool, Task> navigateFromPowerShell,
+        Func<RegistryLocation?, Task> showKeyInPowerShell, Func<FrameworkElement> createRecoveryActions)
     {
         this.ShellName = shellName;
         this.ShellDetails = shellDetails;
         this._createRecoveryActions = createRecoveryActions;
+        this._navigateFromPowerShell = navigateFromPowerShell;
+        this._locationFeed = locationFeed;
         this._isScript = run is not null;
+        if (locationFeed is not null)
+        {
+            this._followPowerShell = new ToolCommand("Follow PowerShell", Symbol.Link)
+            {
+                AutomationId = "FollowPowerShell",
+                ToolTip = "Follow the registry location in this PowerShell tab.",
+                IsToggle = true,
+                IsEnabled = false
+            };
+            this._followPowerShell.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(ToolCommand.IsChecked))
+                {
+                    _ = this.FollowCurrentRegistryLocationAsync();
+                }
+            };
+            this._showPowerShellKey = new AsyncRelayCommand(
+                () => this._registryLocation is { } location
+                    ? this._navigateFromPowerShell(this, location, true)
+                    : Task.CompletedTask,
+                () => this._registryLocation is not null);
+            this._showBrowserKey = new AsyncRelayCommand(
+                () => showKeyInPowerShell(this._browserLocation),
+                () => this.CanSetRegistryLocation(this._browserLocation));
+            this._registryCommands =
+            [
+                this._followPowerShell,
+                new ToolCommand("Show key in browser", Symbol.Up)
+                {
+                    AutomationId = "ShowPowerShellKeyInBrowser",
+                    ToolTip = "Open the current PowerShell registry key in the browser.",
+                    Command = this._showPowerShellKey
+                },
+                new ToolCommand("Show browser key in PowerShell", Symbol.Sync)
+                {
+                    IconSource = new FontIconSource { Glyph = "\uE74B", FontSize = 16 },
+                    AutomationId = "ShowBrowserKeyInPowerShell",
+                    ToolTip = "Set PowerShell's registry location at the next empty prompt.",
+                    Command = this._showBrowserKey
+                }
+            ];
+        }
+
         var layout = new Grid
         {
             RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition() }
@@ -87,27 +173,46 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
                 return;
             }
 
-            var columns = Math.Max(1, terminal.Columns);
-            var rows = Math.Max(1, terminal.Rows);
             var dispatcher = terminal.DispatcherQueue;
+            // Connect the renderer before releasing the output reader.
+            bool ConnectAndWait() => dispatcher.TryEnqueue(() => this.Connect(terminal)) &&
+                this._connected.Task.GetAwaiter().GetResult();
+#if !REGEDIT_SYSTEM_CONPTY
             this._session.TermReady += (_, _) =>
             {
-                // Connect the renderer before releasing the output reader.
-                if (!dispatcher.TryEnqueue(() => this.Connect(terminal)) ||
-                    !this._connected.Task.GetAwaiter().GetResult())
+                if (!ConnectAndWait())
                 {
                     this._session.StopExternalTermOnly();
                 }
             };
+#endif
 
             this._sessionRunning = true;
+            var cancellationToken = this._lifetime.Token;
+            using var locationLifetime = locationFeed is null
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var reportLocations = locationFeed is not null && locationLifetime is not null
+                ? this.WatchRegistryLocationsAsync(locationFeed, locationLifetime.Token)
+                : Task.CompletedTask;
+
             if (run is not null)
             {
-                _ = this.ReportScriptResultAsync(run, this._lifetime.Token);
+                _ = this.ReportScriptResultAsync(run, cancellationToken);
             }
 
             try
             {
+                if (fontFamily != AppSettings.DefaultTerminalFontFamily || fontSize != AppSettings.DefaultTerminalFontSize)
+                {
+                    terminal.SetTheme(DefaultTheme, fontFamily, (short)fontSize);
+                }
+
+                var columns = Math.Max(1, terminal.Columns);
+                var rows = Math.Max(1, terminal.Rows);
+#if REGEDIT_SYSTEM_CONPTY
+                await Task.Run(() => this._session.RunAsync(commandLine!, columns, rows, ConnectAndWait, cancellationToken));
+#else
                 await Task.Run(() =>
                 {
                     try
@@ -126,6 +231,7 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
                         }
                     }
                 });
+#endif
                 if (!this._disposed && !this._startupFailed && run is null)
                 {
                     this.ShowStatus("PowerShell session ended", message: "Review any errors in the terminal below.");
@@ -141,6 +247,8 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
             }
             finally
             {
+                locationLifetime?.Cancel();
+                await reportLocations;
                 this._connected.TrySetResult(false);
                 this._sessionRunning = false;
                 if (this._disposed)
@@ -148,6 +256,78 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
                     this.ReleaseRenderer();
                 }
             }
+        }
+    }
+
+    internal Task FollowCurrentRegistryLocationAsync() =>
+        this._followPowerShell is { IsChecked: true, IsEnabled: true } &&
+        this._locationFeed is { IsLocationChangePending: false } && this._registryLocation is { } location
+            ? this._navigateFromPowerShell(this, location, false)
+            : Task.CompletedTask;
+
+    internal void SetBrowserLocation(RegistryLocation? location)
+    {
+        this._browserLocation = location;
+        this._showBrowserKey?.NotifyCanExecuteChanged();
+    }
+
+    internal bool CanSetRegistryLocation(RegistryLocation? location) =>
+        !this._disposed && this._locationFeed?.CanSetLocation(location) == true;
+
+    internal async Task<string?> SetRegistryLocationAsync(RegistryLocation location)
+    {
+        var cancellationToken = this._lifetime.Token;
+        try
+        {
+            var request = this._locationFeed!.SetLocationAsync(location, cancellationToken);
+            this._showBrowserKey?.NotifyCanExecuteChanged();
+            return await request;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        finally
+        {
+            this._showBrowserKey?.NotifyCanExecuteChanged();
+        }
+    }
+
+    private async Task WatchRegistryLocationsAsync(PowerShellLocationFeed feed, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var location in feed.WatchAsync(cancellationToken))
+            {
+                if (this._disposed)
+                {
+                    return;
+                }
+
+                var locationChanged = location is not null && !location.IsSameLocation(this._registryLocation);
+                this._registryLocation = location;
+                this._followPowerShell!.IsEnabled = true;
+                this._showPowerShellKey!.NotifyCanExecuteChanged();
+                this._showBrowserKey!.NotifyCanExecuteChanged();
+                if (locationChanged)
+                {
+                    _ = this.FollowCurrentRegistryLocationAsync();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Keep PowerShell usable if its location pipe cannot connect or disconnects.
+        }
+        finally
+        {
+            this._registryLocation = null;
+            this._followPowerShell!.IsEnabled = false;
+            this._showPowerShellKey!.NotifyCanExecuteChanged();
+            this._showBrowserKey!.NotifyCanExecuteChanged();
         }
     }
 
@@ -213,6 +393,7 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
             return;
         }
 
+#if !REGEDIT_SYSTEM_CONPTY
         // Closing ConPTY can block while the output pipe drains.
         _ = Task.Run(() =>
         {
@@ -228,6 +409,7 @@ internal sealed partial class PowerShellView : UserControl, IDisposable
                 // PowerShell can exit between checking HasExited and stopping it.
             }
         });
+#endif
     }
 
     private void ReleaseRenderer()

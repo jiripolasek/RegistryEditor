@@ -1,10 +1,10 @@
 # Experimental PowerShell terminal
 
-The following components are included in builds with `RegeditExperimentalTerminal` enabled.
+The experimental terminal includes the WinUI host and native renderer. Builds that use bundled
+ConPTY also include the EasyWindowsTerminalControl session assembly and Microsoft ConPTY package.
 
 - EasyWindowsTerminalControl.WinUI and CI.Microsoft.Terminal.WinUI3.Unofficial. Copyright © MitchCapper 2026. [EasyWindowsTerminalControl source](https://github.com/mitchcapper/EasyWindowsTerminalControl/tree/0741a4b8853c47bcac4412d005ed4ae1d96d2c13)
 - Windows Terminal native renderer and Microsoft.Windows.Console.ConPTY. Copyright (c) Microsoft Corporation. All rights reserved. [Windows Terminal renderer source](https://github.com/microsoft/terminal/tree/9ae724aa5b080aafbeea2bbf88db630b182cc802) · [ConPTY package](https://www.nuget.org/packages/Microsoft.Windows.Console.ConPTY/1.24.260710001)
-- WinUIEx. Copyright (c) 2021 Morten Nielsen. [WinUIEx license](https://github.com/dotMorten/WinUIEx/blob/35e9edfd4d3bee696ca30ed4af5a197793e131f7/LICENSE)
 
 MIT License
 
