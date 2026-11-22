@@ -1,35 +1,31 @@
-<ContentDialog
+<UserControl
     x:Class="JPSoftworks.Regedit.Dialogs.RegistryEditDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    CloseButtonText="Cancel"
-    DefaultButton="Primary"
-    Style="{StaticResource AppDialogStyle}">
-    <ScrollViewer MaxHeight="520" VerticalScrollBarVisibility="Auto">
-        <StackPanel x:Name="ContentPanel" Style="{StaticResource DialogContentPanelStyle}">
-            <TextBox x:Name="NameBox" Visibility="Collapsed" />
-            <ContentPresenter x:Name="ValueEditorHost" Visibility="Collapsed" />
-            <TextBlock
-                x:Name="DeleteMessage"
-                TextWrapping="Wrap"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel x:Name="ContentPanel" Style="{StaticResource DialogContentPanelStyle}">
+        <TextBox x:Name="NameBox" Visibility="Collapsed" />
+        <ContentPresenter x:Name="ValueEditorHost" Visibility="Collapsed" />
+        <TextBlock
+            x:Name="DeleteMessage"
+            TextWrapping="Wrap"
+            Visibility="Collapsed" />
+        <TextBlock
+            AutomationProperties.AutomationId="DialogError"
+            AutomationProperties.LiveSetting="Polite"
+            Style="{StaticResource DialogErrorTextStyle}"
+            Text="{x:Bind Prompt.Error, Mode=OneWay}"
+            Visibility="{x:Bind Prompt.HasError, Mode=OneWay}" />
+        <StackPanel
+            x:Name="RecoveryPanel"
+            Spacing="12"
+            Visibility="Collapsed">
+            <TextBlock x:Name="RecoveryTarget" TextWrapping="Wrap" />
+            <TextBlock x:Name="RecoveryGuidance" TextWrapping="Wrap" />
+            <Button
+                x:Name="ElevateButton"
+                AutomationProperties.AutomationId="EditOpenAsAdministrator"
+                Content="Open as administrator"
                 Visibility="Collapsed" />
-            <TextBlock
-                AutomationProperties.LiveSetting="Polite"
-                Style="{StaticResource DialogErrorTextStyle}"
-                Text="{x:Bind Prompt.Error, Mode=OneWay}"
-                Visibility="{x:Bind Prompt.HasError, Mode=OneWay}" />
-            <StackPanel
-                x:Name="RecoveryPanel"
-                Spacing="12"
-                Visibility="Collapsed">
-                <TextBlock x:Name="RecoveryTarget" TextWrapping="Wrap" />
-                <TextBlock x:Name="RecoveryGuidance" TextWrapping="Wrap" />
-                <Button
-                    x:Name="ElevateButton"
-                    AutomationProperties.AutomationId="EditOpenAsAdministrator"
-                    Content="Open as administrator"
-                    Visibility="Collapsed" />
-            </StackPanel>
         </StackPanel>
-    </ScrollViewer>
-</ContentDialog>
+    </StackPanel>
+</UserControl>

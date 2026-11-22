@@ -641,13 +641,30 @@ public sealed partial class BrowserPage : Page
     {
         SavedSearch? search = null;
         var form = new RegistryFindOptions(options);
-        var accepted = await this._dialogs.ShowFormAsync(
-            "Find in registry", form, "Find", () =>
+        var layout = new DialogLayout("Find in registry", form, "Find")
+        {
+            OnOpened = form.FocusInput,
+            Accept = () =>
             {
-                search = options.CreateSearch();
-                return Task.CompletedTask;
-            }, initialFocus: form.Input);
-        return accepted ? search : null;
+                try
+                {
+                    search = options.CreateSearch();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is not OperationCanceledException)
+                    {
+                        this._window.Logger.LogFailure(LogLevel.Warning, nameof(this.ShowFindDialogAsync), ex);
+                    }
+
+                    form.ShowError(ex.Message);
+                    return false;
+                }
+            }
+        };
+
+        return await this._window.Dialogs.ShowAsync(layout) == ContentDialogResult.Primary ? search : null;
     }
 
     private Task<bool> ConfirmAsync(string title, string message, string accept)

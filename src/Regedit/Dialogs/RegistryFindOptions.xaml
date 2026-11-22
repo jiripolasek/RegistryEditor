@@ -2,7 +2,7 @@
     x:Class="JPSoftworks.Regedit.Dialogs.RegistryFindOptions"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <StackPanel Style="{StaticResource DialogFieldsPanelStyle}">
+    <StackPanel Style="{StaticResource DialogContentPanelStyle}">
         <TextBox
             x:Name="QueryInput"
             Header="Find what"
@@ -25,5 +25,11 @@
             Text="{x:Bind ViewModel.Types, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
         <CheckBox Content="Match whole string only" IsChecked="{x:Bind ViewModel.Whole, Mode=TwoWay}" />
         <CheckBox Content="Match case" IsChecked="{x:Bind ViewModel.MatchCase, Mode=TwoWay}" />
+        <TextBlock
+            x:Name="ErrorText"
+            AutomationProperties.AutomationId="DialogError"
+            AutomationProperties.LiveSetting="Polite"
+            Style="{StaticResource DialogErrorTextStyle}"
+            Visibility="Collapsed" />
     </StackPanel>
 </UserControl>

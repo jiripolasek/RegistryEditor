@@ -130,9 +130,9 @@ function Assert-AppSid([int] $ProcessId) {
         if ($owner.Sid -ne $ExpectedAppSid) { throw 'The test editor process does not belong to the verified disposable SID.' }
     }
 }
-function Wait-Ui([scriptblock] $Check, [switch] $All) {
+function Wait-Ui([scriptblock] $Check, [switch] $All, [long] $Window = $script:mainWindow) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
-    do { if (& $Check @(Read-Ui -All:$All)) { return }; Start-Sleep -Milliseconds 100 } while ($timer.Elapsed.TotalSeconds -lt 20)
+    do { if (& $Check @(Read-Ui -Window $Window -All:$All)) { return }; Start-Sleep -Milliseconds 100 } while ($timer.Elapsed.TotalSeconds -lt 20)
     throw 'Expected UI state did not appear.'
 }
 function Assert-Clipboard([string] $Expected, [string] $EvidenceName, [string] $Sentinel = '') {
@@ -887,13 +887,35 @@ try {
         if (@(Read-Ui | Where-Object automationId -eq 'PrimaryButton').Count) { throw 'Inspect opened a dialog while the panel was visible.' }
         if (@(Read-Ui | Where-Object automationId -eq 'ValueHexView').Count) { throw 'The narrow inspector still displays clipped raw-byte columns.' }
         Ui @('invoke', 'OpenRawBytes', '--action', 'invoke') | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'ExpandedValueHexView' }
-        $hex = @(Read-Ui | Where-Object automationId -eq 'ExpandedValueHexView')[0]
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        do {
+            $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+            $raw = @($windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -eq 'Registry Editor' })
+            if ($raw.Count -eq 1) { break }
+            Start-Sleep -Milliseconds 100
+        } while ($timer.Elapsed.TotalSeconds -lt 15)
+        if ($raw.Count -ne 1) { throw 'Raw bytes did not open with the app caption.' }
+        $rawWindow = [long]$raw[0].hwnd
+        if (-not [UxTestWindow]::IsOwnedBy($rawWindow, $mainWindow)) { throw 'The app window does not own the raw-byte window.' }
+        if ([UxTestWindow]::IsWindowEnabled($mainWindow)) { throw 'The raw-byte window left its owner enabled.' }
+        Wait-Ui { param($items) $items.automationId -contains 'ExpandedValueHexView' } -Window $rawWindow
+        $rawItems = Read-Ui -Window $rawWindow
+        $hex = @($rawItems | Where-Object automationId -eq 'ExpandedValueHexView')[0]
         $scale = [UxTestWindow]::GetDpiForWindow([IntPtr]$mainWindow) / 96.0
         if ($hex.width -lt 744 * $scale - 2 -or $hex.height -lt 350 * $scale) { throw 'The larger raw-byte view is not wide or tall enough.' }
-        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-raw-bytes.png')) | Out-Null
-        Primary
-        Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
+        $caption = @($rawItems | Where-Object automationId -eq 'DialogTitleBar')[0]
+        $heading = @($rawItems | Where-Object automationId -eq 'DialogHeading')[0]
+        $body = @($rawItems | Where-Object automationId -eq 'DialogBody')[0]
+        if (-not $caption -or -not $heading -or [Math]::Abs($heading.y - $caption.y - $caption.height - 12 * $scale) -gt 2) {
+            throw 'The raw-byte window is missing its custom caption or compact header spacing.'
+        }
+        if (-not $body -or [Math]::Abs($hex.x - $body.x) -gt 2 -or [Math]::Abs($hex.y - $body.y) -gt 2 -or
+            [Math]::Abs($hex.width - $body.width) -gt 2 -or [Math]::Abs($hex.height - $body.height) -gt 2) {
+            throw 'The raw-byte view does not fill the dialog body.'
+        }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-raw-bytes.png')) -Window $rawWindow | Out-Null
+        Ui @('send-keys', 'esc', '--via', 'send-input', '--target', 'CloseButton') -Window $rawWindow | Out-Null
+        Wait-Ui { [UxTestWindow]::IsWindowEnabled($mainWindow) -and [UxTestWindow]::GetForegroundWindow() -eq $mainWindow }
         Ui @('hover', 'ValueNameHeading') | Out-Null
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-docked-wide.png')) | Out-Null
         Select-Row 'NeedleOne' | Out-Null
@@ -2321,8 +2343,22 @@ try {
         Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
         $focused = Ui @('get-focused', '--json') | ConvertFrom-Json
         if (-not $focused.hasFocus -or $focused.element.automationId -ne 'ValueDataEditor') { throw 'Editing a value did not focus its data.' }
-        if (@(Read-Ui | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Value name' }).Count) { throw 'The existing value name still looks editable.' }
+        $editor = Pick 'Window' 'Edit value NumericFixture'
+        $editorItems = @(Elements $editor.children)
+        if (@($editorItems | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Value name' }).Count) {
+            throw 'The existing value name still looks editable.'
+        }
         $data = Pick 'Edit' 'Value data'
+        $surface = @($editorItems | Where-Object automationId -eq 'ContentScrollViewer')[0]
+        $heading = @($editorItems | Where-Object automationId -eq 'DialogHeading')[0]
+        $cancel = @($editorItems | Where-Object automationId -eq 'CloseButton')[0]
+        $padding = 24 * [UxTestWindow]::GetDpiForWindow([IntPtr]$mainWindow) / 96.0
+        if ([Math]::Abs($heading.x - $surface.x - $padding) -gt 2 -or
+            [Math]::Abs($data.x - $heading.x) -gt 2 -or
+            [Math]::Abs($surface.x + $surface.width - $cancel.x - $cancel.width - $padding) -gt 2 -or
+            [Math]::Abs($surface.y + $surface.height - $cancel.y - $cancel.height - $padding) -gt 2) {
+            throw 'The dialog heading, data field and footer do not use WinUI dialog padding.'
+        }
         $hex = Pick 'RadioButton' 'Hexadecimal'
         $decimal = Pick 'RadioButton' 'Decimal'
         if ($hex.x -le $data.x + $data.width -or [Math]::Abs($hex.y - $data.y) -gt $data.height) { throw 'Numeric data and base are not grouped beside each other.' }
@@ -2339,7 +2375,13 @@ try {
         $selected = $decimalOption.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
         if ((Pick 'Edit' 'Value data').value -cne 'invalid' -or -not $selected) { throw 'An invalid base switch changed the data or selected base.' }
         Primary
-        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and @($items | Where-Object name -like '*correct format*').Count -gt 0 }
+        Wait-Ui {
+            param($items)
+            $items.automationId -contains 'PrimaryButton' -and
+                @($items | Where-Object {
+                    $_.automationId -eq 'DialogError' -and $_.name -eq 'Enter a whole decimal number from 0 to 4294967295.'
+                }).Count -eq 1
+        }
         Fill 'Value data' '16'
         Ui @('invoke', $hex.selector, '--action', 'select') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Value data' -and $_.value -eq '10' }).Count -eq 1 }
@@ -3787,6 +3829,8 @@ try {
         Press 'Cancel'
         $input = Pick 'Edit' 'Search registry'
         Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $input.selector) | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' -and $items.name -contains 'Find: needle' }
+        Press 'Open panel tab in main tab'
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*Needle*' }).Count -eq 2 }
         Open-Menu 'Close tab'; Browser
     }
@@ -4561,9 +4605,21 @@ try {
 
     Test-Ui 'Find-all keeps matches while opening a result and saves its query' {
         Browser
+        if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1380, 900, 0x16)) { throw 'Could not resize the fixture window.' }
+        Set-TestWindowForeground
         Press 'Advanced search'
-        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
-        Fill 'Find what' 'needle'; Fill 'Value types (blank for all)' 'REG_SZ'; Primary
+        Wait-Ui {
+            param($items)
+            if ($items.automationId -notcontains 'DialogHeading') { return $false }
+            $focused = Ui @('get-focused', '--json') | ConvertFrom-Json
+            $focused.hasFocus -and $focused.element.automationId -eq 'QueryInput'
+        }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'find-dialog.png')) | Out-Null
+        Fill 'Find what' 'needle'; Fill 'Value types (blank for all)' 'not-a-type'; Primary
+        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and $items.automationId -contains 'DialogError' }
+        Fill 'Value types (blank for all)' 'REG_SZ'
+        $types = Pick 'Edit' 'Value types (blank for all)'
+        Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $types.selector) | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' }
         Press 'Open panel tab in main tab'
         Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' -and @($items | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq 'Find: needle' }).Count -eq 1 -and @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*Needle*' }).Count -eq 2 }
@@ -6085,8 +6141,13 @@ try {
         $value = Select-Row 'Counter'
         Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $value.selector) | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
-        if (@(Read-Ui | Where-Object { $_.automationId -eq 'ValueNameReadout' -and $_.name -eq 'Counter' }).Count -ne 1) { throw 'Enter opened the wrong registry value.' }
-        Press 'Cancel'
+        $items = Read-Ui
+        if (@($items | Where-Object { $_.automationId -eq 'DialogHeading' -and $_.name -eq 'Edit value Counter' }).Count -ne 1) {
+            throw 'Enter opened the wrong registry value.'
+        }
+        if ($items.automationId -notcontains 'DialogHelpButton') { throw 'The value editor is missing its Help button.' }
+        Ui @('invoke', 'DialogDismissButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'DialogDismissButton' }
         $saved = Get-Content $settingsFile -Raw | ConvertFrom-Json
         if (-not $saved.ShowKeysInList) { View-Option 'Show keys in list' }
         if (-not $saved.ShowParentKeyInList) { View-Option 'Show parent key ..' }
@@ -6101,8 +6162,9 @@ try {
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Counter,*' }).Count -eq 1 }
         $value = Select-Row 'Counter'
         Ui @('send-keys', 'f2', '--via', 'send-input', '--target', $value.selector) | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
-        Press 'Cancel'
+        Wait-Ui { param($items) $items.automationId -contains 'InlineEditor' }
+        Ui @('send-keys', 'esc', '--via', 'send-input', '--target', 'InlineEditor') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'InlineEditor' }
         Press 'Filter'; Fill 'Filter this key' 'Counter'
         Ui @('send-keys', 'enter', '--via', 'send-input', '--target', 'FilterBox') | Out-Null
         if ((Read-Ui).automationId -contains 'PrimaryButton') { throw 'Enter in the filter activated a registry value.' }

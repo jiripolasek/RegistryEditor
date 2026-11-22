@@ -33,22 +33,6 @@
             PlaceholderText="(Default)"
             Text="{x:Bind ViewModel.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
             Visibility="{x:Bind ViewModel.IsCreating}" />
-        <StackPanel Spacing="4">
-            <TextBlock
-                AutomationProperties.AutomationId="ValueNameReadout"
-                IsTextSelectionEnabled="True"
-                MaxLines="2"
-                Style="{ThemeResource BodyStrongTextBlockStyle}"
-                Text="{x:Bind ViewModel.DisplayName}"
-                TextTrimming="CharacterEllipsis"
-                TextWrapping="Wrap"
-                ToolTipService.ToolTip="{x:Bind ViewModel.DisplayName}"
-                Visibility="{x:Bind ViewModel.IsNameReadOnly}" />
-            <TextBlock
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{ThemeResource CaptionTextBlockStyle}"
-                Text="{x:Bind ViewModel.TypeName}" />
-        </StackPanel>
         <InfoBar
             Title="Opened in binary editor"
             AutomationProperties.AutomationId="ValueRawFallbackNotice"
@@ -93,6 +77,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <!--  Reserve room for the focused bottom stroke in the text host.  -->
                 <TextBox
                     x:Name="DataBox"
                     MaxHeight="300"
@@ -100,6 +85,7 @@
                     AcceptsReturn="{x:Bind ViewModel.IsMultiline, Mode=OneWay}"
                     AutomationProperties.AutomationId="ValueDataEditor"
                     AutomationProperties.HelpText="{x:Bind ViewModel.DataHelp, Mode=OneWay}"
+                    BorderThickness="1,1,1,2"
                     Header="{x:Bind ViewModel.DataHeader}"
                     Paste="DataBox_Paste"
                     Style="{x:Bind GetDataEditorStyle(ViewModel.IsMultiline), Mode=OneWay}"
