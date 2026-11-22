@@ -36,6 +36,7 @@ public sealed partial class MainWindow
     {
         BrowserPage page => page.MenuButton,
         InvestigationPage page => page.MenuButton,
+        RegistryUsagePage page => page.MenuButton,
         IToolSurface page => page.MenuButton,
         SettingsPage page => page.MenuButton,
         _ => null
@@ -44,8 +45,28 @@ public sealed partial class MainWindow
     internal void ApplicationMenu_Click(object sender, RoutedEventArgs args)
     {
         var button = (Button)sender;
-        this.FillToolsMenu(this.ApplicationTools.Items);
+        this.FillToolsMenu(this.ApplicationMenu, this.ApplicationTools.Items);
         this.ApplicationMenu.ShowAt(button);
+    }
+
+    internal void RunAfterMenuCloses(MenuFlyout menu, Action action)
+    {
+        // Removing a page with a focused flyout item makes WinUI traverse the outgoing tree to restore focus.
+        if (menu.IsOpen)
+        {
+            menu.Closed += Closed;
+            menu.Hide();
+        }
+        else
+        {
+            this.DispatcherQueue.TryEnqueue(() => action());
+        }
+
+        void Closed(object? sender, object args)
+        {
+            menu.Closed -= Closed;
+            this.DispatcherQueue.TryEnqueue(() => action());
+        }
     }
 
     private void HelpAndAbout_Click(object sender, RoutedEventArgs args)

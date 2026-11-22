@@ -107,6 +107,11 @@ public sealed partial class ToolToolbar : UserControl
         return content is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    internal void HideUtilities()
+    {
+        this.Utilities.Visibility = Visibility.Collapsed;
+    }
+
     internal void ShowSearchOnly()
     {
         this._searchOnly = true;

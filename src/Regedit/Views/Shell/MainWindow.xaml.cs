@@ -466,6 +466,7 @@ public sealed partial class MainWindow : Window
 #if REGEDIT_EXPERIMENTAL_TERMINAL
             PowerShellTab shell => this.CreatePowerShellView(shell),
 #endif
+            RegistryUsageTab usage => new RegistryUsagePage(this, usage),
             InvestigationViewModel investigation => new InvestigationPage(
                 investigation, this.Dialogs, this.Notifications, this.Settings.ListRowPadding, this.ColumnLayouts),
             _ => throw new InvalidOperationException("Unknown tab type.")
@@ -482,6 +483,11 @@ public sealed partial class MainWindow : Window
             }
 
             page.MenuButton.Click += this.ApplicationMenu_Click;
+        }
+
+        if (view is RegistryUsagePage usagePage)
+        {
+            usagePage.MenuButton.Click += this.ApplicationMenu_Click;
         }
 
         if (view is SettingsPage settingsPage)

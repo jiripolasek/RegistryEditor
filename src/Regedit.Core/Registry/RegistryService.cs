@@ -15,7 +15,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace JPSoftworks.Regedit.Core.Registry;
 
-public sealed class RegistryService
+public sealed partial class RegistryService
 {
     public RegistryJournal? Journal { get; set; }
 
