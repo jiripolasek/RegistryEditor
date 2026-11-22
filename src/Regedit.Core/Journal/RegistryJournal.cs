@@ -178,8 +178,13 @@ public sealed class RegistryJournal
 
     public JournalHistory ReadHistory()
     {
+        return this.ReadHistory(CancellationToken.None);
+    }
+
+    public JournalHistory ReadHistory(CancellationToken token)
+    {
         var damaged = new List<string>();
-        return new JournalHistory(this.ReadEntries(damaged), damaged.ToArray());
+        return new JournalHistory(this.ReadEntries(damaged, token: token), damaged.ToArray());
     }
 
     internal JournalHistory ReadHistory(JournalHistoryReader reader)
@@ -188,7 +193,7 @@ public sealed class RegistryJournal
         return new JournalHistory(this.ReadEntries(damaged, reader), damaged.ToArray());
     }
 
-    private JournalEntry[] ReadEntries(List<string>? damaged, JournalHistoryReader? reader = null)
+    private JournalEntry[] ReadEntries(List<string>? damaged, JournalHistoryReader? reader = null, CancellationToken token = default)
     {
         lock (this._gate)
         {
@@ -205,6 +210,7 @@ public sealed class RegistryJournal
                 var ids = new HashSet<Guid>();
                 foreach (var file in Directory.EnumerateFiles(this._folder, "*.json"))
                 {
+                    token.ThrowIfCancellationRequested();
                     if (this.AdministratorOnly)
                     {
                         AdministratorJournalDirectory.ValidateFile(file);

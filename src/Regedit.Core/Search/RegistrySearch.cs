@@ -8,11 +8,18 @@ using System.Security;
 using System.Text;
 using JPSoftworks.Regedit.Core.Registry;
 using JPSoftworks.Regedit.Core.Workspaces;
+using Microsoft.Win32;
 
 namespace JPSoftworks.Regedit.Core.Search;
 
-public static class RegistrySearch
+public static partial class RegistrySearch
 {
+    private static readonly EqualityComparer<RegistryLocation> LocationComparer = EqualityComparer<RegistryLocation>.Create(
+        (left, right) => left?.IsSameLocation(right) ?? right is null,
+        location => HashCode.Combine(location.Hive, location.View,
+            StringComparer.OrdinalIgnoreCase.GetHashCode(location.Machine ?? string.Empty),
+            StringComparer.OrdinalIgnoreCase.GetHashCode(location.SubKey)));
+
     internal static string ValueSearchText(RegistryValue value)
     {
         return value.Type switch
@@ -58,11 +65,34 @@ public static class RegistrySearch
             || string.IsNullOrWhiteSpace(search.Name)
             || search.Roots is null
             || search.Roots.Length == 0
-            || search.Options is null
-            || string.IsNullOrEmpty(search.Options.Text)
-            || !(search.Options.Keys || search.Options.Values || search.Options.Data))
+            || search.Options is null)
         {
-            throw new ArgumentException("A saved search needs a name, search text, scope, and at least one search field.");
+            throw new ArgumentException("A saved search needs a name, options, and a scope.");
+        }
+
+        var options = search.Options;
+        if (!Enum.IsDefined(options.Activity) || options.Text is null
+            || options.ActivityWithin is { } within && (options.Activity == SearchActivity.None
+                                                         || within.Ticks <= 0 || within.Ticks % TimeSpan.TicksPerHour != 0))
+        {
+            throw new ArgumentException("Choose a valid activity and time window.");
+        }
+
+        options.KeyModified?.Validate();
+        if (options.Activity == SearchActivity.None && (options.Text.Length == 0 && options.KeyModified is null
+                                                        || !(options.MatchKeyResults || options.MatchValueResults || options.MatchNoteResults)))
+        {
+            throw new ArgumentException("Enter search text or choose a filter, then select where to look for matches.");
+        }
+
+        if (options.Activity != SearchActivity.None && options.Notes)
+        {
+            throw new ArgumentException("Activity filters match values only. Choose value names or value data.");
+        }
+
+        if (options.Activity != SearchActivity.None && options.Text.Length > 0 && !(options.Values || options.Data))
+        {
+            throw new ArgumentException("Choose value names or value data to match text in an activity search.");
         }
 
         foreach (var root in search.Roots)
@@ -78,7 +108,20 @@ public static class RegistrySearch
         int limit = 100000,
         Action<RegistrySearchMatch[]>? progress = null)
     {
+        return FindAll(registry, search, token, inspections: null, limit, progress);
+    }
+
+    public static RegistrySearchResults FindAll(
+        RegistryService registry,
+        SavedSearch search,
+        CancellationToken token,
+        IEnumerable<RegistryValueInspection>? inspections,
+        int limit = 100000,
+        Action<RegistrySearchMatch[]>? progress = null,
+        IReadOnlyList<KeyNote>? notes = null)
+    {
         Validate(search);
+        token.ThrowIfCancellationRequested();
         if (limit < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(limit));
@@ -111,7 +154,31 @@ public static class RegistrySearch
         }
 
         var skipped = 0;
-        var comparison = search.Options.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        var skippedJournalEntries = 0;
+        var skippedTimestamps = new HashSet<RegistryLocation>();
+        var options = search.Options;
+        var textless = options.Text.Length == 0;
+        var searchData = !textless && options.Data;
+        var comparison = options.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        var now = DateTimeOffset.UtcNow;
+        var localZone = TimeZoneInfo.Local;
+        var modified = options.KeyModified;
+
+        bool MatchesDate(RegistryLocation location, DateTimeOffset? time)
+        {
+            if (modified is null)
+            {
+                return true;
+            }
+
+            if (time is { } timestamp)
+            {
+                return modified.Matches(timestamp, now, localZone);
+            }
+
+            skippedTimestamps.Add(location);
+            return false;
+        }
 
         bool Matches(string text)
         {
@@ -125,65 +192,247 @@ public static class RegistrySearch
             return (start > 0 ? "…" : string.Empty) + text.Substring(start, length) + (start + length < text.Length ? "…" : string.Empty);
         }
 
-        var stack = new Stack<RegistryLocation>(search.Roots.Reverse());
+        RegistrySearchResults Finish(bool truncated = false)
+        {
+            Publish(true);
+            return new RegistrySearchResults(matches.ToArray(), skipped, truncated)
+            {
+                SkippedJournalEntries = skippedJournalEntries,
+                SkippedUnknownTimestamps = skippedTimestamps.Count
+            };
+        }
+
+        RegistryKey? OpenKey(RegistryLocation location, bool ignoreMissing = false)
+        {
+            try
+            {
+                return registry.Open(location);
+            }
+            catch (FileNotFoundException) when (ignoreMissing)
+            {
+                return null;
+            }
+            catch (Exception ex) when (IsReadFailure(ex))
+            {
+                skipped++;
+                return null;
+            }
+        }
+
+        bool AddKey(RegistryLocation location, DateTimeOffset? lastWriteTime, bool nameMatches, string? note)
+        {
+            if (matches.Count == limit)
+            {
+                return false;
+            }
+
+            var fields = note is null ? "Key name" : nameMatches ? "Key name and note" : "Key note";
+            var text = note ?? location.Name;
+            Add(new RegistrySearchMatch(location, null, null, fields, textless ? text : Excerpt(text))
+            {
+                KeyLastModifiedUtc = lastWriteTime
+            });
+            return true;
+        }
+
+        bool FindValues(RegistryLocation location, RegistryKey key, Dictionary<string, SearchActivity>? activities = null)
+        {
+            DateTimeOffset? lastWriteTime;
+            string[] names;
+            try
+            {
+                lastWriteTime = modified is null ? null : RegistryService.ReadLastWriteTime(key);
+                if (!MatchesDate(location, lastWriteTime))
+                {
+                    return true;
+                }
+
+                names = key.GetValueNames();
+                if (activities is null)
+                {
+                    Array.Sort(names, StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            catch (Exception ex) when (IsReadFailure(ex))
+            {
+                skipped++;
+                return true;
+            }
+
+            foreach (var name in names)
+            {
+                token.ThrowIfCancellationRequested();
+                var activity = SearchActivity.None;
+                if (activities is not null && !activities.TryGetValue(name, out activity))
+                {
+                    continue;
+                }
+
+                var nameMatch = !textless && options.Values && Matches(name);
+                if (!textless && !nameMatch && !searchData)
+                {
+                    continue;
+                }
+
+                RegistryValue? value;
+                try
+                {
+                    if (options.Types is { Length: > 0 } || !searchData && matches.Count == limit)
+                    {
+                        var type = RegistryService.ReadValueType(key, name);
+                        if (type is null || !TypeAllowed(type.Value))
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (!searchData && matches.Count == limit)
+                    {
+                        return false;
+                    }
+
+                    value = RegistryService.ReadValue(key, name);
+                }
+                catch (Exception ex) when (IsReadFailure(ex))
+                {
+                    skipped++;
+                    return true;
+                }
+
+                token.ThrowIfCancellationRequested();
+                if (value is null || !TypeAllowed(value.Type))
+                {
+                    continue;
+                }
+
+                var data = searchData ? ValueSearchText(value) : string.Empty;
+                var dataMatch = searchData && Matches(data);
+                if (!textless && !nameMatch && !dataMatch)
+                {
+                    continue;
+                }
+
+                if (matches.Count == limit)
+                {
+                    return false;
+                }
+
+                var fields = textless ? "Value" : nameMatch && dataMatch ? "Value name and data" : nameMatch ? "Value name" : "Data";
+                if (activity != SearchActivity.None)
+                {
+                    fields = textless ? ActivityLabel(activity) : $"{ActivityLabel(activity)} · {fields}";
+                }
+
+                Add(new RegistrySearchMatch(location, name, value, fields, textless ? value.TypeName : Excerpt(dataMatch ? data : name))
+                {
+                    KeyLastModifiedUtc = lastWriteTime
+                });
+            }
+
+            return true;
+        }
+
+        bool TypeAllowed(RegistryValueType type) => options.Types is not { Length: > 0 } types || types.Contains(type);
+
+        if (options.Activity != SearchActivity.None)
+        {
+            var candidates = GetActivityCandidates(registry, search, inspections, token, out skippedJournalEntries);
+            foreach (var (location, values) in candidates)
+            {
+                token.ThrowIfCancellationRequested();
+                using var key = OpenKey(location, ignoreMissing: true);
+                if (key is not null && !FindValues(location, key, values))
+                {
+                    return Finish(truncated: true);
+                }
+            }
+
+            return Finish();
+        }
+
+        Dictionary<RegistryLocation, string>? matchingNotes = null;
+        if (options.MatchNoteResults)
+        {
+            matchingNotes = new(LocationComparer);
+            foreach (var note in notes ?? throw new InvalidOperationException("Key notes are unavailable."))
+            {
+                token.ThrowIfCancellationRequested();
+                if (Matches(note.Text) && search.Roots.Any(note.Location.IsAtOrBelow))
+                {
+                    matchingNotes.TryAdd(note.Location, note.Text);
+                }
+            }
+        }
+
+        var notesOnly = matchingNotes is not null && !options.MatchKeyResults && !options.MatchValueResults;
+        var stack = new Stack<RegistryLocation>(notesOnly ? matchingNotes!.Keys.Reverse() : search.Roots.Reverse());
         while (stack.TryPop(out var location))
         {
             token.ThrowIfCancellationRequested();
-            RegistrySnapshot snapshot;
-            try
+            var nameMatches = options.MatchKeyResults && (textless || Matches(location.Name));
+            var note = matchingNotes?.GetValueOrDefault(location);
+            var keyMatches = nameMatches || note is not null;
+            if (keyMatches && modified is not null)
             {
-                snapshot = registry.Read(location);
+                DateTimeOffset? ownTimestamp;
+                try
+                {
+                    ownTimestamp = registry.ReadKeyDetails(location, includeLink: false).LastWriteTimeUtc;
+                }
+                catch (Exception ex) when (IsReadFailure(ex))
+                {
+                    ownTimestamp = null;
+                }
+
+                if (MatchesDate(location, ownTimestamp) && !AddKey(location, ownTimestamp, nameMatches, note))
+                {
+                    return Finish(truncated: true);
+                }
+
+                if (notesOnly)
+                {
+                    continue;
+                }
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException or IOException or Win32Exception)
+
+            token.ThrowIfCancellationRequested();
+            using var key = OpenKey(location, ignoreMissing: notesOnly);
+            if (key is null)
             {
-                skipped++;
                 continue;
             }
 
-            if (search.Options.Keys && Matches(location.Name))
+            if (!notesOnly)
             {
-                if (matches.Count == limit)
+                string[] children;
+                try
                 {
-                    Publish(true);
-                    return new RegistrySearchResults(matches.ToArray(), skipped, true);
+                    children = key.GetSubKeyNames();
                 }
-
-                Add(new RegistrySearchMatch(location, null, null, "Key name", Excerpt(location.Name)));
-            }
-
-            foreach (var value in snapshot.Values)
-            {
-                token.ThrowIfCancellationRequested();
-                if (search.Options.Types is { Length: > 0 } types && !types.Contains(value.Type))
+                catch (Exception ex) when (IsReadFailure(ex))
                 {
+                    skipped++;
                     continue;
                 }
 
-                var nameMatch = search.Options.Values && Matches(value.Name);
-                var data = search.Options.Data ? ValueSearchText(value) : string.Empty;
-                var dataMatch = search.Options.Data && Matches(data);
-                if (!nameMatch && !dataMatch)
+                Array.Sort(children, StringComparer.OrdinalIgnoreCase);
+                for (var index = children.Length - 1; index >= 0; index--)
                 {
-                    continue;
+                    stack.Push(location.Child(children[index]));
                 }
-
-                if (matches.Count == limit)
-                {
-                    Publish(true);
-                    return new RegistrySearchResults(matches.ToArray(), skipped, true);
-                }
-
-                Add(
-                    new RegistrySearchMatch(
-                        location, value.Name, value, nameMatch && dataMatch ? "Value name and data" : nameMatch ? "Value name" : "Data",
-                        Excerpt(dataMatch ? data : value.Name)));
             }
 
-            snapshot.PushChildren(stack, location);
+            if (keyMatches && modified is null && !AddKey(location, null, nameMatches, note)
+                || options.MatchValueResults && !FindValues(location, key))
+            {
+                return Finish(truncated: true);
+            }
+
             Publish();
         }
 
-        Publish(true);
-        return new RegistrySearchResults(matches.ToArray(), skipped, false);
+        return Finish();
     }
+
+    private static bool IsReadFailure(Exception ex) => ex is UnauthorizedAccessException or SecurityException or IOException or Win32Exception;
 }

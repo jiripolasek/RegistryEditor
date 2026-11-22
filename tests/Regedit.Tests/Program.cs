@@ -105,6 +105,9 @@ AddAsync("notifications", () => JPSoftworks.Regedit.Tests.Notifications.Notifica
 AddAsync("status-notifications", () => JPSoftworks.Regedit.Tests.Notifications.StatusNotificationTests.RunAsync(Check));
 
 AddAsync("ux-mvp", () => UxMvpTests.RunAsync(Check));
+AddAsync("inspection-history", () => InspectionHistoryTests.RunAsync(Check));
+AddAsync("activity-search", () => ActivitySearchTests.RunAsync(Check, args.Contains("--registry")));
+AddAsync("key-modified-search", () => KeyModifiedSearchTests.RunAsync(Check, args.Contains("--registry")));
 Add("logging", () => LoggingTests.Run(Check));
 AddAsync("app-services", () => AppServicesTests.RunAsync(Check));
 AddAsync("main-window-view-model", () => MainWindowViewModelTests.RunAsync(Check));

@@ -666,7 +666,17 @@ public sealed partial class BrowserPage : Page
             }
         };
 
-        return await this._window.Dialogs.ShowAsync(layout) == ContentDialogResult.Primary ? search : null;
+        // Keep browser access keys from taking focus while the dialog is open.
+        var wasAccessKeyScope = this.IsAccessKeyScope;
+        this.IsAccessKeyScope = true;
+        try
+        {
+            return await this._window.Dialogs.ShowAsync(layout) == ContentDialogResult.Primary ? search : null;
+        }
+        finally
+        {
+            this.IsAccessKeyScope = wasAccessKeyScope;
+        }
     }
 
     private Task<bool> ConfirmAsync(string title, string message, string accept)

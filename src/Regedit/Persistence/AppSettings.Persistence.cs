@@ -133,7 +133,7 @@ public sealed partial class AppSettings
 
         ValidateSaved(local.Deserialize(SettingsJsonContext.Default.SavedSettings)!);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(filePath))!);
-        using var lease = AcquireSettingsLock(filePath + ".lock");
+        using var lease = ProfileFileLock.Acquire(filePath + ".lock", "Another window is saving settings. Try again shortly.");
         if (this._loadedContent is not null && !File.Exists(filePath))
         {
             throw Conflict("settings file was removed");
@@ -224,27 +224,6 @@ public sealed partial class AppSettings
             if (File.Exists(temporary))
             {
                 File.Delete(temporary);
-            }
-        }
-    }
-
-    private static FileStream AcquireSettingsLock(string filePath)
-    {
-        var started = Stopwatch.GetTimestamp();
-        while (true)
-        {
-            try
-            {
-                return new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            }
-            catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33)
-            {
-                if (Stopwatch.GetElapsedTime(started) >= TimeSpan.FromSeconds(3))
-                {
-                    throw new IOException("Another window is saving settings. Try again shortly.", ex);
-                }
-
-                Thread.Sleep(25);
             }
         }
     }

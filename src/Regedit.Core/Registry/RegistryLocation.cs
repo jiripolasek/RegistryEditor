@@ -121,6 +121,16 @@ public sealed record RegistryLocation(
 
     public RegistryLocation[] GetScopeRoots(bool allHives = false)
     {
+        return this.GetScopeRoots(allHives, includeAliases: false);
+    }
+
+    public RegistryLocation[] GetScopeRoots(bool allHives, bool includeAliases)
+    {
+        if (includeAliases && (this.IsComputer || allHives))
+        {
+            return this.GetHives();
+        }
+
         return this.IsComputer || allHives
             ?
             [

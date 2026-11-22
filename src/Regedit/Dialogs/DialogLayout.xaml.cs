@@ -17,6 +17,7 @@ public sealed partial class DialogLayout : UserControl
     internal TitleBar WindowTitleBar => this.CaptionBar;
     internal bool CanDismiss { get; init; } = true;
     internal bool ShowCloseButton { get; init; } = true;
+    internal bool CanAccept { set => this.AcceptButton.IsEnabled = value; }
     internal Func<bool>? Accept { get; init; }
     internal Action? OnOpened { get; init; }
     internal event Action<ContentDialogResult>? Completed;

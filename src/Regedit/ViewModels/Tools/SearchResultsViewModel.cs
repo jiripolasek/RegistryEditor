@@ -68,7 +68,8 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
         Action<RegistrySearchMatch, bool> open,
         Func<RegistrySearchMatch, CancellationToken, Task>? navigate = null,
         Func<SavedSearch, Action<RegistrySearchMatch[]>, CancellationToken, Task<RegistrySearchResults>>? findProgressively = null)
-        : base("Find: " + search.Options.Text, "Scope: " + Scope(search), "Ready to search", "Choose Run search to scan the saved scope.")
+        : base("Find: " + SearchQueryText.Format(search.Options, quotePlainText: false),
+            "Scope: " + Scope(search), "Ready to search", "Choose Run search to scan the saved scope.")
     {
         this.Search = search;
         this._connection = RemoteRegistryCredentials.Retain(search.Roots.Select(root => root.Machine));
@@ -224,9 +225,14 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
                 return;
             }
 
-            this.Description = $"{result.Matches.Length:N0} matches · {result.SkippedKeys:N0} inaccessible keys skipped · {scope}";
+            var journalStatus = result.SkippedJournalEntries == 0 ? string.Empty : $"{result.SkippedJournalEntries:N0} unreadable journal entries skipped · ";
+            var timestampStatus = result.SkippedUnknownTimestamps == 0 ? string.Empty
+                : $"{result.SkippedUnknownTimestamps:N0} keys without timestamps skipped · ";
+            this.Description = $"{result.Matches.Length:N0} matches · {result.SkippedKeys:N0} inaccessible keys skipped · {journalStatus}{timestampStatus}{scope}";
             this.EmptyTitle = "No matches found";
-            this.EmptyDescription = "Try different search text or adjust the scope and filters.";
+            this.EmptyDescription = this.Search.Options.Activity is SearchActivity.Inspected or SearchActivity.Either
+                ? "Try a wider scope or time window. Manage inspection recording in Tools → Recently inspected."
+                : "Try different search text or adjust the scope and filters.";
             if (result.Truncated)
             {
                 this.Report(
@@ -386,6 +392,12 @@ internal sealed partial class SearchResultsViewModel : InvestigationViewModel
         {
             this._open(match, false);
         }
+    }
+
+    [RelayCommand]
+    private void CopyQuery()
+    {
+        this.CopyText(SearchQueryText.Format(this.Search.Options), null, null, "Could not copy the query");
     }
 
     [RelayCommand]

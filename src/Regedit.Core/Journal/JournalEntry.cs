@@ -40,10 +40,11 @@ public sealed record JournalEntry(
                                   || this.Before.Zip(after).Any(pair => !RegistryJournal.Same(pair.First, pair.Second)));
 
     [JsonIgnore]
-    public IReadOnlyList<RegistryDifference> Differences => this.After is null
+    public IReadOnlyList<RegistryDifference> Differences => this.GetDifferences(CancellationToken.None).ToArray();
+
+    internal IEnumerable<RegistryDifference> GetDifferences(CancellationToken token) => this.After is null
         ? []
-        : this.Before.Zip(this.After).SelectMany(pair => new RegistryComparison(pair.First.Snapshot, pair.Second.Snapshot).Differences)
-            .ToArray();
+        : this.Before.Zip(this.After).SelectMany(pair => new RegistryComparison(pair.First.Snapshot, pair.Second.Snapshot, token).Differences);
 
     public string? RevertUnavailableReason(IReadOnlySet<Guid> reverted)
     {

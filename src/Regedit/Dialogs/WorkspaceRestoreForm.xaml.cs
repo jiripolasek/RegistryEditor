@@ -2,6 +2,7 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using JPSoftworks.Regedit.Core.Search;
 using JPSoftworks.Regedit.Core.Workspaces;
 using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.ViewModels.Tools;
@@ -28,7 +29,7 @@ public sealed partial class WorkspaceRestoreForm : UserControl
                     "Search: "
                     + search.Name
                     + " · Find: "
-                    + search.Options.Text
+                    + SearchQueryText.Format(search.Options)
                     + "\n"
                     + string.Join("\n", search.Roots.Select(WorkspacesViewModel.Target)))).Concat(
                 workspace.Watches.Select(watch => "Watch: " + WatchSurfaceViewModel.FormatTarget(watch.Location, watch.ValueName)))

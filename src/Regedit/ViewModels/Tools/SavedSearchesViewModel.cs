@@ -30,9 +30,12 @@ internal sealed partial class SavedSearchesViewModel : InvestigationViewModel
     private void Refresh()
     {
         this.ReplaceNamedRows(
-            this._store.Searches.Select(search => new InvestigationRow(
-                "Saved search", search.Name, string.Join(", ", search.Roots.Select(root => root.Address)), search.Options.Text,
-                string.Empty, search.Options.Text, search)));
+            this._store.Searches.Select(search =>
+            {
+                var query = SearchQueryText.Format(search.Options);
+                return new InvestigationRow("Saved search", search.Name, string.Join(", ", search.Roots.Select(root => root.Address)),
+                    query, string.Empty, query, search);
+            }));
     }
 
     protected override void SelectionChanged()

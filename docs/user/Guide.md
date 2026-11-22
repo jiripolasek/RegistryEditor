@@ -73,6 +73,37 @@ Right-click a main tab, or focus it and press **Shift+F10**, to close it, close 
 
 Enter a query in the separate search box and press Enter or its search icon to search the current key and subkeys. The adjacent **Advanced search** action opens the options dialog with your query. Type `?` in the omnibox to access the same search actions immediately. Both fields share recent queries. Turn off **Separate search box** under **Settings > Appearance** to give its space to the omnibox. Ctrl+F then opens the omnibox in Search mode. Type `>` in the omnibox to open the command palette immediately, or `*` to enter Favorites mode. The toolbar fits on one row when space narrows or a panel is pinned. The **Tools** menu opens downward and aligns with the right edge of its button.
 
+**My activity** in Advanced search finds current values that were **Edited** in Regedit, **Inspected** explicitly, or **Either**. Turn on inspection recording under **Tools → Recently inspected**. Leave **Find what** blank to search by activity alone.
+
+**Key last modified** accepts **Last hour**, **Last 24 hours**, **Last 7 days**, **Last 30 days**, or a custom range. A date-only search shows keys by default. Add text, value types, or an activity filter to narrow the results. Value matches use their containing key’s timestamp.
+
+**Typed query examples**
+
+Enter the query as shown in the search box. In the omnibox, put `?` first, as in `?modified:24h`.
+
+| Query | Finds |
+| --- | --- |
+| `proxy` | Key names, value names, or value data containing `proxy` |
+| `proxy match:names` | Values whose names contain `proxy` |
+| `proxy match:keys,names` | Key names and value names containing `proxy` |
+| `driver timeout match:notes` | Keys with saved notes containing `driver timeout` |
+| `proxy match:keys,names,data,notes` | Matches for `proxy` in key names, value names, value data, or saved key notes |
+| `activity:edited` | Values you edited in Regedit |
+| `activity:inspected within:12h` | Values you explicitly inspected in the last 12 hours |
+| `activity:either within:7d` | Values you edited or inspected in the last 7 days |
+| `modified:24h` | Keys last modified in the last 24 hours |
+| `modified:2026-11-01..2026-11-22` | Keys last modified from November 1 through November 22, 2026 |
+| `modified:2026-11-01..` | Keys last modified on or after November 1, 2026 |
+| `modified:..2026-11-22` | Keys last modified on or before November 22, 2026 |
+| `proxy activity:either within:7d modified:30d` | Values matching `proxy` that you edited or inspected in the last 7 days, in keys last modified in the last 30 days |
+| `"activity:edited"` | The literal text `activity:edited` in names or data |
+
+Use `within:` with `activity:` and give the window in hours (`h`) or days (`d`). For `modified:`, the rolling presets are `1h`, `24h`, `7d`, and `30d`. Custom dates use `YYYY-MM-DD` and include both endpoints in local time.
+
+Use `match:` to select the same fields as **Match text in** in Advanced search. Choose `keys` for key names, `names` for value names, `data` for value data, and `notes` for saved key notes. Separate fields with commas and omit spaces. A match in any listed field counts. The default fields are key names, value names, and value data. With `activity:`, choose `names`, `data`, or both.
+
+To search key notes from the dialog, select **Key notes** and enter text in **Find what**. Results show an excerpt and open the matching key. A `modified:` filter uses the key’s last-write date.
+
 Right-click **Back** or **Forward** to choose a previous or later visit, nearest first. The menus retain full registry paths and the 32/64-bit view; jumping within history preserves the intervening visits. **Alt+Left / Alt+Right** and mouse **X1 / X2** navigate the active registry tab. **Backspace** goes back in the list; in the tree, it opens and selects the selected key's parent, keeping keyboard focus in the tree. Text fields keep their normal editing behavior. Mouse navigation is ignored while a modal dialog or a full tool tab is active.
 
 **Middle-click** a tree item, registry list row, favorite, note, or search result to open its key in a background tab. The current tab and selection stay in place, including an open Favorites panel. Values open their owning key with that value selected; the optional `..` row opens the parent. Existing open-key/new-tab buttons also support middle-click. Computer and 32/64-bit view are preserved. Empty space and Favorites folders do nothing; the tree chevron keeps its expansion action. Release on the same item to open it.

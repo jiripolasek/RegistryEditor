@@ -3870,6 +3870,14 @@ try {
         if (@(Read-Ui | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq 'Find: needle' }).Count) { throw 'Typing started a scan.' }
         Press 'Advanced search'
         if ((Pick 'Edit' 'Find what').value -ne 'needle') { throw 'Advanced search lost the quick query.' }
+        $form = @(Read-Ui)
+        $activity = @($form | Where-Object automationId -eq 'SearchActivity')[0]
+        $modified = @($form | Where-Object automationId -eq 'SearchKeyModified')[0]
+        if (-not $activity -or -not $modified -or $form.name -notcontains 'Filters' -or
+            [Math]::Abs($activity.y - $modified.y) -gt 2 -or ($activity.x + $activity.width) -gt $modified.x) {
+            throw 'The activity and modification filters are not grouped side by side.'
+        }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'advanced-search-layout.png')) | Out-Null
         Press 'Cancel'
         $input = Pick 'Edit' 'Search registry'
         Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $input.selector) | Out-Null
@@ -3877,6 +3885,108 @@ try {
         Press 'Open panel tab in main tab'
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*Needle*' }).Count -eq 2 }
         Open-Menu 'Close tab'; Browser
+    }
+
+    Test-Ui 'Typed match lists select fields in Advanced search, the search box, and the omnibox' {
+        function Assert-MatchFieldResults([string] $Query, [string[]] $Expected) {
+            Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' -and $items.name -contains "Find: $Query" }
+            Press 'Open panel tab in main tab'
+            Wait-Ui {
+                param($items)
+                $hits = @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'MatchField*' })
+                foreach ($name in $Expected) { if (-not ($hits.name -like "$name,*")) { return $false } }
+                $hits.Count -eq $Expected.Count -and
+                    @($items | Where-Object { $_.type -eq 'Button' -and $_.name -eq 'Run search' -and $_.isEnabled }).Count -eq 1
+            }
+        }
+
+        Browser
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)
+        try {
+            $key.CreateSubKey('MatchFieldNeedleKey').Dispose()
+            $key.SetValue('MatchFieldNeedleName', 'unrelated')
+            $key.SetValue('MatchFieldOnlyData', 'MatchFieldNeedle')
+
+            $mixed = 'MatchFieldNeedle match:keys,names'
+            Fill 'Search registry' $mixed
+            Press 'Advanced search'
+            if ((Pick 'Edit' 'Find what').value -ne 'MatchFieldNeedle') { throw 'The match list remained in the query text.' }
+            $dataState = Ui @('get-property', 'SearchValueData', '--property', 'ToggleState', '--json') | ConvertFrom-Json
+            if ([string]$dataState.properties.ToggleState -notmatch '^(?:ToggleState_)?Off$|^0$') { throw 'The typed list did not uncheck value data.' }
+            Primary
+            Assert-MatchFieldResults $mixed @('MatchFieldNeedleKey', 'MatchFieldNeedleName')
+            Press 'Copy query' -CommandBarId 'ItemCommands'
+            Assert-Clipboard $mixed 'match-field-query'
+            Open-Menu 'Close tab'; Browser
+
+            Fill 'Search registry' 'MatchFieldNeedle match:names'
+            Press 'Start search'
+            Assert-MatchFieldResults 'MatchFieldNeedle match:names' @('MatchFieldNeedleName')
+            Open-Menu 'Close tab'; Browser
+
+            Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+            Wait-Ui { param($items) $items.automationId -contains 'OmniboxInput' }
+            Ui @('set-value', 'OmniboxInput', '?MatchFieldNeedle match:data') | Out-Null
+            Wait-Ui { param($items) $items.name -contains 'Search this branch' }
+            Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+            Assert-MatchFieldResults 'MatchFieldNeedle match:data' @('MatchFieldOnlyData')
+            Open-Menu 'Close tab'; Browser
+        } finally {
+            $key.DeleteSubKeyTree('MatchFieldNeedleKey', $false)
+            $key.DeleteValue('MatchFieldNeedleName', $false)
+            $key.DeleteValue('MatchFieldOnlyData', $false)
+            $key.Dispose()
+        }
+    }
+
+    Test-Ui 'Saved key notes match from the search box, Advanced search, and the omnibox' {
+        function Open-NoteMatches {
+            Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' -and $items.name -contains "Find: $query" }
+            Press 'Open panel tab in main tab'
+            Wait-Ui {
+                param($items)
+                @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like "$fixtureName,*Key note*$noteText*" }).Count -eq 1 -and
+                    @($items | Where-Object { $_.type -eq 'Button' -and $_.name -eq 'Run search' -and $_.isEnabled }).Count -eq 1
+            }
+        }
+
+        Browser
+        $noteText = 'Driver timeout note fixture'
+        $query = 'Driver timeout match:notes'
+        Press 'Notes for this key'
+        $previousNote = (Pick 'Edit' 'Local note').value
+        Fill 'Local note' $noteText
+        Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Saved' }
+        Press 'Close tool panel'
+
+        Fill 'Search registry' $query
+        Press 'Start search'
+        Open-NoteMatches
+        Open-Menu 'Close tab'; Browser
+
+        Press 'Advanced search'
+        if ((Pick 'Edit' 'Find what').value -ne 'Driver timeout') { throw 'The typed note selector remained in the search text.' }
+        $notesState = Ui @('get-property', 'SearchKeyNotes', '--property', 'ToggleState', '--json') | ConvertFrom-Json
+        if ([string]$notesState.properties.ToggleState -notmatch '^(?:ToggleState_)?On$|^1$') { throw 'The typed query did not check Key notes.' }
+        Primary
+        Open-NoteMatches
+        Press 'Copy query' -CommandBarId 'ItemCommands'
+        Assert-Clipboard $query 'key-note-query'
+        Open-Menu 'Close tab'; Browser
+
+        Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'OmniboxInput' }
+        Ui @('set-value', 'OmniboxInput', "?$query") | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Search this branch' }
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Open-NoteMatches
+        Open-Menu 'Close tab'; Browser
+
+        Press 'Notes for this key'
+        Fill 'Local note' $previousNote
+        Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null
+        Press 'Close tool panel'
     }
 
     Test-Ui 'View options and narrow layout preserve browsing controls' {
@@ -4645,6 +4755,72 @@ try {
         Open-Menu 'Close tab'
         Wait-Ui { param($items) $items.name -notcontains 'Could not save search' }
         Browser
+    }
+
+    Test-Ui 'Advanced search access keys reach fields and keep focus on validation' {
+        function Assert-SearchFocus([string] $Id) {
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+            do {
+                $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $actual = $focused.Current.AutomationId
+                while ($focused) {
+                    if ($focused.Current.AutomationId -eq $Id) { return }
+                    $focused = [System.Windows.Automation.TreeWalker]::RawViewWalker.GetParent($focused)
+                }
+                Start-Sleep -Milliseconds 50
+            } while ($timer.Elapsed.TotalSeconds -lt 3)
+            throw "Expected focus in '$Id' but found '$actual'."
+        }
+
+        function Focus-SearchField([string] $Key, [string] $Id) {
+            Ui @('send-keys', "alt+$Key", '--via', 'send-input') | Out-Null
+            Assert-SearchFocus $Id
+        }
+
+        Browser
+        Set-TestWindowForeground
+        Press 'Advanced search'
+        Wait-Ui { param($items) $items.automationId -contains 'QueryInput' }
+        Assert-SearchFocus 'QueryInput'
+        Ui @('send-keys', 'tab', '--via', 'send-input') | Out-Null
+        Assert-SearchFocus 'SearchScope'
+        Ui @('send-keys', 'shift+tab', '--via', 'send-input') | Out-Null
+        Assert-SearchFocus 'QueryInput'
+
+        Ui @('send-keys', 'vk=0x12', '--via', 'send-input') | Out-Null
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'advanced-search-keytips.png')) | Out-Null
+        Ui @('send-keys', 'vk=0x41', '--via', 'send-input') | Out-Null
+        Assert-SearchFocus 'SearchActivity'
+        Ui @('send-keys', 'space home down down enter', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'SearchInspectionHint' }
+        Focus-SearchField 'i' 'SearchActivityWithin'
+
+        Focus-SearchField 'm' 'SearchKeyModified'
+        Ui @('send-keys', 'space end enter', '--via', 'send-input') | Out-Null
+        Wait-Ui {
+            param($items)
+            $items.name -contains 'Key last modified from' -and $items.name -contains 'Key last modified through'
+        }
+        Focus-SearchField 'r' 'SearchModifiedFrom'
+        Focus-SearchField 't' 'SearchModifiedThrough'
+        Focus-SearchField 's' 'SearchScope'
+        Focus-SearchField 'w' 'QueryInput'
+        Fill 'Find what' 'needle'
+
+        Ui @('send-keys', 'alt+c', '--via', 'send-input') | Out-Null
+        $case = Ui @('get-property', 'SearchMatchCase', '--property', 'ToggleState', '--json') | ConvertFrom-Json
+        if ([string]$case.properties.ToggleState -notmatch '^(?:ToggleState_)?On$|^1$') { throw 'Alt+C did not check Match case.' }
+
+        Focus-SearchField 'v' 'SearchValueTypes'
+        Fill 'Value types (blank for all)' 'not-a-type'
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.automationId -eq 'DialogError' -and $_.name -like 'Unknown value type*' }).Count -eq 1
+        }
+        Assert-SearchFocus 'SearchValueTypes'
+        Ui @('send-keys', 'escape', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'QueryInput' }
     }
 
     Test-Ui 'Find-all keeps matches while opening a result and saves its query' {
@@ -5805,6 +5981,224 @@ try {
         foreach ($name in @('Decimal (unsigned)', 'Hexadecimal', 'Bits (most significant first)', 'Interpret selected bytes as')) { if ($items.name -notcontains $name) { throw "Missing inspector field: $name" } }
         Primary
         Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
+    }
+
+    Test-Ui 'Recently inspected remembers explicit value inspections and reopens them' {
+        Browser
+        $historyFile = Join-Path $dataFolder 'inspection-history.json'
+        Tool-Option 'Recently inspected…'
+        Wait-Ui { param($items) $items.automationId -contains 'RecordInspections' -and $items.name -contains 'No inspections recorded.' }
+        if (Test-Path -LiteralPath $historyFile) { throw 'Opening history created a file before opt-in.' }
+        Ui @('invoke', 'RecordInspections', '--action', 'toggle-on') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RecordInspections' -and $_.isEnabled }).Count -eq 1 }
+        Ui @('invoke', 'DialogDismissButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'RecordInspections' }
+
+        if ((Read-Ui).name -contains 'Show detail panel') { Press 'Show detail panel' }
+        $row = Select-Row 'Counter'
+        Ui @('send-keys', 'ctrl+i', '--via', 'send-input', '--target', $row.selector) | Out-Null
+        Select-Row 'NeedleOne' | Out-Null
+        Tool-Option 'Recently inspected…'
+        Wait-Ui { param($items) $items.automationId -contains 'RecentInspectionList' -and $items.name -contains 'Counter' }
+        $history = Get-Content -LiteralPath $historyFile -Raw | ConvertFrom-Json
+        if ($history.Visits.Count -ne 1 -or $history.Visits[0].ValueName -ne 'Counter') { throw 'History recorded a passive selection or missed the explicit inspection.' }
+
+        $tabs = @(Read-Ui -All | Where-Object type -eq 'TabItem').Count
+        Primary
+        Wait-Ui { param($items) $items.automationId -notcontains 'RecordInspections' -and $items.name -contains 'Hexadecimal' }
+        if (@(Read-Ui -All | Where-Object type -eq 'TabItem').Count -ne ($tabs + 1)) { throw 'The recorded value did not reopen in a new tab.' }
+        Open-Menu 'Close tab'
+        Browser
+        Tool-Option 'Recently inspected…'
+        Wait-Ui { param($items) $items.automationId -contains 'RecentInspectionList' }
+        Ui @('invoke', 'ClearInspections', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'No inspections recorded.' }
+        Ui @('invoke', 'RecordInspections', '--action', 'toggle-off') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RecordInspections' -and $_.isEnabled }).Count -eq 1 }
+        Ui @('invoke', 'DialogDismissButton', '--action', 'invoke') | Out-Null
+    }
+
+    Test-Ui 'Activity filters work in Advanced search, the search box, and the omnibox, including with key dates' {
+        function Select-SearchOption([string] $Id, [string] $Name) {
+            Ui @('invoke', $Id, '--action', 'expand') | Out-Null
+            $options = Read-ContextMenu $Name -Types @('ListItem')
+            $option = @($options.Items | Where-Object name -eq $Name)[0]
+            Ui @('invoke', $option.selector, '--action', 'select') -Window $options.Window | Out-Null
+        }
+
+        function Assert-ActivityResults([string] $Query, [string[]] $Expected, [switch] $CopyQuery) {
+            Wait-Ui { param($items) $items.name -contains "Find: $Query" -and $items.automationId -contains 'BottomTabs' }
+            Press 'Open panel tab in main tab'
+            Wait-Ui {
+                param($items)
+                $rows = @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '*ActivityFixture*' })
+                foreach ($name in $Expected) { if (-not ($rows.name -like "*$name*")) { return $false } }
+                $items.automationId -contains 'ShowInPanelButton' -and $rows.Count -eq $Expected.Count -and
+                    @($items | Where-Object { $_.type -eq 'Button' -and $_.name -eq 'Run search' -and $_.isEnabled }).Count -eq 1
+            }
+            if ($CopyQuery) {
+                $sentinel = 'copy search query sentinel'
+                Set-Clipboard -Value $sentinel
+                Press 'Copy query' -CommandBarId 'ItemCommands'
+                Assert-Clipboard $Query 'combined-search-query' $sentinel
+            }
+            Open-Menu 'Close tab'
+            Browser
+        }
+
+        Browser
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)
+        try {
+            $key.SetValue('ActivityFixtureEdited', 'before')
+            $key.SetValue('ActivityFixtureInspected', 'inspect')
+            $key.SetValue('ActivityFixtureUnrecorded', 'unrecorded')
+        } finally { $key.Dispose() }
+        Press 'Refresh'
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'ActivityFixture*' }).Count -eq 3 }
+        $edited = Select-Row 'ActivityFixtureEdited'
+        Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $edited.selector) | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Edit value ActivityFixtureEdited' }
+        Fill 'Value data' 'after'
+        Primary
+        Wait-Ui { param($items) $items.name -contains 'ActivityFixtureEdited, REG_SZ, after' }
+
+        Tool-Option 'Recently inspected…'
+        Wait-Ui { param($items) $items.automationId -contains 'RecordInspections' }
+        Ui @('invoke', 'RecordInspections', '--action', 'toggle-on') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RecordInspections' -and $_.isEnabled }).Count -eq 1 }
+        Ui @('invoke', 'DialogDismissButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'RecordInspections' }
+        if ((Read-Ui).name -contains 'Show detail panel') { Press 'Show detail panel' }
+        $inspected = Select-Row 'ActivityFixtureInspected'
+        Ui @('send-keys', 'ctrl+i', '--via', 'send-input', '--target', $inspected.selector) | Out-Null
+
+        Press 'Advanced search'
+        Wait-Ui {
+            param($items)
+            $items.automationId -contains 'SearchActivity' -and $items.name -contains 'Query and scope' -and
+                $items.name -contains 'Filters' -and $items.name -contains 'My activity' -and $items.name -contains 'Match options'
+        }
+        Ui @('send-keys', 'ctrl+a backspace', '--via', 'send-input', '--target', 'QueryInput') | Out-Null
+        Ui @('invoke', 'SearchScope', '--action', 'expand') | Out-Null
+        $scope = Read-ContextMenu 'All hives on this computer · 64-bit' -Types @('ListItem')
+        $allHives = @($scope.Items | Where-Object name -like 'All hives*')[0]
+        Ui @('invoke', $allHives.selector, '--action', 'select') -Window $scope.Window | Out-Null
+        Select-SearchOption 'SearchActivity' 'Edited'
+        Wait-Ui { param($items) $items.automationId -notcontains 'SearchInspectionHint' }
+        Select-SearchOption 'SearchActivity' 'Inspected'
+        Wait-Ui { param($items) $items.automationId -contains 'SearchInspectionHint' }
+        Select-SearchOption 'SearchActivity' 'Either'
+        Wait-Ui { param($items) $items.automationId -contains 'SearchInspectionHint' }
+        Fill 'Activity within' '7d'
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'activity-search-dialog.png')) | Out-Null
+        Primary
+        Assert-ActivityResults 'activity:either within:7d' @('ActivityFixtureEdited', 'ActivityFixtureInspected')
+
+        Fill 'Search registry' 'activity:edited within:7d'
+        $search = Pick 'Edit' 'Search registry'
+        Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $search.selector) | Out-Null
+        Assert-ActivityResults 'activity:edited within:7d' @('ActivityFixtureEdited')
+
+        Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'OmniboxInput' }
+        Ui @('set-value', 'OmniboxInput', '?activity:inspected within:7d') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Search this branch' }
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Assert-ActivityResults 'activity:inspected within:7d' @('ActivityFixtureInspected')
+
+        Fill 'Search registry' 'ActivityFixture modified:24h'
+        Press 'Start search'
+        $recorded = @('ActivityFixtureEdited', 'ActivityFixtureInspected')
+        Assert-ActivityResults 'ActivityFixture modified:24h' ($recorded + 'ActivityFixtureUnrecorded')
+
+        Fill 'Search registry' 'ActivityFixture'
+        Press 'Advanced search'
+        Select-SearchOption 'SearchActivity' 'Either'
+        Fill 'Activity within' '7d'
+        Select-SearchOption 'SearchKeyModified' 'Last 24 hours'
+        Primary
+        $combined = 'ActivityFixture activity:either within:7d modified:24h'
+        Assert-ActivityResults $combined $recorded -CopyQuery
+
+        $copied = Get-Clipboard -Raw
+        Fill 'Search registry' $copied
+        Press 'Start search'
+        Assert-ActivityResults $combined $recorded
+
+        Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'OmniboxInput' }
+        Ui @('set-value', 'OmniboxInput', "?$copied") | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Search this branch' }
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Assert-ActivityResults $combined $recorded
+
+        Tool-Option 'Recently inspected…'
+        Wait-Ui { param($items) $items.automationId -contains 'RecentInspectionList' }
+        Ui @('invoke', 'ClearInspections', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'No inspections recorded.' }
+        Ui @('invoke', 'RecordInspections', '--action', 'toggle-off') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'RecordInspections' -and $_.isEnabled }).Count -eq 1 }
+        Ui @('invoke', 'DialogDismissButton', '--action', 'invoke') | Out-Null
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)
+        try {
+            $key.DeleteValue('ActivityFixtureEdited')
+            $key.DeleteValue('ActivityFixtureInspected')
+            $key.DeleteValue('ActivityFixtureUnrecorded')
+        } finally { $key.Dispose() }
+        Press 'Refresh'
+    }
+
+    Test-Ui 'Key last modified works with presets, custom dates, and typed search' {
+        function Assert-ModificationResults([string] $Query, [string] $Match) {
+            Wait-Ui { param($items) $items.name -contains "Find: $Query" -and $items.automationId -contains 'BottomTabs' }
+            Press 'Open panel tab in main tab'
+            Wait-Ui {
+                param($items)
+                $items.automationId -contains 'ShowInPanelButton' -and
+                    @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like "$Match,*Key last modified*" }).Count -gt 0
+            }
+            Open-Menu 'Close tab'
+            Browser
+        }
+
+        Browser
+        Fill 'Search registry' 'modified:'
+        Press 'Advanced search'
+        Wait-Ui {
+            param($items)
+            $items.automationId -contains 'SearchKeyModified' -and $items.automationId -contains 'DialogError' -and
+                @($items | Where-Object { $_.automationId -eq 'QueryInput' -and -not $_.value }).Count -eq 1
+        }
+        Ui @('invoke', 'SearchKeyModified', '--action', 'expand') | Out-Null
+        $options = Read-ContextMenu 'Last 24 hours' -Types @('ListItem')
+        $preset = @($options.Items | Where-Object name -eq 'Last 24 hours')[0]
+        Ui @('invoke', $preset.selector, '--action', 'select') -Window $options.Window | Out-Null
+        Primary
+        Assert-ModificationResults 'modified:24h' $fixtureName
+
+        $today = Get-Date -Format 'yyyy-MM-dd'
+        $custom = "modified:$today..$today"
+        Fill 'Search registry' "Counter $custom"
+        $search = Pick 'Edit' 'Search registry'
+        Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $search.selector) | Out-Null
+        Assert-ModificationResults "Counter $custom" 'Counter'
+
+        Press 'Advanced search'
+        Wait-Ui {
+            param($items)
+            $items.automationId -contains 'SearchModifiedFrom' -and $items.automationId -contains 'SearchModifiedThrough' -and
+                @($items | Where-Object { $_.automationId -eq 'QueryInput' -and $_.value -eq 'Counter' }).Count -eq 1
+        }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'key-modified-custom-range.png')) | Out-Null
+        Primary
+        Assert-ModificationResults "Counter $custom" 'Counter'
+
+        Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'OmniboxInput' }
+        Ui @('set-value', 'OmniboxInput', "?Counter modified:$today..") | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Search this branch' }
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Assert-ModificationResults "Counter modified:$today.." 'Counter'
     }
 
     Test-Ui 'Notes sidebar uses contextual commands and the full editor width' {

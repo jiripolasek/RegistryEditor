@@ -26,11 +26,11 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
     [ObservableProperty]
     public partial string Query { get; set; } = string.Empty;
 
-    private void StartSearch(SavedSearch search)
+    private void StartSearch(SavedSearch search, string? input = null)
     {
         RegistrySearch.Validate(search);
         this._search = search;
-        this.Query = search.Options.Text;
+        this.Query = input ?? SearchQueryText.Format(search.Options);
         this.ResultsRequested?.Invoke(search);
     }
 
@@ -42,10 +42,17 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
             return;
         }
 
-        var target = location();
-        this.StartSearch(
-            new SavedSearch(
-                this.Query, target.GetScopeRoots(target.IsComputer), new SearchOptions(this.Query, true, true, true, false, false)));
+        try
+        {
+            var target = location();
+            var options = SearchQueryText.Parse(this.Query);
+            var roots = target.GetScopeRoots(target.IsComputer, includeAliases: options.Activity != SearchActivity.None);
+            this.StartSearch(new SavedSearch(this.Query, roots, options), this.Query);
+        }
+        catch (ArgumentException ex)
+        {
+            this.Notice?.Invoke("Could not start search", ex.Message, NoticeKind.Error);
+        }
     }
 
     [RelayCommand]
@@ -58,7 +65,16 @@ internal sealed partial class BrowserSearchViewModel(Func<RegistryLocation> loca
 
         try
         {
-            var form = new FindOptionsViewModel(location(), query ?? this.Query, this._search?.Options);
+            var typed = SearchQueryText.ParseDraft(query ?? this.Query, out var error, out var hasMatchSelection);
+            var form = new FindOptionsViewModel(location(), typed.Text, this._search?.Options, typed) { InitialError = error };
+            if (hasMatchSelection)
+            {
+                form.Keys = typed.Keys;
+                form.Values = typed.Values;
+                form.Data = typed.Data;
+                form.Notes = typed.Notes;
+            }
+
             if (await this.FindRequested(form) is { } search && !this._closed)
             {
                 this.StartSearch(search);
