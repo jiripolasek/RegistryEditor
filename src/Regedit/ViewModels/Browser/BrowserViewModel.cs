@@ -52,6 +52,7 @@ public sealed partial class BrowserViewModel : ObservableObject
     private readonly SettingsViewModel? _preferences;
     private readonly Action<Uri> _launchWebSearch;
     private readonly RegistryHistoryBroadcaster? _historyBroadcaster;
+    private readonly InspectionHistoryStore? _inspectionHistory;
     private readonly RegistryListMetadata _metadata;
     private readonly CancellationTokenSource _editCancellation = new();
     private IReadOnlyList<RegistrySortColumn> _columns = RegistryColumns.Defaults();
@@ -231,7 +232,8 @@ public sealed partial class BrowserViewModel : ObservableObject
         AppSettings? settings = null,
         SettingsViewModel? preferences = null,
         Action<Uri>? launchWebSearch = null,
-        RegistryHistoryBroadcaster? historyBroadcaster = null)
+        RegistryHistoryBroadcaster? historyBroadcaster = null,
+        InspectionHistoryStore? inspectionHistory = null)
     {
         this.Registry = registry;
         this.Addresses = new RegistryAddressSuggestions(registry.SubKeys);
@@ -239,6 +241,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         this._settings = settings;
         this._preferences = preferences;
         this._historyBroadcaster = historyBroadcaster;
+        this._inspectionHistory = inspectionHistory;
         this._launchWebSearch = launchWebSearch ?? (uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }));
         if (settings is not null)
         {
@@ -968,21 +971,28 @@ public sealed partial class BrowserViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanInspect))]
     private async Task InspectAsync()
     {
-        if (!this.CanInspect || this.IsLoading)
+        if (this.SingleEntry?.Value is not { } value || this.IsLoading || this._closed)
         {
             return;
         }
 
+        var location = this.Location;
+        Task showing;
         if (this.IsInspectorOpen)
         {
             this.UpdateInspector();
+            showing = Task.CompletedTask;
+        }
+        else if (this.InspectorRequested is { } show && this.CreateInspector() is { } inspector)
+        {
+            showing = show(inspector);
+        }
+        else
+        {
             return;
         }
 
-        if (this.CreateInspector() is { } inspector && this.InspectorRequested is { } show)
-        {
-            await show(inspector);
-        }
+        await Task.WhenAll(showing, this._inspectionHistory?.RecordAsync(location, value.Name) ?? Task.CompletedTask);
     }
 
     [RelayCommand(CanExecute = nameof(CanWatchValue))]

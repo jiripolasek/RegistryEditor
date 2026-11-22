@@ -257,5 +257,49 @@ internal static class InvestigationViewModelTests
         searchInput.QuickSearchCommand.Execute(null);
         await searchInput.FindCommand.ExecuteAsync(null);
         check(requested.Count == 2, "Closing a browser prevents both search entry points from starting another search");
+        await CheckTypedMatchSelectionAsync(origin, check);
+    }
+
+    private static async Task CheckTypedMatchSelectionAsync(RegistryLocation location, Action<bool, string> check)
+    {
+        var selected = SearchQueryText.Parse("proxy MATCH:Data,Keys");
+        check(SearchQueryText.Parse("proxy") is { Keys: true, Values: true, Data: true, Notes: false }
+              && selected is { Text: "proxy", Keys: true, Values: false, Data: true }
+              && SearchQueryText.Format(selected) == "proxy match:keys,data",
+            "A match list replaces the default fields and formats in a consistent order");
+
+        var combined = SearchQueryText.Parse("\"match:keys\" activity:inspected within:12h modified:7d match:names");
+        check(combined is { Text: "match:keys", Keys: false, Values: true, Data: false, Activity: SearchActivity.Inspected }
+              && SearchQueryText.Parse(SearchQueryText.Format(combined)) == combined,
+            "Matching literal operator text combines with field, activity, and last-modified filters");
+
+        var input = new BrowserSearchViewModel(() => location);
+        var searches = new List<SavedSearch>();
+        var errors = 0;
+        input.ResultsRequested += searches.Add;
+        input.Notice += (_, _, _) => errors++;
+        foreach (var invalid in new[] { "match:", "match:keys,", "match:comments", "match:names match:data", "match:keys activity:edited", "match:notes activity:inspected" })
+        {
+            input.Query = "proxy " + invalid;
+            input.QuickSearchCommand.Execute(null);
+        }
+
+        check(errors == 6 && searches.Count == 0, "Invalid or incompatible match lists show a validation error");
+
+        input.Query = "proxy match:names";
+        input.QuickSearchCommand.Execute(null);
+        input.FindRequested += form => Task.FromResult<SavedSearch?>(form.CreateSearch());
+        await input.FindCommand.ExecuteAsync("proxy");
+        await input.FindCommand.ExecuteAsync("proxy match:keys,names,data");
+        check(searches.Count == 3
+              && searches[0].Options is { Keys: false, Values: true, Data: false }
+              && searches[1].Options == searches[0].Options
+              && searches[2].Options is { Keys: true, Values: true, Data: true },
+            "An explicit match list replaces the previous dialog selection while a plain draft keeps it");
+
+        await input.FindCommand.ExecuteAsync("proxy match:notes");
+        check(searches.Count == 4 && searches[^1].Options is { Keys: false, Values: false, Data: false, Notes: true }
+              && input.Query == "proxy match:notes" && SearchQueryText.Parse(input.Query) == searches[^1].Options,
+            "Typed key notes round-trip through the Advanced search form");
     }
 }

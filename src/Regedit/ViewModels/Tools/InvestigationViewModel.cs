@@ -138,7 +138,7 @@ internal abstract partial class InvestigationViewModel : WindowTab
         this.CopyText(ResultText.Hex(value), "Exact bytes copied", ResultText.BytesCopied(value), "Could not copy exact bytes");
     }
 
-    private void CopyText(string text, string? successTitle, string? successMessage, string failureTitle)
+    protected void CopyText(string text, string? successTitle, string? successMessage, string failureTitle)
     {
         try
         {

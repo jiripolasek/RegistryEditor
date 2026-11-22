@@ -49,6 +49,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
     private readonly Dictionary<SearchResultsViewModel, (BrowserTab Tab, int Navigation)> _searchDestinations = [];
     private readonly SearchHistoryStore? _searchHistory;
+
+    internal InspectionHistoryStore? InspectionHistory { get; }
     private readonly AppSettings _settings;
     private BrowserTab? _contextTab;
 
@@ -119,11 +121,13 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         NotesStore notes,
         RegistryHistoryBroadcaster? historyBroadcaster = null,
         JournalViewModel? journalHistory = null,
-        SearchHistoryStore? searchHistory = null)
+        SearchHistoryStore? searchHistory = null,
+        InspectionHistoryStore? inspectionHistory = null)
     {
         this._logger = logger;
         this._settings = settings;
         this._searchHistory = searchHistory;
+        this.InspectionHistory = inspectionHistory;
         this._investigations = investigations;
         this._registry = registry;
         this._createBrowser = createBrowser;
@@ -576,18 +580,33 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         }
 
         _ = tab.RunCommand.ExecuteAsync(null);
-        _ = this._searchHistory?.RecordAsync(search.Options.Text);
+        _ = this._searchHistory?.RecordAsync(SearchQueryText.Format(search.Options));
     }
 
     private SearchResultsViewModel CreateSearch(SavedSearch search)
     {
         SearchResultsViewModel? tab = null;
         tab = new SearchResultsViewModel(
-            search, this._investigations, (query, token) => Task.Run(() => RegistrySearch.FindAll(this._registry, query, token), token),
+            search, this._investigations, (query, token) => Task.Run(() => this.FindRegistryAsync(query, null, token), token),
             (match, select) => this.OpenBrowser(match.Location, match.ValueName, select),
             (match, token) => this.NavigateSearchResultAsync(tab!, match, token),
-            (query, progress, token) => Task.FromResult(RegistrySearch.FindAll(this._registry, query, token, progress: progress)));
+            (query, progress, token) => this.FindRegistryAsync(query, progress, token));
         return tab;
+    }
+
+    private async Task<RegistrySearchResults> FindRegistryAsync(
+        SavedSearch search, Action<RegistrySearchMatch[]>? progress, CancellationToken token)
+    {
+        if (search.Options.Activity is SearchActivity.Inspected or SearchActivity.Either && this.InspectionHistory is { } store)
+        {
+            var history = await store.ReadAsync().WaitAsync(token).ConfigureAwait(false);
+            return RegistrySearch.FindAll(this._registry, search, token,
+                inspections: history.Visits.Select(visit => new RegistryValueInspection(visit.Location, visit.ValueName, visit.LastInspectedUtc)),
+                progress: progress);
+        }
+
+        return RegistrySearch.FindAll(this._registry, search, token, inspections: null, progress: progress,
+            notes: search.Options.Notes ? this.NoteStore.SavedNotes : null);
     }
 
     private async Task NavigateSearchResultAsync(SearchResultsViewModel source, RegistrySearchMatch match, CancellationToken token)

@@ -271,6 +271,8 @@ public sealed partial class InvestigationPage : Page, IPanelView
             this._itemCommands.Add(
                 new ToolCommand("Search scope", Symbol.Filter, ToolCommandPlacement.Overflow) { Flyout = this.SearchScopeFlyout });
             this._itemCommands.Add(
+                new ToolCommand("Copy query", Symbol.Copy, ToolCommandPlacement.Overflow) { Command = search.CopyQueryCommand });
+            this._itemCommands.Add(
                 new ToolCommand("Save search", Symbol.Save, ToolCommandPlacement.Overflow) { Command = search.SaveCommand });
             return;
         }
@@ -419,7 +421,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
                     search.Name, string.Join("\n", search.Roots.Select(ToolPresentation.Address)), string.Empty, (ToolComparison[])
                     [
                         new ToolComparison(
-                            string.Empty, search.Options.Text, ToolPresentation.SearchOptionsText(search.Options), "Query", "Match options")
+                            string.Empty, SearchQueryText.Format(search.Options), ToolPresentation.SearchOptionsText(search.Options), "Query", "Match options")
                     ]);
             }
             else

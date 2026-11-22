@@ -11,4 +11,7 @@ public sealed record RegistrySearchMatch(
     string? ValueName,
     RegistryValue? Value,
     string Fields,
-    string MatchedText);
+    string MatchedText)
+{
+    public DateTimeOffset? KeyLastModifiedUtc { get; init; }
+}

@@ -37,7 +37,13 @@ internal static class ToolPresentation
 
     internal static string SearchOptionsText(SearchOptions options)
     {
-        var fields = new[] { options.Keys ? "Key names" : null, options.Values ? "Value names" : null, options.Data ? "Value data" : null };
+        var fields = new[]
+        {
+            options.Keys ? "Key names" : null,
+            options.Values ? "Value names" : null,
+            options.Data ? "Value data" : null,
+            options.Notes ? "Key notes" : null
+        };
         var types = options.Types is { Length: > 0 }
             ? string.Join(", ", options.Types.Select(type => new RegistryValue(string.Empty, type, []).TypeName))
             : "All";
@@ -48,7 +54,10 @@ internal static class ToolPresentation
                + " · "
                + (options.Whole ? "Whole text" : "Substring")
                + "\nValue types: "
-               + types;
+               + types
+               + (options.Activity == SearchActivity.None ? string.Empty : "\nMy activity: " + options.Activity
+                   + (options.ActivityWithin is { } within ? " · within " + SearchQueryText.FormatWindow(within) : string.Empty))
+               + (options.KeyModified is { } modified ? "\nKey last modified: " + SearchQueryText.FormatKeyModified(modified) : string.Empty);
     }
 
     internal static IEnumerable<ToolComparison> WorkspaceComparisons(RegistryWorkspace workspace)

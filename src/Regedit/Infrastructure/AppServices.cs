@@ -29,6 +29,9 @@ internal static class AppServices
         services.AddScoped(provider => provider.GetRequiredService<Func<AppSettings>>()());
         services.AddSingleton(provider => new SearchHistoryStore(
             provider.GetRequiredService<Func<AppSettings>>(), settingsPath, provider.GetRequiredService<ILogger<SearchHistoryStore>>()));
+        services.AddSingleton(provider => new InspectionHistoryStore(
+            Path.Combine(Path.GetDirectoryName(settingsPath)!, "inspection-history.json"),
+            provider.GetRequiredService<ILogger<InspectionHistoryStore>>()));
         services.AddSingleton<IJumpListBackend>(jumpListBackend);
         services.AddSingleton(provider => new JumpListService(
             provider.GetRequiredService<Func<AppSettings>>(), provider.GetRequiredService<IJumpListBackend>(), settingsPath,
@@ -67,15 +70,16 @@ internal static class AppServices
             var settings = provider.GetRequiredService<AppSettings>();
             var preferences = provider.GetRequiredService<SettingsViewModel>();
             var history = provider.GetRequiredService<RegistryHistoryBroadcaster>();
+            var inspections = provider.GetRequiredService<InspectionHistoryStore>();
             return location => new BrowserViewModel(
-                registry, location, clipboard, favorites, settings, preferences, historyBroadcaster: history);
+                registry, location, clipboard, favorites, settings, preferences, historyBroadcaster: history, inspectionHistory: inspections);
         });
         services.AddScoped(provider => new MainWindowViewModel(
             provider.GetRequiredService<AppSettings>(), provider.GetRequiredService<InvestigationStore>(),
             provider.GetRequiredService<RegistryService>(), provider.GetRequiredService<Func<RegistryLocation, BrowserViewModel>>(),
             provider.GetRequiredService<ILogger<MainWindowViewModel>>(), provider.GetRequiredService<NotesStore>(),
             provider.GetRequiredService<RegistryHistoryBroadcaster>(), provider.GetRequiredService<JournalViewModel>(),
-            provider.GetRequiredService<SearchHistoryStore>()));
+            provider.GetRequiredService<SearchHistoryStore>(), provider.GetRequiredService<InspectionHistoryStore>()));
         services.AddTransient(provider => new WatchSurfaceViewModel(provider.GetRequiredService<MainWindowViewModel>()));
         services.AddScoped<Func<WatchSurfaceViewModel>>(provider => provider.GetRequiredService<WatchSurfaceViewModel>);
         return services;

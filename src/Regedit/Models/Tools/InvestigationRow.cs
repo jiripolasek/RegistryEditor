@@ -50,6 +50,7 @@ public sealed class InvestigationRow
     {
         JournalEntry entry => JournalTarget(entry, false, this.Path) + " · " + JournalSummary(entry),
         WatchObservation observation => WatchTarget(observation, false) + " · " + WatchSummary(observation),
+        RegistrySearchMatch { KeyLastModifiedUtc: { } modified } => $"{this.Path} · Key last modified {modified.ToLocalTime():G}",
         _ => this.Path
     };
 
@@ -162,7 +163,8 @@ public sealed class InvestigationRow
     internal InvestigationRow(RegistrySearchMatch match)
         : this(
             match.Value?.TypeName ?? "Key", match.Value?.DisplayName ?? match.Location.Name, match.Location.Address,
-            match.Fields + " · " + match.MatchedText, null, match.MatchedText, match)
+            (match.KeyLastModifiedUtc is { } modified ? $"Key last modified {modified.ToLocalTime():G} · " : string.Empty)
+            + match.Fields + " · " + match.MatchedText, null, match.MatchedText, match)
     {
     }
 

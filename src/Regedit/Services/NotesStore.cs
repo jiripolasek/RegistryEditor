@@ -22,10 +22,12 @@ internal sealed class NotesStore : IDisposable
     private readonly Func<CancellationToken, Task> _delay;
     private readonly ObservableCollection<NoteDraft> _drafts = [];
     private readonly Dictionary<NoteDraft, CancellationTokenSource> _pending = [];
+    private KeyNote[] _savedNotes;
     private bool _paused, _disposed;
 
     internal ReadOnlyObservableCollection<NoteDraft> Notes { get; }
 
+    internal IReadOnlyList<KeyNote> SavedNotes => Volatile.Read(ref this._savedNotes);
     internal bool IsPaused => this._paused || this._disposed;
 
     internal NotesStore(AppSettings settings, Action save, Func<CancellationToken, Task>? delay = null)
@@ -33,6 +35,7 @@ internal sealed class NotesStore : IDisposable
         this._settings = settings;
         this._save = save;
         this._delay = delay ?? (token => Task.Delay(TimeSpan.FromSeconds(1), token));
+        this._savedNotes = settings.Notes.ToArray();
         this.Notes = new ReadOnlyObservableCollection<NoteDraft>(this._drafts);
         foreach (var note in settings.Notes)
         {
@@ -194,6 +197,8 @@ internal sealed class NotesStore : IDisposable
                 throw;
             }
 
+            // Searches read the last successful save from a worker thread.
+            Volatile.Write(ref this._savedNotes, this._settings.Notes.ToArray());
             if (replaceText && note.Text == draftText)
             {
                 note.Text = text;

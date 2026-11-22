@@ -157,6 +157,13 @@ public sealed partial class MainWindow
                     this.RunAfterMenuCloses(menu, () => this.ViewModel.OpenRegistryUsage(location));
                 };
                 items.Add(usage);
+
+                if (this.ViewModel.InspectionHistory is not null)
+                {
+                    var inspections = new MenuFlyoutItem { Text = "Recently inspected…", Icon = new SymbolIcon(Symbol.Clock) };
+                    inspections.Click += async (_, _) => await this.ShowRecentInspectionsAsync();
+                    items.Add(inspections);
+                }
 #if REGEDIT_EXPERIMENTAL_TERMINAL
                 items.Add(this.CreatePowerShellMenuItem());
 #endif

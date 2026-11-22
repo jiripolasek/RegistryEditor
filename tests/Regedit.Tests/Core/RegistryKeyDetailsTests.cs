@@ -3,6 +3,7 @@
 // ------------------------------------------------------------
 
 using JPSoftworks.Regedit.Core.Registry;
+using JPSoftworks.Regedit.Core.Search;
 
 
 namespace JPSoftworks.Regedit.Tests.Core;
@@ -50,6 +51,10 @@ internal static class RegistryKeyDetailsTests
             check(
                 service.Read(link, true).LastWriteTimeUtc == service.ReadKeyDetails(target, false).LastWriteTimeUtc,
                 "Values reached through a registry link use the timestamp of the key that holds those values");
+            var found = RegistrySearch.FindAll(service,
+                new SavedSearch("Link timestamp", [link], SearchQueryText.Parse("modified:1601-01-02..")), default, limit: 1);
+            check(found.Matches is [var match] && match.Location.IsSameLocation(link) && match.KeyLastModifiedUtc == source.LastWriteTimeUtc,
+                "Date-only search uses the symbolic link's own last-write timestamp for its key result");
         }
         finally
         {

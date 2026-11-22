@@ -217,14 +217,7 @@ public sealed partial class RegistryService
         Array.Sort(names, StringComparer.OrdinalIgnoreCase);
         var values = key.GetValueNames().Order(StringComparer.OrdinalIgnoreCase).Select(name => ReadValue(key, name))
             .OfType<RegistryValue>().ToArray();
-        DateTimeOffset? lastWrite = null;
-        if (includeLastWriteTime)
-        {
-            // An unavailable timestamp must not hide readable values.
-            QueryKeyInfo(key.Handle, out lastWrite, out _, out _);
-        }
-
-        return new RegistrySnapshot(names, values) { LastWriteTimeUtc = lastWrite };
+        return new RegistrySnapshot(names, values) { LastWriteTimeUtc = includeLastWriteTime ? ReadLastWriteTime(key) : null };
     }
 
     internal RegistrySnapshot Read(RegistryLocation location, JournalCaptureBudget budget)
@@ -294,14 +287,27 @@ public sealed partial class RegistryService
     {
         using var key = this.Open(location);
         var value = ReadValue(key, name);
-        lastWriteTimeUtc = null;
-        if (location.Machine is null)
+        lastWriteTimeUtc = location.Machine is null ? ReadLastWriteTime(key) : null;
+        return value;
+    }
+
+    internal static DateTimeOffset? ReadLastWriteTime(RegistryKey key)
+    {
+        QueryKeyInfo(key.Handle, out var lastWrite, out _, out _);
+        return lastWrite;
+    }
+
+    internal static RegistryValueType? ReadValueType(RegistryKey key, string name)
+    {
+        uint size = 0;
+        var error = RegistryNative.QueryValue(key.Handle, name, 0, out var type, null, ref size);
+        if (error == 2)
         {
-            // An unavailable timestamp must not hide a readable value.
-            QueryKeyInfo(key.Handle, out lastWriteTimeUtc, out _, out _);
+            return null;
         }
 
-        return value;
+        Check(error);
+        return (RegistryValueType)type;
     }
 
     internal static RegistryValue? ReadValue(
@@ -485,6 +491,11 @@ public sealed partial class RegistryService
 
     public SearchResult FindNext(RegistryLocation root, SearchOptions options, SearchHit? after, CancellationToken token)
     {
+        if (options.Activity != SearchActivity.None || options.ActivityWithin is not null || options.KeyModified is not null || options.Notes)
+        {
+            throw new ArgumentException("Activity, Key last modified, and key note filters require a Find all search.", nameof(options));
+        }
+
         if (string.IsNullOrEmpty(options.Text) || !(options.Keys || options.Values || options.Data))
         {
             throw new ArgumentException("Enter search text and choose keys, values, or data.");

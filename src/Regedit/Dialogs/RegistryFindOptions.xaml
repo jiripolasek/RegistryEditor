@@ -2,29 +2,205 @@
     x:Class="JPSoftworks.Regedit.Dialogs.RegistryFindOptions"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <StackPanel Style="{StaticResource DialogContentPanelStyle}">
-        <TextBox
-            x:Name="QueryInput"
-            Header="Find what"
-            Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        <ComboBox
-            HorizontalAlignment="Stretch"
-            AutomationProperties.AutomationId="SearchScope"
-            Header="Search in"
-            IsEnabled="{x:Bind ViewModel.CanChooseScope}"
-            SelectedIndex="{x:Bind ViewModel.ScopeIndex, Mode=TwoWay}">
-            <ComboBoxItem Content="Current key and subkeys" />
-            <ComboBoxItem Content="{x:Bind ViewModel.AllHivesLabel}" />
-        </ComboBox>
-        <CheckBox Content="Key names" IsChecked="{x:Bind ViewModel.Keys, Mode=TwoWay}" />
-        <CheckBox Content="Value names" IsChecked="{x:Bind ViewModel.Values, Mode=TwoWay}" />
-        <CheckBox Content="Value data" IsChecked="{x:Bind ViewModel.Data, Mode=TwoWay}" />
-        <TextBox
-            Header="Value types (blank for all)"
-            PlaceholderText="REG_SZ, REG_DWORD, 99"
-            Text="{x:Bind ViewModel.Types, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-        <CheckBox Content="Match whole string only" IsChecked="{x:Bind ViewModel.Whole, Mode=TwoWay}" />
-        <CheckBox Content="Match case" IsChecked="{x:Bind ViewModel.MatchCase, Mode=TwoWay}" />
+    <UserControl.Resources>
+        <Style x:Key="FindSectionHeading" TargetType="TextBlock">
+            <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="FindSectionDivider" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="Height" Value="1" />
+        </Style>
+    </UserControl.Resources>
+    <StackPanel Spacing="12" Style="{StaticResource DialogContentPanelStyle}">
+        <StackPanel Spacing="8">
+            <TextBlock Style="{StaticResource FindSectionHeading}" Text="Query and scope" />
+            <TextBox
+                x:Name="QueryInput"
+                AccessKey="W"
+                AccessKeyInvoked="Field_AccessKeyInvoked"
+                AutomationProperties.HelpText="Leave blank to search by filters alone."
+                Header="Find what"
+                PlaceholderText="Leave blank to search by filters alone"
+                Text="{x:Bind ViewModel.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <ComboBox
+                HorizontalAlignment="Stretch"
+                AccessKey="S"
+                AccessKeyInvoked="Field_AccessKeyInvoked"
+                AutomationProperties.AutomationId="SearchScope"
+                Header="Search in"
+                IsEnabled="{x:Bind ViewModel.CanChooseScope}"
+                SelectedIndex="{x:Bind ViewModel.ScopeIndex, Mode=TwoWay}">
+                <ComboBoxItem Content="Current key and subkeys" />
+                <ComboBoxItem Content="{x:Bind ViewModel.AllHivesLabel}" />
+            </ComboBox>
+        </StackPanel>
+        <Border Style="{StaticResource FindSectionDivider}" />
+        <StackPanel Spacing="8">
+            <TextBlock Style="{StaticResource FindSectionHeading}" Text="Filters" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
+                <ComboBox
+                    HorizontalAlignment="Stretch"
+                    AccessKey="A"
+                    AccessKeyInvoked="Field_AccessKeyInvoked"
+                    AutomationProperties.AutomationId="SearchActivity"
+                    AutomationProperties.HelpText="Edited uses the change journal. Manage inspection recording under Tools → Recently inspected."
+                    AutomationProperties.Name="My activity"
+                    Header="My activity"
+                    SelectedIndex="{x:Bind ViewModel.ActivityIndex, Mode=TwoWay}">
+                    <ComboBoxItem Content="No activity filter" />
+                    <ComboBoxItem Content="Edited" />
+                    <ComboBoxItem Content="Inspected" />
+                    <ComboBoxItem Content="Either" />
+                </ComboBox>
+                <ComboBox
+                    Grid.Column="1"
+                    HorizontalAlignment="Stretch"
+                    AccessKey="M"
+                    AccessKeyInvoked="Field_AccessKeyInvoked"
+                    AutomationProperties.AutomationId="SearchKeyModified"
+                    AutomationProperties.HelpText="Value matches use their containing key’s timestamp."
+                    AutomationProperties.Name="Key last modified"
+                    Header="Key last modified"
+                    SelectedIndex="{x:Bind ViewModel.KeyModifiedIndex, Mode=TwoWay}">
+                    <ComboBoxItem Content="Any time" />
+                    <ComboBoxItem Content="Last hour" />
+                    <ComboBoxItem Content="Last 24 hours" />
+                    <ComboBoxItem Content="Last 7 days" />
+                    <ComboBoxItem Content="Last 30 days" />
+                    <ComboBoxItem Content="Custom date range" />
+                </ComboBox>
+                <TextBox
+                    Grid.Row="1"
+                    Margin="0,8,0,0"
+                    AccessKey="I"
+                    AccessKeyInvoked="Field_AccessKeyInvoked"
+                    AutomationProperties.AutomationId="SearchActivityWithin"
+                    AutomationProperties.HelpText="Leave blank for any time, or enter a duration such as 12h or 7d."
+                    Header="Activity within"
+                    PlaceholderText="Any time (e.g. 12h or 7d)"
+                    Text="{x:Bind ViewModel.Within, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    Visibility="{x:Bind ViewModel.HasActivity, Mode=OneWay}" />
+            </Grid>
+            <TextBlock
+                AutomationProperties.AutomationId="SearchInspectionHint"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{ThemeResource CaptionTextBlockStyle}"
+                Text="Inspection recording is opt-in. Manage it under Tools → Recently inspected."
+                TextWrapping="Wrap"
+                Visibility="{x:Bind ViewModel.ShowInspectionHint, Mode=OneWay}" />
+            <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HasCustomModifiedRange, Mode=OneWay}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <CalendarDatePicker
+                        x:Name="ModifiedFromPicker"
+                        HorizontalAlignment="Stretch"
+                        AccessKey="R"
+                        AccessKeyInvoked="Field_AccessKeyInvoked"
+                        AutomationProperties.AutomationId="SearchModifiedFrom"
+                        AutomationProperties.HelpText="Optional start date, inclusive in local time."
+                        AutomationProperties.Name="Key last modified from"
+                        CalendarIdentifier="GregorianCalendar"
+                        Date="{x:Bind ViewModel.ModifiedFrom, Mode=TwoWay}"
+                        Header="From"
+                        PlaceholderText="No start date" />
+                    <CalendarDatePicker
+                        x:Name="ModifiedThroughPicker"
+                        Grid.Column="1"
+                        HorizontalAlignment="Stretch"
+                        AccessKey="T"
+                        AccessKeyInvoked="Field_AccessKeyInvoked"
+                        AutomationProperties.AutomationId="SearchModifiedThrough"
+                        AutomationProperties.HelpText="Optional end date, inclusive in local time."
+                        AutomationProperties.Name="Key last modified through"
+                        CalendarIdentifier="GregorianCalendar"
+                        Date="{x:Bind ViewModel.ModifiedThrough, Mode=TwoWay}"
+                        Header="Through"
+                        PlaceholderText="No end date" />
+                </Grid>
+            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Visibility="{x:Bind ViewModel.HasKeyModified, Mode=OneWay}">
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{ThemeResource CaptionTextBlockStyle}"
+                        Text="Inclusive local dates. Either end is optional."
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.HasCustomModifiedRange, Mode=OneWay}" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{ThemeResource CaptionTextBlockStyle}"
+                        Text="Value matches use their containing key’s timestamp."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+                <Button
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    AccessKey="L"
+                    AutomationProperties.AutomationId="SearchClearModifiedDates"
+                    Click="ClearModifiedDates_Click"
+                    Content="Clear dates"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    Visibility="{x:Bind ViewModel.HasCustomModifiedRange, Mode=OneWay}" />
+            </Grid>
+        </StackPanel>
+        <Border Style="{StaticResource FindSectionDivider}" />
+        <StackPanel Spacing="8">
+            <TextBlock Style="{StaticResource FindSectionHeading}" Text="Match options" />
+            <StackPanel>
+                <TextBlock Text="Match text in" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto">
+                    <CheckBox
+                        AccessKey="K"
+                        AutomationProperties.AutomationId="SearchKeyNames"
+                        AutomationProperties.HelpText="Activity filters match values only."
+                        Content="Key names"
+                        IsChecked="{x:Bind ViewModel.MatchKeyNames, Mode=TwoWay}"
+                        IsEnabled="{x:Bind ViewModel.CanMatchKeyFields, Mode=OneWay}" />
+                    <CheckBox
+                        Grid.Column="1"
+                        AccessKey="N"
+                        AutomationProperties.AutomationId="SearchValueNames"
+                        Content="Value names"
+                        IsChecked="{x:Bind ViewModel.Values, Mode=TwoWay}" />
+                    <CheckBox
+                        Grid.Row="1"
+                        AccessKey="D"
+                        AutomationProperties.AutomationId="SearchValueData"
+                        Content="Value data"
+                        IsChecked="{x:Bind ViewModel.Data, Mode=TwoWay}" />
+                    <CheckBox
+                        Grid.Row="1"
+                        Grid.Column="1"
+                        AccessKey="E"
+                        AutomationProperties.AutomationId="SearchKeyNotes"
+                        AutomationProperties.HelpText="Matches text in saved notes for registry keys."
+                        Content="Key notes"
+                        IsChecked="{x:Bind ViewModel.MatchNotes, Mode=TwoWay}"
+                        IsEnabled="{x:Bind ViewModel.CanMatchKeyFields, Mode=OneWay}" />
+                </Grid>
+            </StackPanel>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <CheckBox
+                    AccessKey="O"
+                    AutomationProperties.AutomationId="SearchMatchWholeString"
+                    Content="Match whole string only"
+                    IsChecked="{x:Bind ViewModel.Whole, Mode=TwoWay}" />
+                <CheckBox
+                    Grid.Column="1"
+                    AccessKey="C"
+                    AutomationProperties.AutomationId="SearchMatchCase"
+                    Content="Match case"
+                    IsChecked="{x:Bind ViewModel.MatchCase, Mode=TwoWay}" />
+            </Grid>
+            <TextBox
+                AccessKey="V"
+                AccessKeyInvoked="Field_AccessKeyInvoked"
+                AutomationProperties.AutomationId="SearchValueTypes"
+                AutomationProperties.HelpText="Separate types with commas. Use names such as REG_SZ or numeric codes."
+                Header="Value types (blank for all)"
+                PlaceholderText="REG_SZ, REG_DWORD, 99"
+                Text="{x:Bind ViewModel.Types, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
         <TextBlock
             x:Name="ErrorText"
             AutomationProperties.AutomationId="DialogError"
