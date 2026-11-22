@@ -89,6 +89,17 @@ public sealed partial class AppSettings
 
     public RegistryFileLayout RegistryFileLayout { get; set; } = RegistryFileLayout.Split;
 
+    public string PowerShellPath { get; set; } = string.Empty;
+
+    public bool OfferWindowsPowerShellFallback { get; set; } = true;
+
+    internal const string DefaultTerminalFontFamily = "Consolas";
+    internal const int DefaultTerminalFontSize = 14;
+
+    public string TerminalFontFamily { get; set; } = DefaultTerminalFontFamily;
+
+    public int TerminalFontSize { get; set; } = DefaultTerminalFontSize;
+
     public bool ShowListToolbar { get; set; } = true;
 
     /// <summary>Places the bottom panel tab strip below its content instead of above it.</summary>
@@ -214,6 +225,12 @@ public sealed partial class AppSettings
                     ? editorFont with { Family = editorFont.Family.Trim() }
                     : DefaultEditorFont;
             settings.RegistryFileLayout = Enum.IsDefined(saved.RegistryFileLayout) ? saved.RegistryFileLayout : RegistryFileLayout.Split;
+            settings.PowerShellPath = saved.PowerShellPath?.Trim() ?? string.Empty;
+            settings.OfferWindowsPowerShellFallback = saved.OfferWindowsPowerShellFallback;
+            settings.TerminalFontFamily = string.IsNullOrWhiteSpace(saved.TerminalFontFamily)
+                ? DefaultTerminalFontFamily
+                : saved.TerminalFontFamily.Trim();
+            settings.TerminalFontSize = Math.Clamp(saved.TerminalFontSize, 8, 32);
             settings.ShowListToolbar = saved.ShowListToolbar;
             settings.PanelTabsAtBottom = saved.PanelTabsAtBottom;
             settings.ToolbarButtons = saved.ToolbarButtons & ToolbarButtons.All;
@@ -288,7 +305,8 @@ public sealed partial class AppSettings
             this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
             this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton,
             this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
-            this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu);
+            this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
+            this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.TerminalFontFamily, this.TerminalFontSize);
         try
         {
             change(this);
@@ -332,6 +350,13 @@ public sealed partial class AppSettings
 
             this.EditorFont = editorFont with { Family = editorFont.Family.Trim() };
 
+            if (string.IsNullOrWhiteSpace(this.TerminalFontFamily) || this.TerminalFontSize is < 8 or > 32)
+            {
+                throw new ArgumentException("Enter a terminal font family and a size between 8 and 32 points.");
+            }
+
+            this.TerminalFontFamily = this.TerminalFontFamily.Trim();
+
             if (!double.IsFinite(this.ListRowPadding) || this.ListRowPadding is < 0 or > 10)
             {
                 throw new ArgumentException("Choose list spacing between 0 and 10.");
@@ -352,7 +377,8 @@ public sealed partial class AppSettings
                 this.ShowValuePreview, this.AutoSyncTree, this.DataFont, this.ShowListToolbar, this.ListColumns, this.ListRowPadding,
                 this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton,
                 this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl,
-                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu) = previous;
+                this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
+                this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.TerminalFontFamily, this.TerminalFontSize) = previous;
             throw;
         }
     }
@@ -401,5 +427,9 @@ public sealed partial class AppSettings
         string[]? RecentSearches = null,
         bool ShowSearchBox = true,
         bool ShowFavoritesBar = false,
-        bool OpenFavoritesMenu = false);
+        bool OpenFavoritesMenu = false,
+        string? PowerShellPath = null,
+        bool OfferWindowsPowerShellFallback = true,
+        string? TerminalFontFamily = null,
+        int TerminalFontSize = DefaultTerminalFontSize);
 }

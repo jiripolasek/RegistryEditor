@@ -520,6 +520,60 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="Changes are saved automatically and apply to all registry tabs."
                         TextWrapping="Wrap" />
+                    <StackPanel Spacing="4" Visibility="{x:Bind TerminalSettingsVisibility}">
+                        <TextBlock
+                            Margin="0,24,0,4"
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="Terminal" />
+                        <toolkit:SettingsCard Description="Leave blank to detect PowerShell 7 in its standard installation folder." Header="PowerShell 7 executable">
+                            <TextBox
+                                x:Name="PowerShellPathBox"
+                                Width="240"
+                                AutomationProperties.Name="PowerShell 7 executable"
+                                PlaceholderText="Automatic"
+                                Text="{x:Bind ViewModel.PowerShellPath, Mode=TwoWay}" />
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard Description="Offer 5.1 in the bottom panel when PowerShell 7 cannot start." Header="Offer Windows PowerShell 5.1">
+                            <ToggleSwitch
+                                x:Name="PowerShellFallbackSwitch"
+                                AutomationProperties.Name="Offer Windows PowerShell 5.1"
+                                IsOn="{x:Bind ViewModel.OfferWindowsPowerShellFallback, Mode=TwoWay}" />
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsExpander
+                            AutomationProperties.AutomationId="TerminalAppearanceExpander"
+                            Description="Font changes apply to new PowerShell tabs."
+                            Expanded="FontExpander_Expanded"
+                            Header="Terminal appearance">
+                            <toolkit:SettingsExpander.Items>
+                                <toolkit:SettingsCard Description="{x:Bind ViewModel.FontFamiliesError, Mode=OneWay}" Header="Font family">
+                                    <ComboBox
+                                        x:Name="TerminalFontSelector"
+                                        Width="240"
+                                        AutomationProperties.AutomationId="TerminalFontSelector"
+                                        AutomationProperties.Name="Terminal font family"
+                                        IsEditable="True"
+                                        ItemsSource="{x:Bind ViewModel.FontFamilies, Mode=OneWay}"
+                                        LostFocus="FontFamily_LostFocus"
+                                        SelectionChanged="FontFamily_Changed"
+                                        Text="{x:Bind ViewModel.TerminalFontFamily, Mode=OneWay}"
+                                        TextSubmitted="FontFamily_Submitted" />
+                                </toolkit:SettingsCard>
+                                <toolkit:SettingsCard Description="Size in points." Header="Font size">
+                                    <NumberBox
+                                        Width="160"
+                                        AutomationProperties.AutomationId="TerminalFontSizeBox"
+                                        AutomationProperties.Name="Terminal font size"
+                                        LargeChange="2"
+                                        Maximum="32"
+                                        Minimum="8"
+                                        SmallChange="1"
+                                        SpinButtonPlacementMode="Inline"
+                                        Value="{x:Bind ViewModel.TerminalFontSize, Mode=TwoWay}" />
+                                </toolkit:SettingsCard>
+                            </toolkit:SettingsExpander.Items>
+                        </toolkit:SettingsExpander>
+                    </StackPanel>
                     <TextBlock
                         Margin="0,24,0,8"
                         AutomationProperties.HeadingLevel="Level2"

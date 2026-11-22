@@ -193,6 +193,15 @@ public sealed partial class MainWindow : Window
         this.ApplyBackdrop();
         preferences.PreferenceSaved += property =>
         {
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+            if (property == nameof(SettingsViewModel.OfferWindowsPowerShellFallback))
+            {
+                foreach (var terminal in this._views.Values.OfType<PowerShellView>())
+                {
+                    terminal.RefreshRecoveryActions();
+                }
+            }
+#endif
             if (property == nameof(SettingsViewModel.ThemeIndex))
             {
                 this.ApplyTheme(this.Settings.Theme);
@@ -238,6 +247,9 @@ public sealed partial class MainWindow : Window
         this.ViewModel.TabClosed += this.ReleaseView;
         this.ViewModel.SearchFocusRequested += () => (this.SelectedTabContent as BrowserPage)?.FocusSearch();
         this.ViewModel.CloseRequested += this.RequestClose;
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        this.InitializeTerminalMenu();
+#endif
         this.ApplyPanelTabPosition();
         this.ShellStateChanged(this.ViewModel, new PropertyChangedEventArgs(nameof(MainWindowViewModel.ActiveTab)));
         this.ShowBottomContent();
@@ -451,6 +463,9 @@ public sealed partial class MainWindow : Window
             BrowserTab browser => new BrowserPage(this, browser.Browser, browser.InitialValue),
             SettingsTab => new SettingsPage(this.Preferences),
             ToolTab tool => (FrameworkElement)this.CreateTool(tool.Tool),
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+            PowerShellTab shell => this.CreatePowerShellView(shell),
+#endif
             InvestigationViewModel investigation => new InvestigationPage(
                 investigation, this.Dialogs, this.Notifications, this.Settings.ListRowPadding, this.ColumnLayouts),
             _ => throw new InvalidOperationException("Unknown tab type.")
@@ -493,6 +508,11 @@ public sealed partial class MainWindow : Window
             case InvestigationPage investigation:
                 investigation.DismissNotification();
                 break;
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+            case PowerShellView terminal:
+                terminal.Dispose();
+                break;
+#endif
         }
     }
 
@@ -527,6 +547,12 @@ public sealed partial class MainWindow : Window
         {
             this.ShowBottomContent();
         }
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        else if (args.PropertyName == nameof(MainWindowViewModel.IsDialogOpen))
+        {
+            this.UpdateTerminalVisibility();
+        }
+#endif
     }
 
     private void UpdateTitle()
@@ -588,25 +614,38 @@ public sealed partial class MainWindow : Window
             return (InputKeyboardSource.GetKeyStateForCurrentThread(key) & CoreVirtualKeyStates.Down) != 0;
         }
 
-        if (args.Handled || this.Dialogs.IsOpen || !Down(VirtualKey.Control))
+        if (args.Handled || this.Dialogs.IsOpen || !Down(VirtualKey.Control) ||
+            Down(VirtualKey.LeftWindows) || Down(VirtualKey.RightWindows))
         {
             return;
         }
 
-        // Resolve the character each time so layout switches and a shifted slash work.
+        bool Matches(short key) =>
+            key != -1 && args.Key == (VirtualKey)(key & 0xFF) &&
+            Down(VirtualKey.Shift) == ((key & 0x100) != 0) && Down(VirtualKey.Menu) == ((key & 0x400) != 0);
+
+        // Resolve punctuation against the current keyboard layout.
         var slash = args.Key == VirtualKey.Divide ? (short)VirtualKey.Divide : VkKeyScan('/');
-        if (slash == -1
-            || args.Key != (VirtualKey)(slash & 0xFF)
-            || Down(VirtualKey.Shift) != ((slash & 0x100) != 0)
-            || Down(VirtualKey.Menu) != ((slash & 0x400) != 0)
-            || Down(VirtualKey.LeftWindows)
-            || Down(VirtualKey.RightWindows))
+        if (Matches(slash))
         {
+            this.ViewModel.OpenShortcutsCommand.Execute(null);
+            args.Handled = true;
             return;
         }
 
-        this.ViewModel.OpenShortcutsCommand.Execute(null);
-        args.Handled = true;
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        var semicolon = VkKeyScan(';');
+        // AltGr can synthesize left Ctrl. Require right Ctrl when typing a semicolon needs AltGr.
+        if (Matches(semicolon) && ((semicolon & 0x600) != 0x600 || Down(VirtualKey.RightControl)))
+        {
+            if (!args.KeyStatus.WasKeyDown)
+            {
+                this.OpenPowerShell();
+            }
+
+            args.Handled = true;
+        }
+#endif
     }
 
     private void NewTab_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

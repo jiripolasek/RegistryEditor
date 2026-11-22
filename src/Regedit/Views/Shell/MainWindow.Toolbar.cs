@@ -142,6 +142,9 @@ public sealed partial class MainWindow
         {
             if (button == ToolbarButtons.Sidebar)
             {
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+                items.Add(this.CreatePowerShellMenuItem());
+#endif
                 items.Add(new MenuFlyoutSeparator());
             }
 

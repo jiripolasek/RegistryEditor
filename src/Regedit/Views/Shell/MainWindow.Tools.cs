@@ -125,6 +125,9 @@ public sealed partial class MainWindow
             favorites.SetCurrentLocation(this.ViewModel.VisibleBrowser?.Location);
         }
 
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        (this.BottomContent.Content as PowerShellView)?.SetBrowserLocation(this.ViewModel.VisibleBrowser?.Location);
+#endif
         this.UpdateTitle();
         this.ContextChanged?.Invoke(this, EventArgs.Empty);
     }

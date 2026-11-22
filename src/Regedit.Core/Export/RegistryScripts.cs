@@ -14,6 +14,13 @@ namespace JPSoftworks.Regedit.Core.Export;
 
 public static class RegistryScripts
 {
+    public static string PowerShellLocation(RegistryLocation location)
+    {
+        var path = location.FormatPath(RegistryPathFormat.PowerShellProvider) ??
+                   throw new ArgumentException("Select a local registry key.", nameof(location));
+        return "Set-Location -LiteralPath " + Quote(path);
+    }
+
     public static string PowerShell(IEnumerable<RegistryDifference> selection)
     {
         var changes = Validate(selection);

@@ -570,6 +570,26 @@
                                 Margin="0,0,6,0"
                                 Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
                             <Button
+                                x:Name="TerminalShellButton"
+                                Width="Auto"
+                                Padding="8,0"
+                                Style="{StaticResource ToolHeaderButton}"
+                                ToolTipService.ToolTip="Shell details"
+                                Visibility="Collapsed">
+                                <Button.Flyout>
+                                    <Flyout Placement="TopEdgeAlignedRight" ShouldConstrainToRootBounds="False">
+                                        <StackPanel MaxWidth="360" Spacing="8">
+                                            <TextBlock x:Name="TerminalShellName" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock
+                                                x:Name="TerminalShellDetails"
+                                                IsTextSelectionEnabled="True"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button
+                                x:Name="PromoteBottomTabButton"
                                 AutomationProperties.Name="Open panel tab in main tab"
                                 Click="PromoteBottomTab_Click"
                                 Style="{StaticResource ToolHeaderButton}"

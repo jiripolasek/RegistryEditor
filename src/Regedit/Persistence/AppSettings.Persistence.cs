@@ -39,7 +39,8 @@ public sealed partial class AppSettings
                 new Dictionary<string, ColumnLayout>(this.ColumnLayouts, StringComparer.Ordinal), this.ShowBackButton,
                 this.ShowForwardButton, this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop,
                 this.HiddenJumpListFavorites.ToArray(), this.WebSearchUrl, this.RegistryFileLayout, this.EditorFont,
-                this.RecentSearches.ToArray(), this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu),
+                this.RecentSearches.ToArray(), this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
+                this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.TerminalFontFamily, this.TerminalFontSize),
             SettingsJsonContext.Default.SavedSettings)!.AsObject();
     }
 

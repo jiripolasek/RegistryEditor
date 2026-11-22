@@ -34,6 +34,8 @@ internal static class SettingsTests
                 && settings.FontFamily == "Segoe UI Variable"
                 && settings.FontSize == 14
                 && settings.ShowStatusBar, "Settings page retains existing appearance defaults");
+            check(settings.TerminalFontFamily == "Consolas" && settings.TerminalFontSize == 14,
+                "Legacy settings retain the terminal renderer's default font");
             settings.Favorites.Add(new Favorite("Example", "HKCU\\Software"));
             settings.Tabs.Add(new SavedTab("HKCU"));
             settings.ToolPanePinned = true;
@@ -43,6 +45,8 @@ internal static class SettingsTests
                     value.Theme = "Dark";
                     value.FontFamily = " Consolas ";
                     value.FontSize = 18;
+                    value.TerminalFontFamily = " Courier New ";
+                    value.TerminalFontSize = 24;
                     value.ShowStatusBar = false;
                     value.ShowKeysInList = value.ShowParentKeyInList = value.ShowValuePreview = true;
                     value.AutoSyncTree = false;
@@ -50,6 +54,8 @@ internal static class SettingsTests
                 }, file);
             var loaded = AppSettings.Load(file);
             check(!loaded.AutoSyncTree, "Disabled automatic tree tracking survives saving and loading");
+            check(loaded.TerminalFontFamily == "Courier New" && loaded.TerminalFontSize == 24,
+                "Terminal font preferences round-trip through the settings file");
             check(
                 loaded.ShowFavoritesBar && loaded.OpenFavoritesMenu, "Favorites access options survive saving and loading");
             check(
@@ -84,6 +90,8 @@ internal static class SettingsTests
                     && settings.Theme == "Dark"
                     && settings.FontFamily == "Consolas"
                     && settings.FontSize == 18
+                    && settings.TerminalFontFamily == "Courier New"
+                    && settings.TerminalFontSize == 24
                     && saved.SequenceEqual(File.ReadAllBytes(file)), message);
             }
 
@@ -94,6 +102,8 @@ internal static class SettingsTests
                     value.FontFamily = " ";
                 }, "Invalid font restores all changed preferences and leaves the file intact");
             Reject(value => value.Theme = "Blue", "Unknown themes cannot be saved");
+            Reject(value => { value.TerminalFontFamily = "Consolas"; value.TerminalFontSize = 33; },
+                "Invalid terminal font size restores both terminal font preferences");
             foreach (var size in new[] { double.NaN, double.PositiveInfinity, 7, 33 })
             {
                 Reject(value => value.FontSize = size, $"Invalid font size {size} leaves saved preferences intact");

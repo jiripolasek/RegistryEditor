@@ -25,6 +25,14 @@ public sealed partial class SettingsPage : Page
 
     private string AppVersion => $"Version {typeof(SettingsPage).Assembly.GetName().Version?.ToString(3)}";
 
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+    private Visibility TerminalSettingsVisibility => Visibility.Visible;
+
+    internal void ShowTerminalSettings() => this.ShowShortcuts(false, this.PowerShellPathBox);
+#else
+    private Visibility TerminalSettingsVisibility => Visibility.Collapsed;
+#endif
+
     internal SettingsPage(SettingsViewModel viewModel)
     {
         this.ViewModel = viewModel;
@@ -55,6 +63,9 @@ public sealed partial class SettingsPage : Page
         this.AddShortcutGroup(
             "Tools and favorites", ("Open / close the right sidebar", "F9"), ("Open / close the bottom panel", "Ctrl+J"),
             ("Show or hide the Favorites bar", "Ctrl+Shift+B"), ("Open Favorites in the sidebar", "Ctrl+Shift+O"),
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+            ("Open a PowerShell terminal", "Ctrl+;"),
+#endif
             ("Add or remove the selected key or current location in Favorites", "Ctrl+D"), ("Save the current note in Notes", "Ctrl+S"));
         this.AddShortcutGroup(
             "Registry file editor", ("Open the File menu", "Alt+F"), ("Open / save a registry file", "Ctrl+O / Ctrl+S"),
@@ -220,6 +231,10 @@ public sealed partial class SettingsPage : Page
         if (selector == this.EditorFontSelector)
         {
             this.ViewModel.EditorFontFamily = family;
+        }
+        else if (selector == this.TerminalFontSelector)
+        {
+            this.ViewModel.TerminalFontFamily = family;
         }
         else
         {

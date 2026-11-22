@@ -43,18 +43,36 @@ public sealed partial class MainWindow
 
     private void ShowBottomContent()
     {
-        this.AttachPanelView(null);
-        this.BottomContent.Content = null;
-        this.BottomTabs.SelectedItem = this.ViewModel.ActiveBottomTab;
-        if (this.ViewModel.ActiveBottomTab is { } tab)
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        if (this.BottomContent.Content is PowerShellView terminal)
         {
-            var view = this.GetView(tab);
+            terminal.SetSurfaceVisible(false);
+        }
+
+        this.PromoteBottomTabButton.IsEnabled = this.ViewModel.ActiveBottomTab is not PowerShellTab;
+#endif
+        this.BottomTabs.SelectedItem = this.ViewModel.ActiveBottomTab;
+        var view = this.ViewModel.ActiveBottomTab is { } tab ? this.GetView(tab) : null;
+        if (!ReferenceEquals(this.BottomContent.Content, view))
+        {
+            this.BottomContent.Content = null;
             this.ConfigureDockedView(view, true);
             this.AttachPanelView(view as IPanelView);
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+            this.SetTerminalShellButton(view as PowerShellView);
+#endif
             this.BottomContent.Content = view;
         }
 
         this.UpdateToolLayout();
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        this.UpdateTerminalVisibility();
+        if (view is PowerShellView visibleTerminal)
+        {
+            visibleTerminal.SetBrowserLocation(this.ViewModel.VisibleBrowser?.Location);
+            _ = visibleTerminal.FollowCurrentRegistryLocationAsync();
+        }
+#endif
     }
 
     /// <summary>Renders the panel header search box and commands for <paramref name="view"/>.</summary>
@@ -137,6 +155,12 @@ public sealed partial class MainWindow
 
     private void PromoteBottomTab_Click(object sender, RoutedEventArgs args)
     {
+#if REGEDIT_EXPERIMENTAL_TERMINAL
+        if (this.ViewModel.ActiveBottomTab is PowerShellTab)
+        {
+            return;
+        }
+#endif
         this.ViewModel.PromoteBottomTab();
     }
 
