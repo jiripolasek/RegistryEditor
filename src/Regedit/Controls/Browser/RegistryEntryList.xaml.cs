@@ -26,6 +26,8 @@ public sealed partial class RegistryEntryList : UserControl
 {
     internal event Action<RegistryEntry>? OpenInBackground;
 
+    internal event Action<RegistryEntry>? NoteRequested;
+
     internal event Action<char>? FilterTyped;
 
     internal event Action<string>? RenameRejected;
@@ -58,6 +60,14 @@ public sealed partial class RegistryEntryList : UserControl
         MiddleClick.Attach(
             this.EntriesList, args => MiddleClick.Container<ListViewItem>(this.EntriesList, args)?.Content as RegistryEntry,
             entry => this.OpenInBackground?.Invoke(entry));
+    }
+
+    private void NoteMarker_Click(object sender, RoutedEventArgs args)
+    {
+        if (((Button)sender).Tag is RegistryEntry entry)
+        {
+            this.NoteRequested?.Invoke(entry);
+        }
     }
 
     internal void Initialize(BrowserViewModel viewModel, SettingsViewModel preferences, MenuFlyout entries, MenuFlyout background)

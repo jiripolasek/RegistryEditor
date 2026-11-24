@@ -97,6 +97,8 @@
                     AutomationProperties.HelpText="{x:Bind PrimaryToolTip}"
                     MaxLines="2"
                     Style="{StaticResource BodyTextBlockStyle}"
+                    DataContextChanged="NoteMatches_Changed"
+                    Tag="Title"
                     Text="{x:Bind PrimaryText}"
                     TextTrimming="CharacterEllipsis"
                     TextWrapping="Wrap"
@@ -106,10 +108,20 @@
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     MaxLines="2"
                     Style="{StaticResource CaptionTextBlockStyle}"
+                    DataContextChanged="NoteMatches_Changed"
+                    Tag="Path"
                     Text="{x:Bind SecondaryText}"
                     TextTrimming="CharacterEllipsis"
                     TextWrapping="Wrap"
                     ToolTipService.ToolTip="{x:Bind SecondaryToolTip}" />
+                <TextBlock
+                    DataContextChanged="NoteMatches_Changed"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Tag="Text"
+                    Text="{x:Bind TableSummary}"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="{x:Bind HasNoteSummary}" />
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Style="{StaticResource CaptionTextBlockStyle}"
@@ -175,6 +187,8 @@
     <DataTemplate x:Key="ToolSubjectCell" x:DataType="models:InvestigationRow">
         <TextBlock
             VerticalAlignment="Center"
+            DataContextChanged="NoteMatches_Changed"
+            Tag="Title"
             Text="{x:Bind TableSubject}"
             TextTrimming="CharacterEllipsis"
             ToolTipService.ToolTip="{x:Bind PrimaryToolTip}" />
@@ -182,6 +196,8 @@
     <DataTemplate x:Key="ToolPathCell" x:DataType="models:InvestigationRow">
         <TextBlock
             VerticalAlignment="Center"
+            DataContextChanged="NoteMatches_Changed"
+            Tag="Path"
             Text="{x:Bind Path}"
             TextTrimming="CharacterEllipsis"
             ToolTipService.ToolTip="{x:Bind Path}" />
@@ -189,6 +205,8 @@
     <DataTemplate x:Key="ToolSummaryCell" x:DataType="models:InvestigationRow">
         <TextBlock
             VerticalAlignment="Center"
+            DataContextChanged="NoteMatches_Changed"
+            Tag="Text"
             Text="{x:Bind TableSummary}"
             TextTrimming="CharacterEllipsis"
             ToolTipService.ToolTip="{x:Bind TableSummary}" />

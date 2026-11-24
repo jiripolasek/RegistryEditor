@@ -221,6 +221,17 @@ internal static class InvestigationTests
             check(
                 RegistrySearch.FindAll(raw, new SavedSearch("All", [root], new SearchOptions("a")), default, 1).Truncated,
                 "Find all reports result truncation explicitly");
+            var notesQuery = new SavedSearch("Notes", [root], new SearchOptions("slow connections", false, false, false, Notes: true));
+            var keyNote = new KeyNote(root, "Use a fallback for slow connections.");
+            var valueNote = new KeyNote(root.Child("Branch"), "Increase for slow connections.") { ValueName = "Watched" };
+            var sharedNote = valueNote with { Location = root, MatchRule = new ValueNoteRule(RegistryValueType.DWord, 4) };
+            check(RegistrySearch.FindAll(raw, notesQuery, default, inspections: null, notes: [sharedNote]).Matches.Length == 0,
+                "A rule note yields only values that satisfy its conditions");
+            var noteMatches = RegistrySearch.FindAll(raw, notesQuery, default, inspections: null, notes: [valueNote, sharedNote, keyNote]).Matches;
+            check(noteMatches is [{ ValueName: null }, { ValueName: "Watched" }]
+                  && noteMatches[0].MatchedText == keyNote.Text && noteMatches[1].MatchedText == valueNote.Text,
+                "One notes search returns both the matching key and the matching value with their own excerpts");
+
             var scriptRoot = root.Child("Scripts");
             var values = new[]
             {

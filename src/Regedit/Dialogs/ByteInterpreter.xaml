@@ -1,0 +1,106 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.ByteInterpreter"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:shared="using:JPSoftworks.Regedit.Controls.Shared">
+    <UserControl.Resources>
+        <Style x:Key="RangeInputStyle" TargetType="NumberBox">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="SpinButtonPlacementMode" Value="Compact" />
+        </Style>
+    </UserControl.Resources>
+    <StackPanel Spacing="12">
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <NumberBox
+                x:Name="OffsetBox"
+                AutomationProperties.AutomationId="InspectorByteOffset"
+                AutomationProperties.Name="Byte offset (zero based)"
+                Header="Offset (0-based)"
+                Maximum="{x:Bind ViewModel.MaximumOffset}"
+                Minimum="0"
+                Style="{StaticResource RangeInputStyle}"
+                Value="{x:Bind ViewModel.Offset, Mode=TwoWay}" />
+            <NumberBox
+                Grid.Column="1"
+                AutomationProperties.AutomationId="InspectorByteCount"
+                Header="Byte count"
+                Maximum="{x:Bind ViewModel.MaximumLength}"
+                Minimum="0"
+                Style="{StaticResource RangeInputStyle}"
+                Value="{x:Bind ViewModel.Length, Mode=TwoWay}" />
+        </Grid>
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox
+                HorizontalAlignment="Stretch"
+                AutomationProperties.AutomationId="InspectorByteFormat"
+                Header="Format"
+                SelectedIndex="{x:Bind ViewModel.FormatIndex, Mode=TwoWay}">
+                <ComboBoxItem Content="Hexadecimal" />
+                <ComboBoxItem Content="UTF-8 (strict)" />
+                <ComboBoxItem Content="UTF-16 little-endian (strict)" />
+                <ComboBoxItem Content="UTF-16 big-endian (strict)" />
+                <ComboBoxItem Content="ASCII (strict)" />
+                <ComboBoxItem Content="Windows GUID (mixed-endian)" />
+                <ComboBoxItem Content="RFC 4122 GUID (network order)" />
+                <ComboBoxItem Content="Unix seconds (signed 64-bit, little-endian)" />
+                <ComboBoxItem Content="Unix milliseconds (signed 64-bit, little-endian)" />
+                <ComboBoxItem Content="Windows FILETIME (64-bit, little-endian)" />
+            </ComboBox>
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                AutomationProperties.AutomationId="InterpretBytes"
+                Command="{x:Bind ViewModel.InterpretCommand}"
+                Content="Interpret"
+                Style="{StaticResource AccentButtonStyle}" />
+        </Grid>
+        <Border Style="{StaticResource HexViewFrameStyle}">
+            <ScrollViewer
+                AutomationProperties.Name="Scroll raw byte columns"
+                HorizontalScrollBarVisibility="Auto"
+                HorizontalScrollMode="Enabled"
+                VerticalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Disabled">
+                <shared:HexView
+                    x:Name="BytesView"
+                    Height="180"
+                    AutomationProperties.AutomationId="InterpreterHexView"
+                    AutomationProperties.Name="Selected bytes"
+                    Bytes="{x:Bind ViewModel.Bytes}" />
+            </ScrollViewer>
+        </Border>
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox
+                MinHeight="76"
+                MaxHeight="160"
+                AcceptsReturn="True"
+                AutomationProperties.AutomationId="InspectorInterpretation"
+                AutomationProperties.LiveSetting="Polite"
+                FontFamily="Consolas"
+                Header="Result"
+                IsReadOnly="True"
+                Text="{x:Bind ViewModel.Result, Mode=OneWay}"
+                TextWrapping="Wrap" />
+            <Button
+                Grid.Column="1"
+                Margin="0,22,0,0"
+                VerticalAlignment="Top"
+                AutomationProperties.Name="Copy interpretation"
+                Click="CopyResult_Click"
+                Content="Copy" />
+        </Grid>
+    </StackPanel>
+</UserControl>

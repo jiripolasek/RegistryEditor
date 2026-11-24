@@ -12,7 +12,9 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
 {
     public string DisplayName => this.Name.Length == 0 ? "(Default)" : this.Name;
 
-    public string TypeName => this.Type switch
+    public string TypeName => FormatType(this.Type);
+
+    public static string FormatType(RegistryValueType type) => type switch
     {
         RegistryValueType.None => "REG_NONE",
         RegistryValueType.String => "REG_SZ",
@@ -26,7 +28,7 @@ public sealed record RegistryValue(string Name, RegistryValueType Type, byte[] D
         RegistryValueType.FullResourceDescriptor => "REG_FULL_RESOURCE_DESCRIPTOR",
         RegistryValueType.ResourceRequirementsList => "REG_RESOURCE_REQUIREMENTS_LIST",
         RegistryValueType.QWord => "REG_QWORD",
-        _ => $"REG_TYPE_{(uint)this.Type}"
+        _ => $"REG_TYPE_{(uint)type}"
     };
 
     public string DisplayData => this.Type switch

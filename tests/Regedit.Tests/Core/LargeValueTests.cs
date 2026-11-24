@@ -163,7 +163,23 @@ internal static class LargeValueTests
             && !numberInspector.HasText
             && numberInspector.HasNumber
             && numberInspector.Data == string.Empty,
-            "Non-text inspection preserves byte counts raw bytes and numeric controls without a partial full-text field");
+            "Non-text inspection preserves byte counts, raw bytes, and numeric controls");
+
+        var unnamedBinary = new ValueInspectorViewModel(new RegistryValue("", RegistryValueType.Binary, [0, 255, 7]));
+        var emptyBinary = new ValueInspectorViewModel(new RegistryValue("Empty", RegistryValueType.Binary, []));
+        check(
+            unnamedBinary.HasDataReadout && unnamedBinary.CanCopyData
+            && unnamedBinary.DataLabel == "Value data (hex)" && unnamedBinary.DataReadout == "00 FF 07",
+            "Binary inspection shows readable hex for an unnamed stored value");
+        check(
+            binaryInspector.HasDataReadout && binaryInspector.DataLabel == "Value data (first 32 bytes)"
+            && binaryInspector.DataReadout.ReplaceLineEndings(" ")
+                == "00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F"
+            && !numberInspector.HasDataReadout,
+            "Large binary previews retain 32 whole bytes and numeric values use their dedicated readouts");
+        check(
+            emptyBinary.HasDataReadout && emptyBinary.DataReadout == "(empty)" && !emptyBinary.CanCopyData,
+            "An empty stored binary value has a visible empty state without a copy action");
         var longName = new RegistryEntry(null, value with { Name = new string('n', 16_000) });
         check(
             longName.Name.Length == 16_000 && longName.NamePreview.Length == 257 && longName.AccessibleName.Length < 600,

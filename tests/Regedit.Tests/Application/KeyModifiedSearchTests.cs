@@ -157,6 +157,47 @@ internal static class KeyModifiedSearchTests
                   && Find(noteQuery with { KeyModified = new KeyModifiedFilter(Through: new DateOnly(1900, 1, 1)) }, notes: notes).Matches.Length == 0,
                 "A key matching both fields appears once and modification dates filter notes by their key timestamp");
 
+            registry.Write(root, new RegistryValue("ModifiedValue", RegistryValueType.DWord, [0, 0, 0, 0]), null);
+            registry.Write(child, new RegistryValue(string.Empty, RegistryValueType.Binary, []), null);
+            var rule = new KeyNote(root, "ModifiedValue needs a reboot")
+                { ValueName = "ModifiedValue", MatchRule = new ValueNoteRule(RegistryValueType.Binary, 2) };
+            var unnamed = new KeyNote(child, "Default needs a reboot") { ValueName = string.Empty };
+            var removed = unnamed with { ValueName = "Removed value" };
+            var noteSearch = new SavedSearch("Notes", [child, root, child], noteQuery);
+            var sharedHits = RegistrySearch.FindAll(registry, noteSearch, default, inspections: null, notes: [rule, unnamed, removed]).Matches;
+            check(sharedHits.Length == 3 && sharedHits.All(hit => hit.Fields == "Value note" && hit.Location == child) &&
+                  sharedHits.Any(hit => hit.ValueName == string.Empty && hit.Value is { Name.Length: 0 }) &&
+                  sharedHits.Any(hit => hit.ValueName == "ModifiedValue" && hit.MatchedText == rule.Text) &&
+                  sharedHits.Any(hit => hit.ValueName == "Removed value" && hit.Value is null && hit.MatchedText == removed.Text),
+                "Notes search deduplicates rule roots and finds inherited rules, unnamed values, and notes on deleted values");
+            var outsideRule = new KeyNote(root, "OtherValue needs a reboot") { ValueName = "OtherValue" };
+            var disjointHits = Find(noteQuery, notes: [rule with { Location = child }, outsideRule]).Matches;
+            check(disjointHits.Length == 2 && disjointHits.Any(hit => hit.Location == root && hit.ValueName == "OtherValue") &&
+                  disjointHits.Any(hit => hit.Location == child && hit.ValueName == "ModifiedValue"),
+                "Root deduplication retains exact notes outside the searched rule subtree");
+            var exact = rule with { Location = child, MatchRule = null, Text = "Exact ModifiedValue note" };
+            var combined = Find(SearchQueryText.Parse("ModifiedValue match:names,notes"),
+                notes: [rule, exact]).Matches.Where(hit => hit.Location == child).ToArray();
+            check(combined is [{ Fields: "Value name and note", MatchedText: "Exact ModifiedValue note" }],
+                "An exact note takes precedence over a matching rule and combines with the value-name result");
+            var inherited = RegistrySearch.FindAll(registry, noteSearch with { Roots = [child] }, default,
+                inspections: null, notes: [rule]).Matches;
+            check(inherited is [{ ValueName: "ModifiedValue" }] &&
+                  Find(noteQuery with { Types = [RegistryValueType.DWord] }, notes: [rule, unnamed]).Matches.Length == 0 &&
+                  Find(noteQuery with { KeyModified = new KeyModifiedFilter(Through: new DateOnly(1900, 1, 1)) },
+                      notes: [rule, unnamed]).Matches.Length == 0,
+                "Rules are inherited into an explicitly searched branch and honor type and timestamp filters");
+
+            registry.DeleteValue(child, new RegistryValue(string.Empty, RegistryValueType.Binary, []));
+            var absentRule = removed with { Location = root, MatchRule = new ValueNoteRule(null, null) };
+            var absent = Find(noteQuery with { Values = true, Data = true, KeyModified = dated.KeyModified },
+                notes: [unnamed, removed, absentRule]).Matches;
+            check(absent is [{ ValueName: "", Value: null }, { ValueName: "Removed value", Value: null }] &&
+                  absent.All(hit => hit.Fields == "Value note" && hit.KeyLastModifiedUtc is not null) &&
+                  Find(noteQuery, notes: [absentRule]).Matches.Length == 0 &&
+                  Find(noteQuery with { Types = [RegistryValueType.Binary] }, notes: [unnamed, removed]).Matches.Length == 0,
+                "Mixed search finds exact notes on unset default and missing named values, with no hits for absent rule targets");
+
             var data = new byte[256 * 1024];
             for (var index = 0; index < 8; index++)
             {

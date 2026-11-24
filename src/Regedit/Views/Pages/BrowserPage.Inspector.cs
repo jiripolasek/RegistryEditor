@@ -2,8 +2,9 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
-using CommunityToolkit.Mvvm.Input;
+using JPSoftworks.Regedit.Core.Workspaces;
 using JPSoftworks.Regedit.Dialogs;
+using JPSoftworks.Regedit.Models.Registry;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -13,15 +14,8 @@ namespace JPSoftworks.Regedit.Views.Pages;
 
 public sealed partial class BrowserPage
 {
-    private bool _isInterpretationExpanded;
-
     private void UpdateValueInspector()
     {
-        if (this.ValueInspectorContent.Content is ValueInspector previous)
-        {
-            this._isInterpretationExpanded = previous.IsInterpretationExpanded;
-        }
-
         var action = this.ViewModel.IsInspectorOpen ? "Close detail panel" : "Show detail panel";
         AutomationProperties.SetName(this.ToggleValueInspector, action);
         ToolTipService.SetToolTip(this.ToggleValueInspector, action + " (Alt+P)");
@@ -29,17 +23,12 @@ public sealed partial class BrowserPage
         if (!this.ViewModel.IsInspectorOpen)
         {
             this.ValueInspectorContent.Content = null;
-            this._isInterpretationExpanded = false;
         }
         else if (this.ViewModel.Inspector is { } inspector)
         {
-            var location = inspector.KeyLocation ?? this.ViewModel.Location;
-            this.ValueInspectorContent.Content = new ValueInspector(
-                inspector, this._window.Dialogs, location.IsComputer ? null : this._window.ViewModel.GetNote(location),
-                new RelayCommand(() => this._window.ShowNotesForKey(location)))
-            {
-                IsInterpretationExpanded = this._isInterpretationExpanded
-            };
+            var content = new ValueInspector(inspector, this._window.Dialogs);
+            this.ConfigureInspectorNotes(content);
+            this.ValueInspectorContent.Content = content;
         }
         else
         {
@@ -51,6 +40,46 @@ public sealed partial class BrowserPage
 
         this.ValueInspectorScroll.IsTabStop = this.ViewModel.Inspector is null;
         this.ArrangeValueInspector();
+    }
+
+    private KeyNote? ValueNoteTarget(RegistryEntry entry)
+    {
+        return entry.IsKey || entry.IsParent || this.ViewModel.Location.IsComputer
+            ? null
+            : new KeyNote(this.ViewModel.Location, string.Empty) { ValueName = entry.Value?.Name ?? string.Empty };
+    }
+
+    private void EntryValueNote_Click(object sender, RoutedEventArgs args)
+    {
+        if (this.ViewModel.SelectedEntries is [var entry] && this.ValueNoteTarget(entry) is { } target)
+        {
+            this._window.ShowNote(this._window.ViewModel.NoteStore.Get(target));
+        }
+    }
+
+    private void OpenNoteMarker(RegistryEntry entry)
+    {
+        if (entry.SavedNote is { } note)
+        {
+            this._window.ShowNote(this._window.ViewModel.NoteStore.Get(note));
+        }
+    }
+
+    private void ConfigureInspectorNotes(ValueInspector inspector, ContentDialog? dialog = null)
+    {
+        var location = inspector.ViewModel.KeyLocation ?? this.ViewModel.Location;
+        if (location.IsComputer || (dialog is not null && inspector.ViewModel.HasNavigationIcon))
+        {
+            return;
+        }
+
+        inspector.Notes = new InspectorNotesViewModel(
+            this._window.ViewModel.NoteStore, location, inspector.ViewModel.HasNavigationIcon,
+            inspector.ViewModel.InspectedValue, showContainingKeyNote: dialog is null, open: note =>
+            {
+                dialog?.Hide();
+                this._window.ShowNote(note);
+            });
     }
 
     private void ArrangeValueInspector()
@@ -75,9 +104,9 @@ public sealed partial class BrowserPage
         this.ArrangeValueInspector();
     }
 
-    private async Task ShowValueInspectorAsync(ValueInspectorViewModel inspector)
+    private Task ShowValueInspectorAsync(ValueInspectorViewModel inspector)
     {
-        await this._window.Dialogs.ShowAsync(new AppDialog("Value inspector", new ValueInspector(inspector), "Close", string.Empty));
+        return ValueInspector.ShowDialogAsync(inspector, this._window.Dialogs, this.ConfigureInspectorNotes);
     }
 
     private void ToggleValueInspector_Click(object sender, RoutedEventArgs args)

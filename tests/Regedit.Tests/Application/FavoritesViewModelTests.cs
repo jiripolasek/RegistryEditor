@@ -187,7 +187,7 @@ internal static class FavoritesViewModelTests
             panelBefore = panelChanges;
             tabBefore = tabChanges;
             var note = new NoteDraft(panel.CurrentLocation, string.Empty) { Text = "Edited note" };
-            using var notes = NotesStoreTests.CreateStore(settings, () => settings.Save(file));
+            using var notes = NotesStoreTests.CreateStore(settings, move => settings.Save(file, move));
             notes.Save(note);
             check(panelChanges == panelBefore && tabChanges == tabBefore, "Editing and saving a note causes zero Favorites refreshes");
             panel.Deactivate();

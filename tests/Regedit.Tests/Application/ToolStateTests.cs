@@ -244,7 +244,7 @@ internal static class ToolStateTests
                     dirtyNotifications++;
                 }
             };
-            using var notes = NotesStoreTests.CreateStore(settings, () => settings.Save(path));
+            using var notes = NotesStoreTests.CreateStore(settings, move => settings.Save(path, move));
             notes.Save(draft);
             var loaded = AppSettings.Load(path);
             check(

@@ -16,7 +16,46 @@ public sealed class NoteDraft : ObservableObject
     private string? _saveError;
     private bool _isSaving;
 
-    public RegistryLocation Location { get; }
+    private KeyNote _target;
+    private NoteDraft? _replacement;
+
+    internal NoteDraft Current
+    {
+        get
+        {
+            var draft = this;
+            while (draft._replacement is { } replacement)
+            {
+                draft = replacement;
+            }
+
+            return draft;
+        }
+    }
+
+    internal KeyNote Target
+    {
+        get => this._target;
+        set => this.SetProperty(ref this._target, value);
+    }
+
+    public RegistryLocation Location => this.Target.Location;
+
+    public string? ValueName => this.Target.ValueName;
+
+    public string Title => this.ValueName switch
+    {
+        null => this.Location.Name,
+        "" => "(Default)",
+        var name => name
+    };
+
+    public string Kind => this.Target.MatchRule is not null ? "Match rule" :
+        this.ValueName is null ? "Key note" : "Value note";
+
+    internal string RuleSummary => this.Target.MatchRule is { } rule
+        ? this.Location.Name + " and subkeys" + rule.Describe()
+        : string.Empty;
 
     public string Text
     {
@@ -67,15 +106,26 @@ public sealed class NoteDraft : ObservableObject
     }
 
     public NoteDraft(RegistryLocation location, string text)
+        : this(new KeyNote(location, text))
     {
-        this._text = text;
-        this._savedText = text;
-        this.Location = location;
+    }
+
+    internal NoteDraft(KeyNote note)
+    {
+        this._text = note.Text;
+        this._savedText = note.Text;
+        this._target = note with { Text = string.Empty };
     }
 
     public bool Matches(RegistryLocation location)
     {
-        return new KeyNote(this.Location, this.Text).Matches(location);
+        return this.Target.Matches(location);
+    }
+
+    internal void RedirectTo(NoteDraft replacement)
+    {
+        this._replacement = replacement;
+        this.OnPropertyChanged(nameof(this.Current));
     }
 
     internal void MarkSaved(string text)

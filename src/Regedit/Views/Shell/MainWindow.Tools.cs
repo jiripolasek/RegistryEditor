@@ -189,6 +189,9 @@ public sealed partial class MainWindow
         this.SidebarActions.SetCommands(view.PanelCommands);
         this.ToolSelector.SelectedItem = tool.Choice();
         this.ViewModel.SelectedTool = tool;
+        var expandLabel = tool == ToolKind.Notes ? "Open Notes organizer" : "Open tool in tab";
+        AutomationProperties.SetName(this.ExpandToolButton, expandLabel);
+        ToolTipService.SetToolTip(this.ExpandToolButton, expandLabel);
         this._returnToolFocus = false;
         this.ViewModel.IsPaneOpen = true;
         this.UpdateToolLayout();
@@ -205,10 +208,15 @@ public sealed partial class MainWindow
             return;
         }
 
+        this.ShowNote(this.ViewModel.GetNote(location));
+    }
+
+    internal void ShowNote(NoteDraft note)
+    {
         this.ShowTools(ToolKind.Notes);
         var view = (ToolView)this.ToolContent.Content;
         view.Notes!.CurrentLocation = this.ViewModel.ContextLocation;
-        view.Notes.Selected = this.ViewModel.GetNote(location);
+        view.Notes.Selected = note;
         view.RequestFocus();
     }
 
@@ -247,8 +255,8 @@ public sealed partial class MainWindow
 
         this.ShowTools(source.Tool);
         var panel = (IToolSurface)this.ToolContent.Content;
-        panel.CopyContextFrom(source);
         this.ViewModel.ShowToolInPanel(source.Tool, (source as ToolView)?.NoteLocation);
+        panel.CopyContextFrom(source);
 
         panel.RequestFocus(true);
         this._toolsTrigger = null;

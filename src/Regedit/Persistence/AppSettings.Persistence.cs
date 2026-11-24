@@ -16,6 +16,8 @@ using JPSoftworks.Regedit.Models.Settings;
 
 namespace JPSoftworks.Regedit.Persistence;
 
+internal sealed record NoteScopeMove(KeyNote Source, KeyNote? SavedSource, KeyNote Destination);
+
 public sealed partial class AppSettings
 {
     private const int RecentSearchLimit = 20;
@@ -116,7 +118,7 @@ public sealed partial class AppSettings
     }
 
     private void SaveCore(
-        string filePath, bool captureSession = false, bool replaceRestored = true, string? recentSearch = null)
+        string filePath, bool captureSession = false, bool replaceRestored = true, string? recentSearch = null, NoteScopeMove? noteMove = null)
     {
         var local = this.Capture();
         var sessions = this._sessions;
@@ -149,6 +151,13 @@ public sealed partial class AppSettings
             && !(this._preserveUnreadableFile && this._loadedContent is not null && current._loadedContent == this._loadedContent))
         {
             throw new IOException("The current settings file cannot be read. It has not been overwritten. " + current.LoadError);
+        }
+
+        if (noteMove is { } move &&
+            (current.Notes.FirstOrDefault(note => note.HasSameTarget(move.Source)) != move.SavedSource ||
+             current.Notes.Any(note => note.HasSameTarget(move.Destination))))
+        {
+            throw Conflict(nameof(Notes));
         }
 
         var latest = current.LoadError is null ? current.Capture() : this._baseline;
@@ -283,7 +292,9 @@ public sealed partial class AppSettings
                     {
                         item["Location"]!["Hive"]?.ToJsonString(), item["Location"]!["View"]?.ToJsonString(),
                         item["Location"]!["Machine"]?.GetValue<string>().ToUpperInvariant(),
-                        item["Location"]!["SubKey"]!.GetValue<string>().ToUpperInvariant()
+                        item["Location"]!["SubKey"]!.GetValue<string>().ToUpperInvariant(),
+                        item["ValueName"]?.GetValue<string>().ToUpperInvariant(),
+                        item["MatchRule"] is null ? null : "Rule"
                     }, SettingsJsonContext.Default.StringArray),
                 _ => throw Conflict(name)
             };
@@ -393,7 +404,7 @@ public sealed partial class AppSettings
                 throw new ArgumentException("A note has no text.");
             }
 
-            RegistryWorkspace.ValidateLocation(note.Location);
+            note.Validate();
         }
 
         foreach (var workspace in saved.Workspaces ?? [])

@@ -217,6 +217,12 @@
                     <FontIcon Glyph="&#xE774;" />
                 </MenuFlyoutItem.Icon>
             </MenuFlyoutItem>
+            <MenuFlyoutItem
+                x:Name="EntryValueNoteMenu"
+                AutomationProperties.AutomationId="EntryValueNote"
+                Click="EntryValueNote_Click"
+                Icon="Edit"
+                Text="Add note…" />
             <MenuFlyoutSeparator x:Name="EntryCopySeparator" />
             <MenuFlyoutItem
                 x:Name="EntryFavoriteMenu"
@@ -1315,7 +1321,7 @@
                                 <ScrollViewer
                                     x:Name="ValueInspectorScroll"
                                     Grid.Row="1"
-                                    Padding="16,16,8,16"
+                                    Padding="16"
                                     AutomationProperties.Name="Value inspector"
                                     VerticalScrollBarVisibility="Auto">
                                     <ContentControl

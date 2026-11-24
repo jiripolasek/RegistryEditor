@@ -71,6 +71,7 @@ public sealed partial class BrowserPage : Page
         this.TreePane.Initialize(viewModel, (MenuFlyout)this.Resources["RegistryTreeMenu"]);
         this.EntryList.Initialize(
             viewModel, this.Preferences, (MenuFlyout)this.Resources["RegistryEntryMenu"], (MenuFlyout)this.Resources["RegistryListMenu"]);
+        this.EntryList.NoteRequested += this.OpenNoteMarker;
         this.EntryList.RenameRejected += error =>
         {
             this.ShowError(error, "Couldn't rename the item");
@@ -272,8 +273,9 @@ public sealed partial class BrowserPage : Page
 
     public void SelectValue(string name)
     {
-        this.EntryList.SelectEntry(
-            this.ViewModel.Entries.FirstOrDefault(entry => entry.Value?.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == true));
+        this.EntryList.SelectEntry(this.ViewModel.Entries.FirstOrDefault(entry => name.Length == 0
+            ? entry.IsDefaultValue
+            : string.Equals(entry.Value?.Name, name, StringComparison.OrdinalIgnoreCase)));
     }
 
     private void RegistryViewMenu_Opening(object sender, object args)
@@ -549,6 +551,10 @@ public sealed partial class BrowserPage : Page
             = this.EntryToolsSeparator.Visibility = Visible(itemActions);
         this.EntryDeleteMenu.Visibility = Visible(!single || !entry.IsParent);
         this.EntryBinaryMenu.Visibility = this.EntryInspectMenu.Visibility = this.EntryWatchMenu.Visibility = Visible(valueActions);
+        var noteTarget = valueActions && this.ValueNoteTarget(entry) is { } target ? target : null;
+        this.EntryValueNoteMenu.Visibility = Visible(noteTarget is not null);
+        this.EntryValueNoteMenu.Text = noteTarget is not null &&
+            this._window.ViewModel.NoteStore.Find(noteTarget)?.HasContent == true ? "Edit note" : "Add note…";
         this.EntryRevealMenu.Visibility = Visible(valueActions && this.ViewModel.RevealFileCommand.CanExecute(null));
         this.EntryDuplicateMenu.Visibility = Visible(valueActions && entry.Value is not null);
         this.EntryOpenTargetMenu.Visibility = Visible(valueActions && entry.IsLink);

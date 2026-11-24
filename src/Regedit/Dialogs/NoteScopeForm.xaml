@@ -1,0 +1,49 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Dialogs.NoteScopeForm"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Style="{StaticResource DialogFieldsPanelStyle}">
+        <ComboBox
+            x:Name="ScopeInput"
+            HorizontalAlignment="Stretch"
+            AutomationProperties.AutomationId="NoteScopeChoice"
+            Header="Show on"
+            SelectedIndex="{x:Bind ViewModel.ScopeIndex, Mode=TwoWay}">
+            <ComboBoxItem Content="Values with this name in this key and its subkeys" />
+            <ComboBoxItem Content="Only the value in this key" />
+        </ComboBox>
+        <TextBox
+            AutomationProperties.AutomationId="NoteRuleBranch"
+            Header="Key or branch"
+            Text="{x:Bind ViewModel.Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <Expander
+            HorizontalAlignment="Stretch"
+            AutomationProperties.AutomationId="NoteScopeConditions"
+            Header="More conditions"
+            Visibility="{x:Bind ViewModel.IsMatching, Mode=OneWay}">
+            <StackPanel Spacing="8">
+                <ComboBox
+                    HorizontalAlignment="Stretch"
+                    AutomationProperties.AutomationId="NoteScopeType"
+                    Header="Registry type"
+                    ItemsSource="{x:Bind ViewModel.TypeLabels}"
+                    SelectedIndex="{x:Bind ViewModel.TypeIndex, Mode=TwoWay}" />
+                <TextBox
+                    AutomationProperties.AutomationId="NoteScopeByteLength"
+                    Header="Byte length"
+                    PlaceholderText="Any length"
+                    Text="{x:Bind ViewModel.ByteLength, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+        </Expander>
+        <TextBlock
+            AutomationProperties.AutomationId="NoteScopeSummary"
+            Text="{x:Bind ViewModel.Summary, Mode=OneWay}"
+            TextWrapping="Wrap" />
+        <TextBlock
+            AutomationProperties.AutomationId="NoteScopeSaveError"
+            AutomationProperties.LiveSetting="Polite"
+            Style="{StaticResource DialogErrorTextStyle}"
+            Text="{x:Bind ViewModel.Error, Mode=OneWay}"
+            Visibility="{x:Bind ViewModel.HasError, Mode=OneWay}" />
+    </StackPanel>
+</UserControl>

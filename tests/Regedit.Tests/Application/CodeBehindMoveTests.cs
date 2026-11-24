@@ -189,7 +189,8 @@ internal static class CodeBehindMoveTests
         var written = new NoteDraft(location, "Line one\nLine two");
         var blank = new NoteDraft(location.Child("Blank"), string.Empty);
         using var noteStore = NotesStoreTests.CreateStore(new AppSettings());
-        var notes = new NotesViewModel(noteStore, (_, _) => Task.CompletedTask, _ => { }, false, _ => { }, _ => Task.FromResult(false));
+        var notes = new NotesViewModel(
+            noteStore, (_, _, _) => Task.CompletedTask, (_, _) => { }, false, _ => { }, _ => Task.FromResult(false));
         var visible = notes.VisibleRows([written, blank], string.Empty).ToArray();
         check(
             visible is [{ Source: NoteDraft only, Subtitle: "Line one Line two" }] && only == written,

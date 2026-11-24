@@ -429,7 +429,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
                 var comparison = row.Source switch
                 {
                     RegistrySearchMatch match => new ToolComparison(
-                        string.Empty, row.Before, row.After, match.Value is null ? "Key" : "Value", "Match", AfterValue: match.Value),
+                        string.Empty, row.Before, row.After, match.ValueName is null ? "Key" : "Value", "Match", AfterValue: match.Value),
                     RegistryDifference difference => ToolPresentation.Compare(difference) with { Name = string.Empty },
                     _ => new ToolComparison(string.Empty, row.Before, row.After, "Details", "Contents")
                 };
@@ -456,7 +456,7 @@ public sealed partial class InvestigationPage : Page, IPanelView
             return;
         }
 
-        this.Layout.Padding = this._docked ? new Thickness(0) : new Thickness(this.Layout.ActualWidth < 760 ? 16 : 24, 24, 12, 16);
+        this.Layout.Padding = ToolPageLayout.GetPadding(this.Layout.ActualWidth, this._docked);
         var beside = this._docked || this.IsWide;
         var visible = this.Details.Visibility == Visibility.Visible;
         this.InspectorWidth.Width = visible && beside ? new GridLength(285) : new GridLength(0);
@@ -485,7 +485,6 @@ public sealed partial class InvestigationPage : Page, IPanelView
 
     private async void InspectValue(RegistryValue value)
     {
-        var dialog = new AppDialog("Value inspector", new ValueInspector(new ValueInspectorViewModel(value)), "Close", string.Empty);
-        await this._dialogs.ShowAsync(dialog);
+        await ValueInspector.ShowDialogAsync(new ValueInspectorViewModel(value), this._dialogs);
     }
 }

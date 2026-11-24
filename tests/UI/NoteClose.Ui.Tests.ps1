@@ -188,7 +188,7 @@ try {
     }
     Test-Ui 'Notes context menu deletion confirmation and Undo preserve text' {
         Start-Case 'DeleteAndUndo' $false
-        Press 'Open tool in tab'
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'NoteTitle' }
         $row = @(Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Software,*' })[0]
         if (-not $row) { throw 'The saved note row is missing.' }
@@ -268,7 +268,7 @@ try {
         Open-Menu 'Close application'
         Wait-Ui { param($items) $items.name -contains 'Unsaved notes' }
         Press 'Discard notes'
-        Wait-Ui { param($items) $items.name -contains "Can't close yet" }
+        Wait-Ui { param($items) $items.name -contains "Couldn't close the window" }
         Expect-Draft
         if ((Pick 'TabItem' 'Software').isOffscreen) { throw 'The registry tab was lost after the failed session save.' }
         Open-Menu 'Close application'

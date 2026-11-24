@@ -130,12 +130,6 @@ public sealed partial class AppSettings
     internal IReadOnlyDictionary<string, ColumnLayout> ColumnLayouts { get; set; }
         = new Dictionary<string, ColumnLayout>(StringComparer.Ordinal);
 
-    internal event Action<KeyNote>? NoteSaved;
-
-    internal void NotifyNoteSaved(KeyNote note)
-    {
-        this.NoteSaved?.Invoke(note);
-    }
 
     public bool ShowStatusBar { get; set; } = true;
 
@@ -269,7 +263,7 @@ public sealed partial class AppSettings
                     throw new JsonException("A note has no text.");
                 }
 
-                RegistryWorkspace.ValidateLocation(note.Location);
+                note.Validate();
             }
 
             settings.Workspaces = saved.Workspaces ?? [];
@@ -383,9 +377,9 @@ public sealed partial class AppSettings
         }
     }
 
-    internal void Save(string filePath)
+    internal void Save(string filePath, NoteScopeMove? noteMove = null)
     {
-        this.SaveCore(filePath);
+        this.SaveCore(filePath, noteMove: noteMove);
     }
 
     private sealed record SavedSettings(

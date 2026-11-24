@@ -5,6 +5,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using JPSoftworks.Regedit.Core.Registry;
+using JPSoftworks.Regedit.Core.Workspaces;
 
 namespace JPSoftworks.Regedit.Models.Registry;
 
@@ -67,9 +68,17 @@ public sealed record RegistryEntry(
 
     public string SizeText => this.Value?.Data.Length.ToString("N0") ?? string.Empty;
 
-    public string Note { get; private set; } = string.Empty;
+    internal KeyNote? SavedNote { get; private set; }
+
+    public string Note => this.SavedNote?.Text ?? string.Empty;
 
     public string NotePreview => Shorten(this.Note);
+
+    public bool HasNote => !this.IsParent && !string.IsNullOrWhiteSpace(this.Note);
+    public string NoteMarkerId => this.IsKey ? "KeyNoteMarker" : "ValueNoteMarker";
+    public string NoteMarkerLabel => this.IsKey ? "Open key note" : "Open value note";
+
+    public string NotePeek => Shorten(this.Note.TrimStart().Split(['\r', '\n'], 2)[0]);
 
     private string Unavailable => this.DetailsRead && this.Details is null ? "Unavailable" : string.Empty;
 
@@ -131,7 +140,6 @@ public sealed record RegistryEntry(
         this.ParentLocation = original.ParentLocation;
         this.ContainingKeyLastWriteUtc = original.ContainingKeyLastWriteUtc;
         this.SourceLocation = original.SourceLocation;
-        this.Note = string.Empty;
     }
 
     // A live row keeps its identity as its data and presentation change.
@@ -171,15 +179,17 @@ public sealed record RegistryEntry(
         }
     }
 
-    internal void SetNote(string text)
+    internal void SetNote(KeyNote? note)
     {
-        if (this.Note == text)
+        if (this.SavedNote == note)
         {
             return;
         }
 
-        this.Note = text;
+        this.SavedNote = note;
         this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(this.NotePreview)));
+        this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(this.HasNote)));
+        this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(this.NotePeek)));
     }
 
     internal void SetValue(RegistryValue? value)

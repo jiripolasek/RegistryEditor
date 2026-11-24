@@ -102,8 +102,8 @@ internal static class SettingsConcurrencyTests
             saved.Save(file);
             first = AppSettings.Load(file);
             second = AppSettings.Load(file);
-            using var firstNotes = NotesStoreTests.CreateStore(first, () => first.Save(file));
-            using var secondNotes = NotesStoreTests.CreateStore(second, () => second.Save(file));
+            using var firstNotes = NotesStoreTests.CreateStore(first, move => first.Save(file, move));
+            using var secondNotes = NotesStoreTests.CreateStore(second, move => second.Save(file, move));
             firstNotes.Save(new NoteDraft(noteLocation, "Original") { Text = "First edit" });
             var draft = new NoteDraft(noteLocation, "Original") { Text = "Second edit" };
             Reject(() => secondNotes.Save(draft), check, "Two edits to the same note produce an explicit conflict");

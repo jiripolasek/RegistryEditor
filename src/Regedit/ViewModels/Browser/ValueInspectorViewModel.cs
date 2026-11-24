@@ -14,10 +14,16 @@ namespace JPSoftworks.Regedit.ViewModels.Browser;
 
 internal sealed partial class ValueInspectorViewModel : ObservableObject
 {
+    private const int HexPreviewByteLimit = 32;
     private readonly RegistryEntry _entry;
 
-    public string Heading => this._entry.Value is { } value ? $"{value.TypeName} · {value.Data.Length:N0} bytes" :
-        this._entry.IsDefaultPlaceholder ? "REG_SZ · Value not set" : this._entry.Type;
+    public string TypeText => this._entry.Type;
+    public string SizeText => this._entry.Value is { } value ? $"{value.Data.Length:N0} bytes" : string.Empty;
+
+    public string Heading => this.HasStoredValue ? $"{this.TypeText} · {this.SizeText}" :
+        this._entry.IsDefaultPlaceholder ? $"{this.TypeText} · Value not set" : this.TypeText;
+
+    internal RegistryValue? InspectedValue => this._entry.Value;
 
     public string Name => this._entry.Name;
 
@@ -49,7 +55,15 @@ internal sealed partial class ValueInspectorViewModel : ObservableObject
 
     public string LinkTargetPath => this.LinkLocation is { } target ? RegistryLink.DisplayPath(target) : this.Data;
 
-    public string DataLabel => this.IsLink ? "Stored target path" : "Value data (full contents)";
+    private bool HasHexPreview => this.HasStoredValue && !this.HasText && !this.HasNumber;
+
+    public bool HasDataReadout => this.HasText || this.HasHexPreview;
+    public bool CanCopyData => this.HasText || (this.HasHexPreview && this.Bytes.Length > 0);
+    public string DataLabel => this.IsLink ? "Stored target path" :
+        !this.HasHexPreview ? "Value data (full contents)" :
+        this.Bytes.Length > HexPreviewByteLimit ? $"Value data (first {HexPreviewByteLimit} bytes)" :
+        "Value data (hex)";
+    public string CopyDataLabel => this.HasHexPreview ? "Copy hex preview" : "Copy value data (full contents)";
 
     public IAsyncRelayCommand? OpenTargetCommand { get; }
 
@@ -75,6 +89,7 @@ internal sealed partial class ValueInspectorViewModel : ObservableObject
     public string IconFontFamily => this._entry.IconFontFamily;
 
     public string Data { get; }
+    public string DataReadout { get; }
 
     public IAsyncRelayCommand? RevealFileCommand { get; }
 
@@ -119,7 +134,11 @@ internal sealed partial class ValueInspectorViewModel : ObservableObject
         this.RevealFileCommand = revealFileCommand;
         this.Data = this.HasText ? data ?? entry.Data : string.Empty;
         this.Number = entry.Value is { } value ? RegistryValueInspector.Number(value) : null;
-        this.Length = Math.Min(16, this.Bytes.Length);
+        var bytes = this.Bytes;
+        this.DataReadout = !this.HasHexPreview ? this.Data :
+            bytes.Length == 0 ? "(empty)" :
+            RegistryValueEditorViewModel.FormatHex(bytes.AsSpan(0, Math.Min(HexPreviewByteLimit, bytes.Length)));
+        this.Length = Math.Min(16, bytes.Length);
         this.LinkLocation = entry.LinkLocation;
         this.OpenTargetCommand = openTargetCommand;
         this.TargetStatus = this.LinkLocation is null ? "Invalid target path" : "Not checked";
