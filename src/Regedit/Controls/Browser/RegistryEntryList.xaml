@@ -153,6 +153,9 @@
                     <ResourceDictionary x:Key="Light">
                         <StaticResource x:Key="ListViewItemPlaceholderBackground" ResourceKey="SubtleFillColorSecondaryBrush" />
                     </ResourceDictionary>
+                    <ResourceDictionary x:Key="Dark">
+                        <StaticResource x:Key="ListViewItemPlaceholderBackground" ResourceKey="SubtleFillColorSecondaryBrush" />
+                    </ResourceDictionary>
                 </ResourceDictionary.ThemeDictionaries>
             </ResourceDictionary>
         </Grid.Resources>
