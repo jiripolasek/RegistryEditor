@@ -23,7 +23,7 @@ internal static class MainWindowViewModelTests
         var shell = new MainWindowViewModel(
             settings, new InvestigationStore(settings, () => { }), registry, location => new BrowserViewModel(registry, location),
             NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(settings, () => throw new IOException("Test note save failure")));
+            NotesStoreTests.CreateStore(settings, _ => throw new IOException("Test note save failure")));
         shell.Initialize(null);
         var first = (BrowserTab)shell.Tabs[0];
         var second = (BrowserTab)shell.Tabs[1];
@@ -159,7 +159,7 @@ internal static class MainWindowViewModelTests
         var tabShell = new MainWindowViewModel(
             tabSettings, new InvestigationStore(tabSettings, () => { }), registry, location => new BrowserViewModel(registry, location),
             NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(tabSettings, () => throw new IOException("Test note save failure")));
+            NotesStoreTests.CreateStore(tabSettings, _ => throw new IOException("Test note save failure")));
         var source = tabShell.OpenBrowser(RegistryLocation.Parse(@"\\server\HKLM\Software", RegistryView.Registry32));
         tabShell.OpenSettingsCommand.Execute(null);
         var tail = tabShell.OpenBrowser(RegistryLocation.Parse("HKCU"));

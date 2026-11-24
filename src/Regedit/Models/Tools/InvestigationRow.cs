@@ -13,11 +13,21 @@ namespace JPSoftworks.Regedit.Models.Tools;
 
 public sealed class InvestigationRow
 {
+    private const string MissingValueText = "Value missing";
+
     private string? _before;
 
     private string? _tableSummary;
 
     public string Kind { get; }
+
+    internal IReadOnlyList<int>? NoteTitleMatches { get; private init; }
+
+    internal IReadOnlyList<int>? NotePathMatches { get; private init; }
+
+    internal IReadOnlyList<int>? NoteTextMatches { get; private init; }
+
+    public bool HasNoteSummary => this.Source is NoteDraft;
 
     public string Title { get; }
 
@@ -61,9 +71,13 @@ public sealed class InvestigationRow
         _ => this.Time
     };
 
-    public string Before => this._before ??= this.Source is RegistrySearchMatch match
-        ? Detail(match.Value, "Key name: " + match.Location.Name)
-        : string.Empty;
+    public string Before => this._before ??= this.Source switch
+    {
+        RegistrySearchMatch { Value: { } value } => Detail(value),
+        RegistrySearchMatch { ValueName: null } match => "Key name: " + match.Location.Name,
+        RegistrySearchMatch => this.TableSummary,
+        _ => string.Empty
+    };
 
     public string After { get; }
 
@@ -84,7 +98,8 @@ public sealed class InvestigationRow
     public string TableSummary => this._tableSummary ??= Shorten(
         (this.Source switch
         {
-            RegistrySearchMatch match => match.Value?.DisplayPreview ?? "Key",
+            RegistrySearchMatch match => match.Value?.DisplayPreview ??
+                (match.ValueName switch { null => "Key", "" => "(value not set)", _ => MissingValueText }),
             JournalEntry entry => JournalSummary(entry),
             WatchObservation observation => WatchSummary(observation),
             _ => this.Subtitle
@@ -105,12 +120,12 @@ public sealed class InvestigationRow
     public bool HasDataIcon => this.MatchEntry?.HasDataIcon == true;
 
     public string Glyph => this.MatchEntry is { } match ? match.Glyph :
-        this.Source is JournalEntry entry ? ToolPresentation.JournalGlyph(entry.OperationKind) : ToolPresentation.Glyph(this.Kind);
+        this.Source is JournalEntry entry ? ToolPresentation.JournalGlyph(entry.OperationKind) :
+        ToolPresentation.Glyph(this.HasNoteSummary ? "Note" : this.Kind);
 
-    public string IconFontFamily => this.MatchEntry?.IconFontFamily
-                                    ?? (this.Kind is "Note" or "Notes"
-                                        ? ToolPresentation.FluentSystemIconsFontFamily
-                                        : "Segoe Fluent Icons, Segoe MDL2 Assets");
+    public string IconFontFamily => this.MatchEntry?.IconFontFamily ?? (this.HasNoteSummary
+        ? ToolPresentation.FluentSystemIconsFontFamily
+        : "Segoe Fluent Icons, Segoe MDL2 Assets");
 
     public string IconStyleKey => this.Source is JournalEntry entry ? ToolPresentation.JournalIconStyleKey(entry) : "ToolIconStyle";
 
@@ -132,6 +147,7 @@ public sealed class InvestigationRow
                                         + WatchSummary(observation)
                                         + ", "
                                         + this.Status,
+        NoteDraft => $"{this.Title}, {this.Kind}, {this.Path}, {this.Status}",
         _ => $"{this.Title}, {this.Path}, {this.Status}"
     };
 
@@ -154,7 +170,11 @@ public sealed class InvestigationRow
         this.After = source is RegistrySearchMatch ? Shorten(after, 512) : after;
         this.Source = source;
         this.MatchEntry = source is RegistrySearchMatch match
-            ? new RegistryEntry(match.Value is null ? match.Location : null, match.Value) { SourceLocation = match.Location }
+            ? new RegistryEntry(match.ValueName is null ? match.Location : null, match.Value)
+            {
+                SourceLocation = match.Location,
+                IsDefaultPlaceholder = match is { ValueName: "", Value: null }
+            }
             : null;
         this.Time = time;
         this.Status = status ?? subtitle;
@@ -162,7 +182,9 @@ public sealed class InvestigationRow
 
     internal InvestigationRow(RegistrySearchMatch match)
         : this(
-            match.Value?.TypeName ?? "Key", match.Value?.DisplayName ?? match.Location.Name, match.Location.Address,
+            match.Value?.TypeName ?? (match.ValueName switch { null => "Key", "" => "Value", _ => MissingValueText }),
+            match.ValueName switch { null => match.Location.Name, "" => "(Default)", var name => name },
+            match.Location.Address,
             (match.KeyLastModifiedUtc is { } modified ? $"Key last modified {modified.ToLocalTime():G} · " : string.Empty)
             + match.Fields + " · " + match.MatchedText, null, match.MatchedText, match)
     {
@@ -197,12 +219,30 @@ public sealed class InvestigationRow
             observation, observation.Time.ToLocalTime().ToString("t"));
     }
 
-    internal static InvestigationRow Note(NoteDraft note)
+    internal static InvestigationRow Note(
+        NoteDraft note,
+        IReadOnlyList<int>? titleMatches = null,
+        IReadOnlyList<int>? pathMatches = null,
+        IReadOnlyList<int>? textMatches = null)
     {
+        var text = note.Text.ReplaceLineEndings(" ");
+        var start = textMatches is { Count: > 0 } ? Math.Max(0, textMatches[0] - 32) : 0;
+        if (start > 0 && char.IsLowSurrogate(text[start]))
+        {
+            start--;
+        }
+
+        var prefix = start == 0 ? string.Empty : "…";
         return new InvestigationRow(
-            "Note", note.Location.Name, ToolPresentation.Address(note.Location), Shorten(note.Text.ReplaceLineEndings(" "), 256),
-            string.Empty, string.Empty, note, note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved" : string.Empty,
-            note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved changes" : "Saved");
+            note.Kind, note.Title, ToolPresentation.Address(note.Location),
+            prefix + Shorten(text[start..], 256), string.Empty, string.Empty, note,
+            note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved" : string.Empty,
+            note.SaveError is not null ? "Couldn’t save" : note.IsDirty ? "Unsaved changes" : "Saved")
+        {
+            NoteTitleMatches = titleMatches,
+            NotePathMatches = pathMatches,
+            NoteTextMatches = textMatches?.Select(position => position - start + prefix.Length).ToArray()
+        };
     }
 
     public static string Detail(RegistryValue? value, string fallback = "Absent")

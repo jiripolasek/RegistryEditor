@@ -100,7 +100,7 @@ internal static class ToolPageDesignTests
             "Refreshing a filtered named collection restores its current row and selection");
 
         var notes = new NotesViewModel(
-            NotesStoreTests.CreateStore(new AppSettings()), (_, _) => Task.CompletedTask, _ => { }, false, _ => { },
+            NotesStoreTests.CreateStore(new AppSettings()), (_, _, _) => Task.CompletedTask, (_, _) => { }, false, _ => { },
             _ => Task.FromResult(true));
         notes.CurrentLocation = branch.Location;
         check(notes.Selected is null, "A dedicated Notes page does not select an invisible browser location");

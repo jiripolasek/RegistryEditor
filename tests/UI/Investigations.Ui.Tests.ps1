@@ -398,7 +398,7 @@ function Open-Menu([string] $Name, [string] $Group, [switch] $MainTab) {
     $item = @($popup.Items | Where-Object name -eq $Name)[0]
     Ui @('invoke', $item.selector) -Window $popup.Window | Out-Null
     if ($MainTab) {
-        if ($Name -in 'Favorites', 'Notes') { Press 'Open tool in tab' }
+        if ($Name -in 'Favorites', 'Notes') { Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null }
         else { Press 'Open panel tab in main tab' }
     }
 }
@@ -640,14 +640,13 @@ function Expect-HistoryLocation([string] $Target) {
     Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' }).Count -eq 1 }
     $input = Pick 'Edit' 'Address'
     if ($input.value -ne $Target) { throw "Navigation reached '$($input.value)' instead of '$Target'." }
-    Ui @('send-keys', 'esc', '--via', 'send-input', '--target', $input.selector) | Out-Null
+    Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
 }
 function Go-ToKey([string] $Path) {
     Set-TestWindowForeground
     Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
-    Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' }).Count -eq 1 }
-    $input = Pick 'Edit' 'Address'
-    Ui @('set-value', $input.selector, $Path) | Out-Null
+    Wait-Ui { param($items) $items.automationId -contains 'OmniboxInput' }
+    Ui @('set-value', 'OmniboxInput', $Path) | Out-Null
     Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
     Wait-Ui { param($items) @($items | Where-Object automationId -match '^Breadcrumb\d+$')[-1].name -eq ($Path -split '\\')[-1] }
 }
@@ -885,7 +884,7 @@ try {
         $row = Select-Row 'Counter'
         Ui @('send-keys', 'ctrl+i', '--via', 'send-input', '--target', $row.selector) | Out-Null
         if (@(Read-Ui | Where-Object automationId -eq 'PrimaryButton').Count) { throw 'Inspect opened a dialog while the panel was visible.' }
-        if (@(Read-Ui | Where-Object automationId -eq 'ValueHexView').Count) { throw 'The narrow inspector still displays clipped raw-byte columns.' }
+        if (@(Read-Ui | Where-Object automationId -eq 'ValueHexView').Count) { throw 'The Inspector displays a raw hex view inline.' }
         Ui @('invoke', 'OpenRawBytes', '--action', 'invoke') | Out-Null
         $timer = [Diagnostics.Stopwatch]::StartNew()
         do {
@@ -929,7 +928,8 @@ try {
         Wait-Ui { param($items) $items.automationId -contains 'ToolDetailsResize' }
         $splitter = @(Read-Ui | Where-Object automationId -eq 'ToolDetailsResize')[0]
         Ui @('drag', 'ToolDetailsResize', ('{0},{1}' -f [int]($splitter.x - 500), [int]($splitter.y + $splitter.height / 2))) | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'ValueHexView' -and $items.automationId -notcontains 'OpenRawBytes' }
+        Wait-Ui { param($items) $items.automationId -contains 'OpenRawBytes' -and $items.automationId -contains 'OpenByteInterpreter' -and
+            $items.automationId -notcontains 'ValueHexView' }
         [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 900, 900, 0x16) | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'ToolDetailsResize' -and $_.width -gt $_.height }).Count -eq 1 }
         Wait-Ui { param($items) $items.automationId -contains 'CloseValueInspector' -and @($items | Where-Object { $_.type -eq 'Text' -and $_.name -eq 'Value inspector' }).Count -eq 1 }
@@ -1086,10 +1086,12 @@ try {
         Browser
         [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1380, 900, 0x16) | Out-Null
         $row = Select-Row '(Default)'
-        Ui @('send-keys', 'alt+p', '--via', 'send-input', '--target', $row.selector) | Out-Null
+        if ((Read-Ui).automationId -notcontains 'ToolDetailsResize') {
+            Ui @('send-keys', 'alt+p', '--via', 'send-input', '--target', $row.selector) | Out-Null
+        }
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'ValueNameHeading' -and $_.value -eq '(Default)' }).Count -eq 1 }
         if ((Pick 'Edit' 'Value data (full contents)').value -ne '(value not set)') { throw 'The unset default does not have an explicit preview.' }
-        if (@(Read-Ui | Where-Object automationId -in @('ToggleByteInterpretation', 'InterpretBytes', 'OpenRawBytes', 'ValueHexView')).Count) { throw 'An unset default exposes stored-byte controls.' }
+        if (@(Read-Ui | Where-Object automationId -in @('OpenByteInterpreter', 'InterpretBytes', 'OpenRawBytes', 'ValueHexView')).Count) { throw 'An unset default exposes stored-byte controls.' }
         Ui @('hover', 'ValueNameHeading') | Out-Null
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'inspector-unset-default.png')) | Out-Null
         View-Option 'Show keys in list'
@@ -1098,7 +1100,7 @@ try {
         Ui @('invoke', $child[0].selector, '--action', 'select') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorKeyPath' -and $_.value -eq "$address\Child" }).Count -eq 1 }
         if ((Pick 'Edit' 'Key name').value -ne 'Child') { throw 'The key preview shows a different selection.' }
-        if (@(Read-Ui | Where-Object automationId -in @('FullValueData', 'ToggleByteInterpretation', 'InterpretBytes', 'OpenRawBytes', 'ValueHexView')).Count) { throw 'A key exposes value-data controls.' }
+        if (@(Read-Ui | Where-Object automationId -in @('FullValueData', 'OpenByteInterpreter', 'InterpretBytes', 'OpenRawBytes', 'ValueHexView')).Count) { throw 'A key exposes value-data controls.' }
         Set-Clipboard -Value 'Key preview path sentinel'
         Press 'Copy key path'
         Assert-Clipboard "$address\Child" 'inspector-key-path-copy' 'Key preview path sentinel'
@@ -1108,13 +1110,13 @@ try {
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorKeyPath' -and $_.value -eq "$address\Child" }).Count -eq 1 }
         Go-ToKey $address
         Select-Row 'Counter' | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'ToggleByteInterpretation' }
+        Wait-Ui { param($items) $items.automationId -contains 'OpenByteInterpreter' }
         if (@(Read-Ui | Where-Object automationId -eq 'InspectorKeyPath').Count) { throw 'Returning to a value left stale key details.' }
         Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
         View-Option 'Show keys in list'
     }
 
-    Test-Ui 'Parent key inspector renders the parent arrow above its heading and destination path' {
+    Test-Ui 'Parent key inspector shows the parent heading and destination path' {
         Browser
         $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$mainWindow)
         $windowPattern = [System.Windows.Automation.WindowPattern]$root.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
@@ -1129,7 +1131,7 @@ try {
         Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorKeyPath' -and $_.value -eq 'HKEY_CURRENT_USER\Software' }).Count -eq 1 }
         if ((Pick 'Edit' 'Key name').value -ne '..') { throw 'The parent preview lost its navigation heading.' }
-        if (@(Read-Ui | Where-Object automationId -in @('FullValueData', 'ToggleByteInterpretation', 'InterpretBytes', 'OpenRawBytes', 'ValueHexView')).Count) { throw 'A parent key exposes value-data controls.' }
+        if (@(Read-Ui | Where-Object automationId -in @('FullValueData', 'OpenByteInterpreter', 'InterpretBytes', 'OpenRawBytes', 'ValueHexView')).Count) { throw 'A parent key exposes value-data controls.' }
         Ui @('hover', 'ValueNameHeading') | Out-Null
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'inspector-parent-key.png')) | Out-Null
         Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
@@ -1137,73 +1139,106 @@ try {
         View-Option 'Show keys in list'
     }
 
-    Test-Ui 'Inspector key note indicator follows shared note edits and opens its editor' {
+    Test-Ui 'Inspector displays the containing key note and opens its editor' {
         Browser
         [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1380, 900, 0x16) | Out-Null
         $row = Select-Row 'Counter'
+        if ((Read-Ui).automationId -contains 'ValueInspectorScroll') {
+            Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
+        }
         Ui @('send-keys', 'ctrl+i', '--via', 'send-input', '--target', $row.selector) | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
-        if (@(Read-Ui | Where-Object automationId -eq 'InspectorKeyNote').Count) { throw 'A value dialog without key context displays a note indicator.' }
+        if (@(Read-Ui | Where-Object automationId -eq 'EditKeyNote').Count) { throw 'A value dialog without key context displays a note indicator.' }
         Primary
         Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
         $row = Select-Row 'Counter'
         Ui @('send-keys', 'alt+p', '--via', 'send-input', '--target', $row.selector) | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'ValueNameHeading' }
-        if (@(Read-Ui | Where-Object automationId -eq 'InspectorKeyNote').Count) { throw 'An empty key note displays an indicator.' }
+        if (@(Read-Ui | Where-Object automationId -eq 'EditKeyNote').Count) { throw 'An empty key note displays an indicator.' }
         Press 'Notes for this key'
         Wait-Ui { param($items) $items.automationId -contains 'NoteEditor' }
         Fill 'Local note' 'Inspector key note fixture'
         Press 'Close tool panel'
-        Wait-Ui { param($items) $items.automationId -contains 'InspectorKeyNote' }
+        Wait-Ui { param($items) $items.automationId -contains 'EditKeyNote' }
         Select-Row 'NeedleOne' | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'InspectorKeyNote' -and $items.automationId -contains 'FullValueData' }
+        Wait-Ui {
+            param($items)
+            $items.name -contains 'Key note' -and $items.name -contains 'Inspector key note fixture' -and
+                $items.automationId -contains 'EditKeyNote' -and $items.automationId -contains 'FullValueData'
+        }
         Ui @('hover', 'ValueNameHeading') | Out-Null
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-key-note.png')) | Out-Null
-        Ui @('invoke', 'InspectorKeyNote', '--action', 'invoke') | Out-Null
+        Ui @('invoke', 'EditKeyNote', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Inspector key note fixture' }).Count -eq 1 }
         Fill 'Local note' ' '
         Press 'Close tool panel'
-        Wait-Ui { param($items) $items.automationId -notcontains 'InspectorKeyNote' }
+        Wait-Ui { param($items) $items.automationId -notcontains 'EditKeyNote' }
         Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) $items.automationId -notcontains 'ToolDetailsResize' }
     }
 
-    Test-Ui 'Byte interpretation controls decode copy and validate a selected range' {
+    Test-Ui 'Byte tools open owned dialogs and return to the inspector' {
+        function Wait-ByteToolWindow([string]$hexView) {
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+            do {
+                $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+                $window = $windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -eq 'Registry Editor' } |
+                    Select-Object -First 1
+                if ($window) { break }
+                Start-Sleep -Milliseconds 100
+            } while ($timer.Elapsed.TotalSeconds -lt 15)
+            if (-not $window) { throw 'The byte tool did not open as a separate window.' }
+            $hwnd = [long]$window.hwnd
+            if (-not [UxTestWindow]::IsOwnedBy($hwnd, $mainWindow) -or [UxTestWindow]::IsWindowEnabled($mainWindow)) {
+                throw 'The byte tool window is not modal to the editor.'
+            }
+            Wait-Ui { param($items) $items.automationId -contains $hexView } -Window $hwnd
+            $hwnd
+        }
+
         Browser
         [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1380, 900, 0x16) | Out-Null
-        $row = Select-Row 'Bytes'
-        Ui @('send-keys', 'alt+p', '--via', 'send-input', '--target', $row.selector) | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'ToggleByteInterpretation' }
-        if (@(Read-Ui | Where-Object automationId -in @('InspectorByteOffset', 'InspectorByteCount', 'InspectorByteFormat', 'InterpretBytes', 'InspectorInterpretation')).Count) { throw 'Byte interpretation is expanded by default.' }
-        $disclosure = @(Read-Ui | Where-Object automationId -eq 'ToggleByteInterpretation')[0]
-        $heading = @(Read-Ui | Where-Object automationId -eq 'ValueNameHeading')[0]
-        if ([math]::Abs($disclosure.x - $heading.x) -gt 1 -or $disclosure.width -ge $heading.width) { throw 'The byte disclosure is inset or spans the inspector width.' }
-        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-collapsed.png')) | Out-Null
-        Ui @('focus', 'ToggleByteInterpretation') | Out-Null
-        Ui @('send-keys', 'space', '--via', 'send-input') | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'InspectorByteOffset' -and $items.name -contains 'Hide byte interpretation' }
-        Ui @('set-value', 'InspectorByteOffset', '1') | Out-Null
-        Ui @('set-value', 'InspectorByteCount', '4') | Out-Null
-        Ui @('invoke', 'InterpretBytes', '--action', 'invoke') | Out-Null
-        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorInterpretation' -and $_.value -eq '01020304' }).Count -eq 1 }
-        Set-Clipboard -Value 'Interpretation copy sentinel'
-        Press 'Copy interpretation'
-        Assert-Clipboard '01020304' 'inspector-range-copy' 'Interpretation copy sentinel'
-        Ui @('hover', 'ValueNameHeading') | Out-Null
-        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-interpretation.png')) | Out-Null
-        Ui @('send-keys', 'end', '--via', 'send-input', '--target', 'InspectorByteFormat') | Out-Null
-        Ui @('invoke', 'InterpretBytes', '--action', 'invoke') | Out-Null
-        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorInterpretation' -and $_.value -eq 'This timestamp format requires exactly 8 bytes.' }).Count -eq 1 }
-        Select-Row 'Counter' | Out-Null
-        Wait-Ui { param($items) $items.automationId -contains 'InspectorByteOffset' -and @($items | Where-Object { $_.automationId -eq 'ValueNameHeading' -and $_.value -eq 'Counter' }).Count -eq 1 }
-        Ui @('focus', 'ToggleByteInterpretation') | Out-Null
-        Ui @('send-keys', 'space', '--via', 'send-input') | Out-Null
-        Wait-Ui { param($items) $items.automationId -notcontains 'InspectorByteOffset' -and $items.name -contains 'Show byte interpretation' }
         Select-Row 'Bytes' | Out-Null
-        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'ValueNameHeading' -and $_.value -eq 'Bytes' }).Count -eq 1 }
-        if (@(Read-Ui | Where-Object automationId -eq 'InspectorByteOffset').Count) { throw 'Changing selection reopened collapsed byte interpretation.' }
+        if ((Read-Ui).name -contains 'Show detail panel') { Press 'Show detail panel' }
+        Wait-Ui { param($items) $items.automationId -contains 'OpenByteInterpreter' }
+        if (@(Read-Ui | Where-Object automationId -in @('InspectorByteOffset', 'InspectorByteFormat', 'InspectorInterpretation')).Count) {
+            throw 'The Inspector exposes the interpretation form inline.'
+        }
+        Ui @('focus', 'OpenByteInterpreter') | Out-Null
+        Ui @('send-keys', 'space', '--via', 'send-input') | Out-Null
+        $dialogWindow = Wait-ByteToolWindow 'InterpreterHexView'
+        Ui @('set-value', 'InspectorByteOffset', '1') -Window $dialogWindow | Out-Null
+        Ui @('set-value', 'InspectorByteCount', '4') -Window $dialogWindow | Out-Null
+        Ui @('invoke', 'InterpretBytes', '--action', 'invoke') -Window $dialogWindow | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorInterpretation' -and $_.value -eq '01020304' }).Count -eq 1 } -Window $dialogWindow
+        Set-Clipboard -Value 'Interpretation copy sentinel'
+        Ui @('invoke', (Pick 'Button' 'Copy interpretation' -Window $dialogWindow).selector, '--action', 'invoke') -Window $dialogWindow | Out-Null
+        Assert-Clipboard '01020304' 'inspector-range-copy' 'Interpretation copy sentinel'
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-inspector-interpretation.png')) -Window $dialogWindow | Out-Null
+
+        Ui @('send-keys', 'end', '--via', 'send-input', '--target', 'InspectorByteFormat') -Window $dialogWindow | Out-Null
+        Ui @('invoke', 'InterpretBytes', '--action', 'invoke') -Window $dialogWindow | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorInterpretation' -and
+            $_.value -eq 'This timestamp format requires exactly 8 bytes.' }).Count -eq 1 } -Window $dialogWindow
+        Ui @('send-keys', 'esc', '--via', 'send-input', '--target', 'CloseButton') -Window $dialogWindow | Out-Null
+        Wait-Ui { [UxTestWindow]::IsWindowEnabled($mainWindow) -and [UxTestWindow]::GetForegroundWindow() -eq $mainWindow }
         Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) $items.automationId -notcontains 'ToolDetailsResize' }
+
+        $row = Select-Row 'Counter'
+        Ui @('send-keys', 'ctrl+i', '--via', 'send-input', '--target', $row.selector) | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and $items.automationId -contains 'OpenRawBytes' }
+        Ui @('invoke', 'OpenRawBytes', '--action', 'invoke') | Out-Null
+        $rawWindow = Wait-ByteToolWindow 'ExpandedValueHexView'
+        Ui @('invoke', 'CloseButton', '--action', 'invoke') -Window $rawWindow | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and $items.automationId -contains 'OpenByteInterpreter' }
+        Ui @('invoke', 'OpenByteInterpreter', '--action', 'invoke') | Out-Null
+        $dialogWindow = Wait-ByteToolWindow 'InterpreterHexView'
+        Ui @('invoke', 'CloseButton', '--action', 'invoke') -Window $dialogWindow | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and
+            @($items | Where-Object { $_.automationId -eq 'ValueNameHeading' -and $_.value -eq 'Counter' }).Count -eq 1 }
+        Primary
+        Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
     }
 
     Test-Ui 'Preview splitters follow the pointer without accumulating drag overshoot' {
@@ -1788,8 +1823,18 @@ try {
             $counter = @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Counter,*' })[0]
             $text = @(Elements $child.children | Where-Object type -eq 'Text').name
             $text -contains 'Metadata column fixture' -and @($text -match '\d{1,2}:\d{2}').Count -gt 0 -and
-                @(Elements $counter.children | Where-Object type -eq 'Text').name -contains '4'
+                @(Elements $counter.children | Where-Object type -eq 'Text').name -contains '4' -and
+                @(Elements $child.children | Where-Object { $_.automationId -eq 'KeyNoteMarker' -and $_.name -eq 'Open key note' }).Count -eq 1
         } -All
+        $child = @(Read-Ui -All | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Child, Key,*' })[0]
+        $marker = @(Elements $child.children | Where-Object automationId -eq 'KeyNoteMarker')[0]
+        Ui @('invoke', $marker.selector, '--action', 'invoke') | Out-Null
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Metadata column fixture' }).Count -eq 1 -and
+                @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Child, Key,*' }).Count -eq 1
+        }
+        Press 'Close tool panel'
         Go-ToKey 'HKEY_LOCAL_MACHINE\SYSTEM'
         Wait-Ui {
             param($items)
@@ -3178,11 +3223,7 @@ try {
 
     Test-Ui 'History menus shortcuts and mouse buttons share active-tab navigation' {
         Browser
-        Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
-        Wait-Ui { param($items) $items.name -contains 'Address' }
-        $input = Pick 'Edit' 'Address'
-        Ui @('set-value', $input.selector, ($address + '\Child')) | Out-Null
-        Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $input.selector) | Out-Null
+        Go-ToKey ($address + '\Child')
         Expect-HistoryLocation ($address + '\Child')
         Press 'Up'; Expect-HistoryLocation $address
 
@@ -3212,7 +3253,8 @@ try {
         Expect-HistoryLocation $address
         if ((Pick 'Button' 'Forward').isEnabled) { throw 'Mouse navigation changed history behind a dialog.' }
 
-        Tool-Option 'Right sidebar'; Press 'Open tool in tab'
+        Tool-Option 'Right sidebar'
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
         Wait-Ui { param($items) $items.automationId -contains 'ShowInPanelButton' }
         Ui @('click', (Pick 'Edit' 'Search tool items').selector) | Out-Null
         [UxTestWindow]::NavigationClick(1)
@@ -3967,8 +4009,8 @@ try {
 
         Press 'Advanced search'
         if ((Pick 'Edit' 'Find what').value -ne 'Driver timeout') { throw 'The typed note selector remained in the search text.' }
-        $notesState = Ui @('get-property', 'SearchKeyNotes', '--property', 'ToggleState', '--json') | ConvertFrom-Json
-        if ([string]$notesState.properties.ToggleState -notmatch '^(?:ToggleState_)?On$|^1$') { throw 'The typed query did not check Key notes.' }
+        $notesState = Ui @('get-property', 'SearchNotes', '--property', 'ToggleState', '--json') | ConvertFrom-Json
+        if ([string]$notesState.properties.ToggleState -notmatch '^(?:ToggleState_)?On$|^1$') { throw 'The typed query did not check Notes.' }
         Primary
         Open-NoteMatches
         Press 'Copy query' -CommandBarId 'ItemCommands'
@@ -6208,7 +6250,9 @@ try {
             foreach ($name in 'New note…','Show details','Hide details','List view') {
                 if ($items.name -contains $name) { throw "Page-only action '$name' leaked into the Notes sidebar." }
             }
-            if ($items.automationId -contains 'InspectDetails') { throw 'The sidebar exposes a preview toggle for its own editor.' }
+            if (@($items | Where-Object automationId -in @('InspectDetails','NotesEdit','NotesOpen','NotesCopy')).Count) {
+                throw 'The sidebar exposes collection-page commands.'
+            }
             $editor = @($items | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Local note' })[0]
             $selector = @($items | Where-Object automationId -eq 'ToolSelector')[0]
             if ($editor.x -gt $selector.x + 8) { throw 'Inspector padding leaves a redundant gutter in the Notes sidebar.' }
@@ -6218,18 +6262,95 @@ try {
         Fill 'Local note' 'Contextual sidebar note'
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteStatus' -and $_.name -eq 'Saved' }).Count -eq 1 }
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'contextual-notes-sidebar.png')) | Out-Null
-        Press 'Open tool in tab'
-        Wait-Ui { param($items) $items.name -contains 'New note…' -and $items.automationId -contains 'InspectDetails' }
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
+        Wait-Ui {
+            param($items)
+            $items.name -contains 'New note…' -and $items.automationId -contains 'InspectDetails' -and
+                @($items | Where-Object { $_.automationId -in @('NotesEdit','NotesOpen','NotesCopy') -and $_.isEnabled }).Count -eq 3
+        }
+        if (@(Read-Ui | Where-Object automationId -eq 'NotesCurrentKeyFilter').Count) {
+            throw 'The detached organizer still shows a current-key filter.'
+        }
+        Set-Preview $false
+        Fill 'Search tool items' 'no matching note here'
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.automationId -in 'InspectDetails','NotesEdit','NotesOpen','NotesCopy' -and -not $_.isEnabled }).Count -eq 4
+        }
+        $bar = (Read-Ui | Where-Object automationId -eq 'Commands')
+        $more = Elements $bar.children | Where-Object automationId -eq 'MoreButton'
+        Ui @('invoke', $more.selector, '--action', 'invoke') | Out-Null
+        $menu = Read-ContextMenu -Expected 'Delete note' -Types @('Button','MenuItem')
+        if (($menu.Items | Where-Object name -eq 'Delete note').isEnabled) { throw 'Delete is enabled for a filtered-out note.' }
+        Close-ContextMenu $menu
+        Fill 'Search tool items' ''
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NotesEdit' -and $_.isEnabled }).Count -eq 1 }
+        Ui @('invoke', 'NotesEdit', '--action', 'invoke') | Out-Null
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Contextual sidebar note' }).Count -eq 1
+        }
         Set-Preview $false
         Press 'Show in panel'
         Assert-ContextualNotes
         if ((Pick 'Edit' 'Local note').value -ne 'Contextual sidebar note') { throw 'Returning from the collection page hid or lost the contextual note.' }
     }
 
+    Test-Ui 'Full tool pages use the same toolbar spacing and alignment' {
+        function Read-ToolbarLayout([string] $Page) {
+            Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'Heading' -and $_.name -eq $Page }).Count -eq 1 }
+            $items = @(Read-Ui)
+            $header = $items | Where-Object automationId -eq 'DescriptionText' | Select-Object -First 1
+            if (-not $header) { throw "$Page is missing its header description." }
+            $bar = $items | Where-Object { $_.type -eq 'AppBar' -and $_.y -ge ($header.y + $header.height) } | Select-Object -First 1
+            if (-not $bar) { throw "$Page is missing its toolbar." }
+            $controls = @(Elements $bar.children | Where-Object { $_.type -in 'Button','CheckBox','Edit','ComboBox','SplitButton' -and $_.height -gt 0 })
+            if (-not $controls.Count) { throw "$Page has no visible toolbar controls." }
+            foreach ($control in $controls) {
+                if ([Math]::Abs(($control.y + $control.height / 2) - ($bar.y + $bar.height / 2)) -gt 1) {
+                    throw "The '$($control.name)' control on $Page is off the toolbar centerline."
+                }
+            }
+            $screenshot = ($Page -replace '[^a-zA-Z0-9]+', '-').ToLowerInvariant() + '-toolbar.png'
+            Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory $screenshot)) | Out-Null
+            @{ Gap = $bar.y - ($header.y + $header.height); Height = $bar.height; Left = $bar.x }
+        }
+
+        Open-Menu 'Settings'
+        Wait-Ui { param($items) $items.automationId -contains 'ThemeSelector' }
+        Ui @('send-keys', 'end', '--via', 'send-input', '--target', 'ThemeSelector') | Out-Null
+        Wait-Ui { param($items) (Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json).Theme -eq 'Dark' }
+        Browser
+        Press 'Notes for this key'
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
+        $layouts = [ordered]@{ Notes = Read-ToolbarLayout 'Notes' }
+        foreach ($page in 'Favorites', 'Watches', 'Change journal', 'Saved searches', 'Workspaces', 'Registry Usage') {
+            Browser
+            Open-Menu $page -Group 'Tools' -MainTab:($page -in 'Favorites', 'Watches', 'Change journal')
+            $layouts[$page] = Read-ToolbarLayout $page
+        }
+        Browser
+        Fill 'Search registry' 'needle'
+        Start-SearchInMainTab
+        Wait-Ui { param($items) $items.automationId -contains 'SearchResultFilter' }
+        $layouts['Search results'] = Read-ToolbarLayout 'Find: needle'
+        $layouts | ConvertTo-Json | Set-Content (Join-Path $ArtifactDirectory 'toolbar-layout.json')
+        foreach ($page in $layouts.Keys) {
+            foreach ($dimension in 'Gap', 'Height', 'Left') {
+                if ([Math]::Abs($layouts[$page][$dimension] - $layouts.Notes[$dimension]) -gt 1) {
+                    throw "$page toolbar ${dimension}: $($layouts[$page][$dimension]) px, Notes: $($layouts.Notes[$dimension]) px."
+                }
+            }
+        }
+    }
+
     Test-Ui 'Notes share drafts across panel and page and survive view closure' {
-        Browser; Press 'Notes for this key'; Fill 'Local note' 'Investigation fixture draft'
+        Browser
+        Press 'Notes for this key'
+        Wait-Ui { param($items) $items.automationId -contains 'NoteEditor' }
+        Fill 'Local note' 'Investigation fixture draft'
         Wait-Ui { param($items) $items.name -contains 'Saved' }
-        Press 'Open tool in tab'
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
         if ((Pick 'Edit' 'Local note').value -ne 'Investigation fixture draft') { throw 'Draft did not transfer to the tab.' }
         Fill 'Local note' 'Investigation fixture note'
         Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null
@@ -6237,7 +6358,38 @@ try {
         $saved = Get-Content $settingsFile -Raw | ConvertFrom-Json
         if (@($saved.Notes | Where-Object { $_.Location.SubKey -eq $subKey -and $_.Text -eq 'Investigation fixture note' }).Count -ne 1) { throw 'Note was not persisted.' }
         Select-Row $address | Out-Null
+        $items = @(Read-Ui)
+        $count = $items | Where-Object automationId -eq 'NotesStatusText'
+        $status = $items | Where-Object automationId -eq 'NoteStatus'
+        if ($status.name -ne 'Saved' -or [Math]::Abs($count.y - $status.y) -gt 1 -or $status.x -le $count.x) {
+            throw 'The saved state is not on the right side of the note count in the status bar.'
+        }
+        if ($items.name -notcontains 'Note type' -or $items.name -notcontains 'Key note' -or
+            $items.name -notcontains 'Registry' -or $items.name -contains 'Matches') {
+            throw 'The selected key note metadata is missing or includes a matching rule.'
+        }
+        $registry = $items | Where-Object name -eq 'This computer · 64-bit registry'
+        $editor = $items | Where-Object automationId -eq 'NoteEditor'
+        if (-not $registry -or [Math]::Abs(($registry.x + $registry.width) - ($editor.x + $editor.width)) -gt 1) {
+            throw 'The Notes metadata does not align with the right edge of the editor.'
+        }
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'notes.png')) | Out-Null
+        $locked = [IO.File]::Open($settingsFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        try {
+            Fill 'Local note' 'Retry fixture note'
+            Wait-Ui { param($items) $items.automationId -contains 'RetryNoteSave' }
+            $items = @(Read-Ui)
+            $retry = $items | Where-Object automationId -eq 'RetryNoteSave'
+            $count = $items | Where-Object automationId -eq 'NotesStatusText'
+            if ([Math]::Abs(($retry.y + $retry.height / 2) - ($count.y + $count.height / 2)) -gt 1) {
+                throw 'Retry is outside the Notes status bar.'
+            }
+            Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'notes-save-error.png')) | Out-Null
+        } finally { $locked.Dispose() }
+        Ui @('invoke', 'RetryNoteSave') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'RetryNoteSave' -and $items.name -contains 'Saved' }
+        Fill 'Local note' 'Investigation fixture note'
+        Wait-Ui { param($items) $items.name -contains 'Saved' }
         Press 'Show in panel'
         Wait-Ui { param($items) $items.automationId -contains 'ToolSelector' -and $items.automationId -contains 'EntriesList' }
         if ((Pick 'Edit' 'Local note').value -ne 'Investigation fixture note') { throw 'Panel did not share the saved note.' }
@@ -6249,7 +6401,6 @@ try {
         $locked = [IO.File]::Open($settingsFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
         try {
             Fill 'Local note' 'Draft after close'
-            Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null
             Wait-Ui { param($items) $items.name -contains 'Could not complete the action' }
             if ((Pick 'Edit' 'Local note').value -ne 'Draft after close') { throw 'Failed save lost the draft.' }
             $appProcess.CloseMainWindow() | Out-Null
@@ -6258,12 +6409,7 @@ try {
             if ($appProcess.HasExited) { throw 'Cancel closed the window.' }
         } finally { $locked.Dispose() }
         Fill 'Local note' 'Investigation fixture note'; Press 'Close tool panel'
-        Ui @('invoke', 'EditAddressButton', '--action', 'invoke') | Out-Null
-        Wait-Ui { param($items) $items.name -contains 'Address' }
-        $input = Pick 'Edit' 'Address'
-        Ui @('set-value', $input.selector, ($address + '\Child')) | Out-Null
-        Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $input.selector) | Out-Null
-        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq 'Child' }).Count -eq 1 }
+        Go-ToKey "$address\Child"
         $notes = Pick 'TabItem' 'Notes' -All
         Ui @('invoke', $notes.selector, '--action', 'select') | Out-Null
         Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Investigation fixture note' }).Count -eq 1 }
@@ -6630,7 +6776,8 @@ try {
         Wait-Ui { param($items) $items.automationId -notcontains 'ToolSelector' }
         if (@(Read-Ui -All | Where-Object type -eq 'TabItem').Count -ne $count + 1) { throw 'Enter in the Favorites panel opened an extra tab.' }
         Browser; Press 'Notes for this key'; Fill 'Local note' 'Enter fixture note'
-        Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null; Press 'Open tool in tab'
+        Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
         $note = Select-Row $address
         Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $note.selector) | Out-Null
         if (((Ui @('get-focused', '--json')) -join "`n") -notmatch 'NoteEditor') { throw 'Enter did not focus the selected note editor.' }
@@ -6857,6 +7004,170 @@ try {
         Press 'Unpin tool panel'; Press 'Close tool panel'
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'legacy-layout-restored.png')) | Out-Null
     }
+    Test-Ui 'Inspector previews one value note and opens other matches in the sidebar' {
+        Browser
+        $appProcess.CloseMainWindow() | Out-Null
+        if (-not $appProcess.WaitForExit(15000)) { throw 'The fixture editor did not close.' }
+        $settings = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json -AsHashtable
+        $hive = [int][Microsoft.Win32.RegistryHive]::CurrentUser
+        $settings.Theme = 'Dark'
+        $settings.ShowKeysInList = $true
+        $destination = "$subKey\Child"
+        $child = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($destination, $true)
+        try { $child.SetValue('Counter', 2, [Microsoft.Win32.RegistryValueKind]::DWord) }
+        finally { $child.Dispose() }
+        $keyText = (1..5 | ForEach-Object { "Key note line $_" }) -join "`n"
+        $settings.Notes = @(
+            @{ Location = @{ Hive = $hive; SubKey = $subKey }; Text = $keyText },
+            @{ Location = @{ Hive = $hive; SubKey = "$subKey\Child" }; Text = 'Child key note' },
+            @{ Location = @{ Hive = $hive; SubKey = "$subKey\Child" }; ValueName = ''; Text = 'Child default note' },
+            @{ Location = @{ Hive = $hive; SubKey = $subKey }; ValueName = 'Counter'; Text = 'Exact Counter note' },
+            @{ Location = @{ Hive = $hive; SubKey = $subKey }; ValueName = 'Counter'; Text = 'Branch Counter note'; MatchRule = @{} },
+            @{ Location = @{ Hive = $hive; SubKey = 'Software' }; ValueName = 'Counter'; Text = 'Parent Counter note'; MatchRule = @{} }
+        )
+        [IO.File]::WriteAllText($settingsFile, ($settings | ConvertTo-Json -Depth 64))
+        Restart-Editor
+        Browser
+        Select-Row 'Counter' | Out-Null
+        if ((Read-Ui).automationId -notcontains 'ValueNameHeading') {
+            Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
+        }
+        Wait-Ui {
+            param($items)
+            $items.name -contains 'Exact Counter note' -and $items.name -contains '2 more shared notes' -and
+                @($items | Where-Object { $_.automationId -eq 'KeyNoteExcerpt' -and $_.name -like 'Key note line 1*Key note line 5' -and $_.height -gt 65 }).Count -eq 1
+        }
+        $names = (Read-Ui).name
+        if ($names -contains 'Branch Counter note' -or $names -contains 'Parent Counter note') { throw 'An additional note body is visible in the preview.' }
+        Ui @('hover', 'ValueNameHeading') | Out-Null
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-note-preview.png')) | Out-Null
+        Ui @('hover', 'NoteExcerpt') | Out-Null
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-note-edit-hover.png')) | Out-Null
+        Ui @('hover', 'KeyNoteExcerpt') | Out-Null
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'key-note-edit-hover.png')) | Out-Null
+        Ui @('hover', 'ValueNameHeading') | Out-Null
+        Ui @('send-keys', 'tab', '--via', 'send-input', '--target', 'OpenByteInterpreter') | Out-Null
+        $focused = Ui @('get-focused', '--json') | ConvertFrom-Json
+        if ($focused.element.automationId -ne 'EditValueNote') { throw 'Tab did not reach the value note edit action.' }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'value-note-edit-focus.png')) | Out-Null
+        Ui @('invoke', 'MoreNotes', '--action', 'invoke') | Out-Null
+        $menu = Read-ContextMenu 'Software and subkeys'
+        if ($menu.Items.name -notcontains "$fixtureName and subkeys") { throw 'The menu is missing the other matching branch.' }
+        Ui @('invoke', (Pick 'MenuItem' 'Software and subkeys' -Window $menu.Window).selector) -Window $menu.Window | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Parent Counter note' }).Count -eq 1 }
+        Press 'Edit matching rule…' 'NoteCommands'
+        Wait-Ui { param($items) $items.automationId -contains 'NoteRuleBranch' }
+        $branch = (Pick 'Edit' 'Key or branch').value
+        Fill 'Key or branch' 'Computer'
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.automationId -eq 'PrimaryButton' -and -not $_.isEnabled }).Count -eq 1 -and
+                $items.name -contains 'Enter a registry key on the same computer.'
+        }
+        Fill 'Key or branch' $address
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.automationId -eq 'PrimaryButton' -and -not $_.isEnabled }).Count -eq 1 -and
+                $items.name -contains 'A matching rule already exists for this value name and branch.'
+        }
+        Fill 'Key or branch' $branch
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'PrimaryButton' -and $_.isEnabled }).Count -eq 1 }
+        Press 'Cancel'
+        Wait-Ui { param($items) $items.automationId -notcontains 'NoteRuleBranch' }
+        Press 'Close tool panel'
+        Ui @('invoke', 'EditValueNote', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Exact Counter note' }).Count -eq 1 }
+        Fill 'Local note' ' '
+        Press 'Close tool panel'
+        Wait-Ui { param($items) $items.name -contains 'Branch Counter note' -and $items.name -contains '1 more shared note' -and $items.automationId -contains 'AddValueNote' }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'shared-note-preview.png')) | Out-Null
+        Ui @('invoke', 'EditMatchingNote', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Branch Counter note' }).Count -eq 1 }
+        Ui @('invoke', 'ExpandToolButton', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'NotesStatusText' -and @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Branch Counter note' }).Count -eq 1 }
+        Press 'Show in panel'
+        Wait-Ui { param($items) $items.automationId -contains 'ToolSelector' -and @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Branch Counter note' }).Count -eq 1 }
+
+        Press 'Edit matching rule…' 'NoteCommands'
+        Wait-Ui { param($items) $items.automationId -contains 'NoteScopeChoice' }
+        Ui @('send-keys', 'end', '--via', 'send-input', '--target', 'NoteScopeChoice') | Out-Null
+        Wait-Ui {
+            param($items)
+            $items.automationId -notcontains 'NoteScopeConditions' -and
+                @($items | Where-Object { $_.automationId -eq 'PrimaryButton' -and -not $_.isEnabled }).Count -eq 1 -and
+                @($items | Where-Object { $_.automationId -eq 'NoteScopeSummary' -and $_.name -like 'Undo Delete is available*' }).Count -eq 1
+        }
+        Fill 'Key or branch' "$address\Child"
+        Primary
+        Wait-Ui {
+            param($items)
+            $items.automationId -notcontains 'NoteScopeChoice' -and
+                @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Branch Counter note' }).Count -eq 1
+        }
+        Fill 'Local note' 'Moved Counter note'
+        Ui @('send-keys', 'ctrl+s', '--via', 'send-input', '--target', 'NoteEditor') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Saved' }
+        $notes = Pick 'TabItem' 'Notes' -All
+        Ui @('invoke', $notes.selector, '--action', 'select') | Out-Null
+        Wait-Ui {
+            param($items)
+            $items.automationId -contains 'NotesStatusText' -and $items.name -contains 'Value note' -and
+                @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Moved Counter note' }).Count -eq 2
+        }
+        $saved = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
+        $counter = @($saved.Notes | Where-Object { $_.Location.SubKey -eq $destination -and $_.ValueName -eq 'Counter' })
+        if ($counter.Count -ne 1 -or $counter[0].MatchRule -or $counter[0].Text -ne 'Moved Counter note' -or
+            @($saved.Notes | Where-Object { $_.Location.SubKey -eq $subKey -and $_.ValueName -eq 'Counter' }).Count -ne 0) {
+            throw 'The scope change did not move the branch note to the exact value in Child.'
+        }
+        Fill 'Search tool items' 'moved counter'
+        Wait-Ui {
+            param($items)
+            $rows = @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -match ', (Value note|Key note|Match rule),' })
+            $rows.Count -eq 1 -and $rows[0].name -like 'Counter, Value note,*'
+        }
+        Browser
+        if ((Read-Ui).name -contains 'Close tool panel') { Press 'Close tool panel' }
+        Select-Row 'Counter' | Out-Null
+        Ui @('invoke', 'AddValueNote', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'UndoNoteDelete' }
+        Ui @('invoke', 'UndoNoteDelete', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Exact Counter note' }).Count -eq 1 }
+        Press 'Close tool panel'
+        Select-Row 'Child, Key,' | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Child key note' -and $items.automationId -contains 'EditKeyNote' -and $items.automationId -notcontains 'MoreNotes' }
+        Ui @('invoke', 'EditKeyNote', '--action', 'invoke') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Child key note' }).Count -eq 1 }
+        Press 'Close tool panel'
+
+        $child = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($destination, $true)
+        try { $child.DeleteValue('Counter') }
+        finally { $child.Dispose() }
+        Fill 'Search registry' 'Moved Counter match:notes'
+        Press 'Advanced search'
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'SearchNotes' -and $_.name -eq 'Notes' }).Count -eq 1 }
+        Primary
+        Wait-Ui { param($items) $items.automationId -contains 'BottomTabs' }
+        Press 'Open panel tab in main tab'
+        Wait-Ui {
+            param($items)
+            @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Counter,*Value note*Moved Counter note*' }).Count -eq 1
+        }
+
+        Browser
+        Open-Menu 'Notes' -Group 'Tools' -MainTab
+        Fill 'Search tool items' 'Child default note'
+        Select-Row '(Default)' | Out-Null
+        Press 'Show in panel'
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'NoteEditor' -and $_.value -eq 'Child default note' }).Count -eq 1 }
+        Press 'Open value' 'NoteCommands'
+        Wait-Ui {
+            param($items)
+            $row = $items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like '(Default),*' }
+            $row -and (Ui @('get-property', $row.selector, '--property', 'IsSelected', '--json') | ConvertFrom-Json).properties.IsSelected -eq 'True'
+        }
+    }
+
     if ($results.Count -eq 0) { throw "No UI test matched '$TestFilter'." }
 }
 catch {

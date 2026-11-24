@@ -272,7 +272,7 @@ internal static class UxMvpTests
         var settings = new AppSettings();
         var shell = new MainWindowViewModel(
             settings, new InvestigationStore(settings, () => { }), registry, target => new BrowserViewModel(registry, target),
-            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings, () => { }));
+            NullLogger<MainWindowViewModel>.Instance, NotesStoreTests.CreateStore(settings));
         shell.Initialize(location);
         check(!shell.ReopenClosedTabCommand.CanExecute(null), "Reopen is disabled before any registry tab closes");
         var closed = shell.OpenBrowser(RegistryLocation.Parse(@"\\server\HKLM\Software", RegistryView.Registry32));

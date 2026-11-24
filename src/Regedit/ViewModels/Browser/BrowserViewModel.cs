@@ -48,7 +48,7 @@ public sealed partial class BrowserViewModel : ObservableObject
     private readonly NavigationHistory _history;
     private readonly RegistryEntryClipboard _clipboard;
     private readonly FavoritesStore? _favorites;
-    private readonly AppSettings? _settings;
+    private readonly NotesStore? _notes;
     private readonly SettingsViewModel? _preferences;
     private readonly Action<Uri> _launchWebSearch;
     private readonly RegistryHistoryBroadcaster? _historyBroadcaster;
@@ -233,12 +233,13 @@ public sealed partial class BrowserViewModel : ObservableObject
         SettingsViewModel? preferences = null,
         Action<Uri>? launchWebSearch = null,
         RegistryHistoryBroadcaster? historyBroadcaster = null,
-        InspectionHistoryStore? inspectionHistory = null)
+        InspectionHistoryStore? inspectionHistory = null,
+        NotesStore? notes = null)
     {
         this.Registry = registry;
         this.Addresses = new RegistryAddressSuggestions(registry.SubKeys);
         this._metadata = new RegistryListMetadata(registry);
-        this._settings = settings;
+        this._notes = notes;
         this._preferences = preferences;
         this._historyBroadcaster = historyBroadcaster;
         this._inspectionHistory = inspectionHistory;
@@ -250,8 +251,11 @@ public sealed partial class BrowserViewModel : ObservableObject
             {
                 this.SortColumn = this._columns[0];
             }
+        }
 
-            settings.NoteSaved += this.NoteSaved;
+        if (notes is not null)
+        {
+            notes.Saved += this.NoteSaved;
         }
 
         this._history = new NavigationHistory(initial);
@@ -473,9 +477,9 @@ public sealed partial class BrowserViewModel : ObservableObject
         this._filterCancellation?.Cancel();
         this._previewCancellation?.Cancel();
         this._metadata.Cancel();
-        if (this._settings is not null)
+        if (this._notes is not null)
         {
-            this._settings.NoteSaved -= this.NoteSaved;
+            this._notes.Saved -= this.NoteSaved;
         }
 
         this._editCancellation.Cancel();
@@ -739,6 +743,7 @@ public sealed partial class BrowserViewModel : ObservableObject
             else
             {
                 previous.SetValue(value);
+                previous.SetNote(this._notes?.SavedAt(owner).ForValue(value));
             }
 
             foreach (var entry in this._allEntries.Where(entry => !entry.IsKey))
@@ -1325,18 +1330,13 @@ public sealed partial class BrowserViewModel : ObservableObject
 
     private void NoteSaved(KeyNote note)
     {
-        if (!this._columns.Contains(RegistrySortColumn.Notes))
+        if (note.ValueName is not null && !note.AppliesAt(this.Location) ||
+            note.ValueName is null && !this._allEntries.Any(entry => entry.Key is { } key && note.Matches(key)))
         {
             return;
         }
 
-        var entry = this._allEntries.FirstOrDefault(row => row.Key?.IsSameLocation(note.Location) == true);
-        if (entry is null)
-        {
-            return;
-        }
-
-        entry.SetNote(string.IsNullOrWhiteSpace(note.Text) ? string.Empty : note.Text);
+        this.ApplyNotes();
         if (this.SortColumn == RegistrySortColumn.Notes)
         {
             this.ApplyFilter(true);
@@ -1345,18 +1345,21 @@ public sealed partial class BrowserViewModel : ObservableObject
 
     private void ApplyNotes()
     {
-        if (this._settings is null || !this._columns.Contains(RegistrySortColumn.Notes))
+        if (this._notes is null)
         {
             return;
         }
 
-        var notes = this._settings.Notes.Where(note => note.Location.View == this.Location.View).ToLookup(
-            note => note.Location.Address, StringComparer.OrdinalIgnoreCase);
+        var notes = this._notes.SavedAt(this.Location);
         foreach (var entry in this._allEntries)
         {
             if (entry.Key is { } key)
             {
-                entry.SetNote(notes.Count == 0 ? string.Empty : notes[key.Address].FirstOrDefault()?.Text ?? string.Empty);
+                entry.SetNote(notes.ForKey(key));
+            }
+            else if (!entry.IsParent)
+            {
+                entry.SetNote(notes.ForValue(entry.Value));
             }
         }
     }

@@ -235,8 +235,13 @@ public static partial class RegistrySearch
             return true;
         }
 
-        bool FindValues(RegistryLocation location, RegistryKey key, Dictionary<string, SearchActivity>? activities = null)
+        bool FindValues(RegistryLocation location, RegistryKey key, Dictionary<string, SearchActivity>? activities = null,
+            List<KeyNote>? exactAtKey = null, List<KeyNote>? rulesAtKey = null)
         {
+            IEnumerable<KeyNote>? valueNotes = exactAtKey is null ? rulesAtKey :
+                rulesAtKey is null ? exactAtKey : exactAtKey.Concat(rulesAtKey);
+            var notesByName = valueNotes?.ToLookup(note => note.ValueName!, StringComparer.OrdinalIgnoreCase);
+            var filterTypes = options.Types is { Length: > 0 };
             DateTimeOffset? lastWriteTime;
             string[] names;
             try
@@ -247,9 +252,16 @@ public static partial class RegistrySearch
                     return true;
                 }
 
-                names = key.GetValueNames();
+                names = activities is null && !options.MatchValueResults && notesByName is not null
+                    ? notesByName.Select(group => group.Key).ToArray()
+                    : key.GetValueNames();
                 if (activities is null)
                 {
+                    if (options.MatchValueResults && exactAtKey is not null)
+                    {
+                        names = names.Union(exactAtKey.Select(note => note.ValueName!), StringComparer.OrdinalIgnoreCase).ToArray();
+                    }
+
                     Array.Sort(names, StringComparer.OrdinalIgnoreCase);
                 }
             }
@@ -269,24 +281,28 @@ public static partial class RegistrySearch
                 }
 
                 var nameMatch = !textless && options.Values && Matches(name);
-                if (!textless && !nameMatch && !searchData)
+                var noteCandidates = notesByName?[name];
+                if (!textless && !nameMatch && !searchData && notesByName?.Contains(name) != true)
                 {
                     continue;
                 }
 
+                var exactNote = noteCandidates?.FirstOrDefault(candidate => candidate.MatchRule is null);
+                var canMatchAbsentValue = exactNote is not null && !filterTypes;
+                var canStopBeforeReading = !searchData && matches.Count == limit && (textless || nameMatch);
                 RegistryValue? value;
                 try
                 {
-                    if (options.Types is { Length: > 0 } || !searchData && matches.Count == limit)
+                    if (filterTypes || canStopBeforeReading)
                     {
                         var type = RegistryService.ReadValueType(key, name);
-                        if (type is null || !TypeAllowed(type.Value))
+                        if (type is { } knownType ? !TypeAllowed(knownType) : !canMatchAbsentValue)
                         {
                             continue;
                         }
                     }
 
-                    if (!searchData && matches.Count == limit)
+                    if (canStopBeforeReading)
                     {
                         return false;
                     }
@@ -300,14 +316,17 @@ public static partial class RegistrySearch
                 }
 
                 token.ThrowIfCancellationRequested();
-                if (value is null || !TypeAllowed(value.Type))
+                if (value is null ? !canMatchAbsentValue : !TypeAllowed(value.Type))
                 {
                     continue;
                 }
 
-                var data = searchData ? ValueSearchText(value) : string.Empty;
-                var dataMatch = searchData && Matches(data);
-                if (!textless && !nameMatch && !dataMatch)
+                nameMatch = value is not null && nameMatch;
+                var data = searchData && value is not null ? ValueSearchText(value) : string.Empty;
+                var dataMatch = searchData && value is not null && Matches(data);
+                var note = exactNote ?? (value is null ? null :
+                    noteCandidates?.FirstOrDefault(candidate => candidate.MatchesValue(location, name, value)));
+                if (!textless && !nameMatch && !dataMatch && note is null)
                 {
                     continue;
                 }
@@ -318,12 +337,19 @@ public static partial class RegistrySearch
                 }
 
                 var fields = textless ? "Value" : nameMatch && dataMatch ? "Value name and data" : nameMatch ? "Value name" : "Data";
+                if (note is not null)
+                {
+                    fields = nameMatch && dataMatch ? "Value name, data, and note" :
+                        nameMatch || dataMatch ? fields + " and note" : "Value note";
+                }
+
                 if (activity != SearchActivity.None)
                 {
                     fields = textless ? ActivityLabel(activity) : $"{ActivityLabel(activity)} · {fields}";
                 }
 
-                Add(new RegistrySearchMatch(location, name, value, fields, textless ? value.TypeName : Excerpt(dataMatch ? data : name))
+                var excerpt = textless ? value!.TypeName : Excerpt(note?.Text ?? (dataMatch ? data : name));
+                Add(new RegistrySearchMatch(location, name, value, fields, excerpt)
                 {
                     KeyLastModifiedUtc = lastWriteTime
                 });
@@ -350,28 +376,112 @@ public static partial class RegistrySearch
             return Finish();
         }
 
-        Dictionary<RegistryLocation, string>? matchingNotes = null;
+        var keyNotes = new Dictionary<RegistryLocation, string>(LocationComparer);
+        var exactNotes = new Dictionary<RegistryLocation, List<KeyNote>>(LocationComparer);
+        var ruleNotes = new Dictionary<RegistryLocation, List<KeyNote>>(LocationComparer);
+        var ruleRoots = new HashSet<RegistryLocation>(LocationComparer);
+        var notesOnly = options.MatchNoteResults && !options.MatchKeyResults && !options.MatchValueResults;
         if (options.MatchNoteResults)
         {
-            matchingNotes = new(LocationComparer);
-            foreach (var note in notes ?? throw new InvalidOperationException("Key notes are unavailable."))
+            foreach (var note in notes ?? throw new InvalidOperationException("Notes are unavailable."))
             {
                 token.ThrowIfCancellationRequested();
-                if (Matches(note.Text) && search.Roots.Any(note.Location.IsAtOrBelow))
+                if (!Matches(note.Text))
                 {
-                    matchingNotes.TryAdd(note.Location, note.Text);
+                    continue;
+                }
+
+                if (note.MatchRule is not null)
+                {
+                    foreach (var root in search.Roots)
+                    {
+                        if (note.Location.IsAtOrBelow(root))
+                        {
+                            ruleRoots.Add(note.Location);
+                        }
+                        else if (root.IsAtOrBelow(note.Location))
+                        {
+                            ruleRoots.Add(root);
+                        }
+                    }
+
+                    AddValueNote(ruleNotes, note);
+                }
+                else if (search.Roots.Any(note.Location.IsAtOrBelow))
+                {
+                    if (note.ValueName is null)
+                    {
+                        keyNotes.TryAdd(note.Location, note.Text);
+                    }
+                    else
+                    {
+                        AddValueNote(exactNotes, note);
+                    }
                 }
             }
         }
 
-        var notesOnly = matchingNotes is not null && !options.MatchKeyResults && !options.MatchValueResults;
-        var stack = new Stack<RegistryLocation>(notesOnly ? matchingNotes!.Keys.Reverse() : search.Roots.Reverse());
+        static void AddValueNote(Dictionary<RegistryLocation, List<KeyNote>> index, KeyNote note)
+        {
+            if (!index.TryGetValue(note.Location, out var list))
+            {
+                index.Add(note.Location, list = []);
+            }
+
+            list.Add(note);
+        }
+
+        List<KeyNote>? RulesFor(RegistryLocation location)
+        {
+            if (ruleNotes.Count == 0)
+            {
+                return null;
+            }
+
+            List<KeyNote>? applicable = null;
+            for (RegistryLocation? ancestor = location; ancestor is not null; ancestor = ancestor.Parent)
+            {
+                if (ruleNotes.TryGetValue(ancestor, out var rules))
+                {
+                    (applicable ??= []).AddRange(rules);
+                }
+            }
+
+            return applicable;
+        }
+
+        bool CoveredByRuleRoot(RegistryLocation? location)
+        {
+            if (ruleRoots.Count != 0)
+            {
+                for (var parent = location; parent is not null; parent = parent.Parent)
+                {
+                    if (ruleRoots.Contains(parent))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // Rule roots traverse whole subtrees; exact notes need only their own keys.
+        var roots = notesOnly
+            ? keyNotes.Keys.Union(exactNotes.Keys, LocationComparer).Where(location => !CoveredByRuleRoot(location))
+                .Concat(ruleRoots.Where(location => !CoveredByRuleRoot(location.Parent)))
+            : search.Roots;
+        var stack = new Stack<RegistryLocation>(roots.Reverse());
         while (stack.TryPop(out var location))
         {
             token.ThrowIfCancellationRequested();
+
             var nameMatches = options.MatchKeyResults && (textless || Matches(location.Name));
-            var note = matchingNotes?.GetValueOrDefault(location);
+            var note = keyNotes.GetValueOrDefault(location);
             var keyMatches = nameMatches || note is not null;
+            var rules = RulesFor(location);
+            var exact = exactNotes.GetValueOrDefault(location);
+            var hasValueNotes = exact is not null || rules is not null;
             if (keyMatches && modified is not null)
             {
                 DateTimeOffset? ownTimestamp;
@@ -389,7 +499,7 @@ public static partial class RegistrySearch
                     return Finish(truncated: true);
                 }
 
-                if (notesOnly)
+                if (notesOnly && !hasValueNotes)
                 {
                     continue;
                 }
@@ -402,7 +512,7 @@ public static partial class RegistrySearch
                 continue;
             }
 
-            if (!notesOnly)
+            if (!notesOnly || rules is not null)
             {
                 string[] children;
                 try
@@ -423,7 +533,7 @@ public static partial class RegistrySearch
             }
 
             if (keyMatches && modified is null && !AddKey(location, null, nameMatches, note)
-                || options.MatchValueResults && !FindValues(location, key))
+                || (options.MatchValueResults || hasValueNotes) && !FindValues(location, key, exactAtKey: exact, rulesAtKey: rules))
             {
                 return Finish(truncated: true);
             }

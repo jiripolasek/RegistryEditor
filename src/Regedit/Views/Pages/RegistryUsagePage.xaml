@@ -51,8 +51,8 @@
         <shared:ToolPageHeader
             x:Name="PageHeader"
             Title="{x:Bind ViewModel.Title}"
-            Margin="0,0,0,24"
-            Description="{x:Bind ViewModel.Description, Mode=OneWay}" />
+            Description="{x:Bind ViewModel.Description, Mode=OneWay}"
+            Style="{StaticResource ToolPageHeaderStyle}" />
         <shared:ToolToolbar
             x:Name="UsageToolbar"
             Grid.Row="1"

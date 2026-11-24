@@ -25,11 +25,26 @@ internal static class SearchLifecycleTests
         var store = new InvestigationStore(settings, () => { });
         var firstMatch = new RegistrySearchMatch(
             root.Child("First"), string.Empty, new RegistryValue(string.Empty, RegistryValueType.Binary, [1]), "Data", "needle");
-        var secondMatch = firstMatch with { Location = root.Child("Second"), ValueName = "Named" };
+        var secondMatch = firstMatch with
         {
-            var batches = Enumerable.Range(0, 16).Select(batch => Enumerable.Range(batch * 64, 64).Select(index => new RegistrySearchMatch(
-                root, "Value" + index, new RegistryValue((index % 2 == 0 ? "Even" : "Odd") + index, RegistryValueType.String, []), "Name",
-                "match")).ToArray()).ToArray();
+            Location = root.Child("Second"), ValueName = "Named", Value = firstMatch.Value! with { Name = "Named" }
+        };
+        var noteHit = new RegistrySearchMatch(root, "Removed value", null, "Value note", "Remember this setting");
+        check(new InvestigationRow(noteHit) is
+            { Title: "Removed value", Kind: "Value missing", TableSummary: "Value missing", Before: "Value missing" },
+            "A note on a missing named value identifies its state in the search row and details");
+        check(new InvestigationRow(noteHit with { ValueName = string.Empty }) is
+            { Title: "(Default)", Kind: "Value", TableSummary: "(value not set)", Before: "(value not set)" },
+            "A note on an unset default value uses the default placeholder in the search row and details");
+        var keyRow = new InvestigationRow(noteHit with { ValueName = null, Fields = "Key note" });
+        check(keyRow is { Kind: "Key", TableSummary: "Key" } && keyRow.Before == "Key name: " + root.Name,
+            "A key hit retains its key summary and name in the details");
+
+        {
+            var batches = Enumerable.Range(0, 1024)
+                .Select(index => (index % 2 == 0 ? "Even" : "Odd") + index)
+                .Select(name => new RegistrySearchMatch(root, name, new RegistryValue(name, RegistryValueType.String, []), "Name", "match"))
+                .Chunk(64).ToArray();
             var streamed = new SearchResultsViewModel(
                 query, store, (_, _) => throw new InvalidOperationException(), (_, _) => { }, findProgressively: (_, publish, _) =>
                 {
@@ -116,6 +131,7 @@ internal static class SearchLifecycleTests
             var scans = 0;
             var textMatch = firstMatch with
             {
+                ValueName = "TextValue",
                 Value = new RegistryValue(
                     "TextValue", RegistryValueType.String, System.Text.Encoding.Unicode.GetBytes("Displayed data\0"))
             };

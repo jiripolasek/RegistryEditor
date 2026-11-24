@@ -12,15 +12,20 @@ namespace JPSoftworks.Regedit.Views.Tools;
 
 public sealed partial class ToolView
 {
-    private MenuFlyout CreateNoteMenu()
+    private MenuFlyout? CreateNoteMenu()
     {
+        if (this.SelectedNoteRow is null)
+        {
+            return null;
+        }
+
         var menu = new MenuFlyout();
         var notes = this.Notes!;
-        ListContextMenu.Add(menu, "Edit note", () => this.RequestFocus(), notes.HasNote, icon: Symbol.Edit, shortcut: "Enter");
+        ListContextMenu.Add(menu, "Edit note", () => this.SetDetailsExpanded(true), notes.HasNote, icon: Symbol.Edit, shortcut: "Enter");
         menu.Items.Add(
             new MenuFlyoutItem
             {
-                Text = "Open key", Command = notes.OpenCommand, Icon = new FontIcon { Glyph = SymbolGlyphs.Get(Symbol.OpenFile) }
+                Text = notes.OpenLabel, Command = notes.OpenCommand, Icon = new FontIcon { Glyph = SymbolGlyphs.Get(Symbol.OpenFile) }
             });
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(

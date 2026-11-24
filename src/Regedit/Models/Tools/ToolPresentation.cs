@@ -42,7 +42,7 @@ internal static class ToolPresentation
             options.Keys ? "Key names" : null,
             options.Values ? "Value names" : null,
             options.Data ? "Value data" : null,
-            options.Notes ? "Key notes" : null
+            options.Notes ? "Notes" : null
         };
         var types = options.Types is { Length: > 0 }
             ? string.Join(", ", options.Types.Select(type => new RegistryValue(string.Empty, type, []).TypeName))

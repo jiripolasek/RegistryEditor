@@ -532,11 +532,23 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    internal async Task NavigateFromToolsAsync(RegistryLocation location, bool newTab = false)
+    internal Task NavigateFromToolsAsync(RegistryLocation location, bool newTab = false)
+    {
+        return this.NavigateFromToolsAsync(location, null, newTab);
+    }
+
+    internal async Task NavigateFromToolsAsync(RegistryLocation location, string? valueName, bool newTab)
     {
         if (!newTab && this.VisibleBrowser is { } browser)
         {
-            await browser.NavigateAsync(location);
+            if (valueName is null)
+            {
+                await browser.NavigateAsync(location);
+            }
+            else
+            {
+                await browser.NavigateToMatchAsync(new SearchHit(location, valueName), CancellationToken.None);
+            }
             if (browser.Error is { } error)
             {
                 throw new IOException(error);
@@ -544,7 +556,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         }
         else
         {
-            this.OpenBrowser(location);
+            this.OpenBrowser(location, valueName);
         }
 
         this.CloseUnpinnedPane();

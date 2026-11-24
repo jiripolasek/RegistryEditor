@@ -53,7 +53,7 @@ public sealed partial class ListCommandBar : CommandBar
         this.Resources["AppBarThemeCompactHeight"] = 32d;
         this.Resources["AppBarThemeMinHeight"] = 32d;
         this.Resources["AppBarButtonInnerBorderMargin"] = new Thickness(2, 0, 2, 0);
-        this.Resources["AppBarButtonContentViewboxMargin"] = new Thickness(8, 6, 0, 6);
+        this.Resources["AppBarButtonContentViewboxMargin"] = new Thickness(8, 8, 0, 8);
     }
 
     /// <summary>

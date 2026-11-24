@@ -550,7 +550,7 @@ internal static class RegistryFilePreviewViewModelTests
         var shell = new MainWindowViewModel(
             settings, new InvestigationStore(settings, () => { }), registry, location => new BrowserViewModel(registry, location),
             NullLogger<MainWindowViewModel>.Instance,
-            NotesStoreTests.CreateStore(settings, () => throw new IOException("Test note save failure")));
+            NotesStoreTests.CreateStore(settings, _ => throw new IOException("Test note save failure")));
         var file = await WriteAsync(directory, "batch-close.reg");
         var firstDialogs = new Dialogs { Choice = RegistryFileSaveChoice.Discard };
         var secondDialogs = new Dialogs { Choice = RegistryFileSaveChoice.Cancel };

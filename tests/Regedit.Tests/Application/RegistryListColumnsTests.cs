@@ -3,6 +3,7 @@
 // ------------------------------------------------------------
 
 using JPSoftworks.Regedit.Core.Registry;
+using JPSoftworks.Regedit.Core.Workspaces;
 using JPSoftworks.Regedit.Models.Registry;
 using JPSoftworks.Regedit.Models.Settings;
 using JPSoftworks.Regedit.Models.Tools;
@@ -114,7 +115,8 @@ internal static class RegistryListColumnsTests
         var software = RegistryLocation.Parse(@"HKCU\Software");
         var root = software.Child("RegeditColumns." + Guid.NewGuid().ToString("N"));
         service.CreateKey(software, root.Name);
-        var browser = new BrowserViewModel(service, root, new RegistryEntryClipboard(), settings: settings)
+        using var notes = NotesStoreTests.CreateStore(settings, move => settings.Save(path, move));
+        var browser = new BrowserViewModel(service, root, new RegistryEntryClipboard(), settings: settings, notes: notes)
         {
             ShowKeysInList = true, ShowParentKeyInList = true
         };
@@ -130,7 +132,6 @@ internal static class RegistryListColumnsTests
             service.Write(root, new RegistryValue("(Default)", RegistryValueType.Binary, []), null);
             service.Write(root, new RegistryValue("Alpha", RegistryValueType.Binary, new byte[16]), null);
             service.Write(root, new RegistryValue("Zulu", RegistryValueType.Binary, [0, 0]), null);
-            using var notes = NotesStoreTests.CreateStore(settings, () => settings.Save(path));
             var originalNote = notes.Get(last);
             originalNote.Text = "Original note";
             notes.Save(originalNote);
@@ -175,6 +176,18 @@ internal static class RegistryListColumnsTests
             check(a.NotePreview.Length == 0, "Removing a saved note clears the displayed cell");
             var alpha = browser.Entries.Single(entry => entry.Name == "Alpha");
             var zulu = browser.Entries.Single(entry => entry.Name == "Zulu");
+            var exactTarget = new KeyNote(root, string.Empty) { ValueName = "Alpha" };
+            var sharedTarget = exactTarget with { MatchRule = new ValueNoteRule(RegistryValueType.Binary, 16) };
+            var sharedDraft = notes.Get(sharedTarget);
+            sharedDraft.Text = "Saved shared note";
+            notes.Save(sharedDraft);
+            var exactDraft = notes.Get(exactTarget);
+            exactDraft.Text = "Unsaved exact draft";
+            check(alpha.NotePeek == "Saved shared note" && alpha.SavedNote is { } shown && notes.Get(shown) == sharedDraft,
+                "The browser marker retains the identity of the displayed note even when an unsaved exact draft matches");
+            notes.Save(exactDraft);
+            check(alpha.NotePeek == "Unsaved exact draft" && alpha.SavedNote is { } saved && notes.Get(saved) == exactDraft,
+                "Saving an exact note updates the browser marker text and target together");
             browser.SetSelection([alpha, zulu]);
             foreach (var column in RegistryColumns.All)
             {
@@ -224,6 +237,24 @@ internal static class RegistryListColumnsTests
                 && browser.Entries[3].SizeText.Length == 0
                 && browser.Entries.Single(entry => entry.Value?.Name == "(Default)").SizeText == "0",
                 "An unset default remains the first value and is distinct from an empty named value");
+
+            notes.Delete(exactDraft);
+            alpha = browser.Entries.Single(entry => entry.Name == "Alpha");
+            zulu = browser.Entries.Single(entry => entry.Name == "Zulu");
+            var zuluNote = notes.Get(new KeyNote(root, string.Empty) { ValueName = "Zulu" });
+            zuluNote.Text = "Unchanged value note";
+            notes.Save(zuluNote);
+            var untouched = zulu.SavedNote;
+            browser.SelectedEntry = alpha;
+            browser.EditPromptRequested += prompt =>
+            {
+                ((RegistryValueEditorViewModel)prompt).Data = "01";
+                return Task.FromResult(true);
+            };
+            await browser.EditBinaryCommand.ExecuteAsync(null);
+            check(alpha.Value?.Data.Length == 1 && !alpha.HasNote && untouched is not null && zulu.SavedNote == untouched &&
+                  browser.Entries.Contains(alpha) && browser.Entries.Contains(zulu),
+                "An in-place edit reevaluates its rule note when byte length changes and retains neighboring rows and notes");
         }
         finally
         {

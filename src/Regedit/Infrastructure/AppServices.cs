@@ -49,7 +49,7 @@ internal static class AppServices
         services.AddScoped(provider =>
         {
             var settings = provider.GetRequiredService<AppSettings>();
-            return new NotesStore(settings, () => settings.Save(settingsPath));
+            return new NotesStore(settings, move => settings.Save(settingsPath, move));
         });
         services.AddScoped(provider =>
         {
@@ -71,8 +71,10 @@ internal static class AppServices
             var preferences = provider.GetRequiredService<SettingsViewModel>();
             var history = provider.GetRequiredService<RegistryHistoryBroadcaster>();
             var inspections = provider.GetRequiredService<InspectionHistoryStore>();
+            var notes = provider.GetRequiredService<NotesStore>();
             return location => new BrowserViewModel(
-                registry, location, clipboard, favorites, settings, preferences, historyBroadcaster: history, inspectionHistory: inspections);
+                registry, location, clipboard, favorites, settings, preferences,
+                historyBroadcaster: history, inspectionHistory: inspections, notes: notes);
         });
         services.AddScoped(provider => new MainWindowViewModel(
             provider.GetRequiredService<AppSettings>(), provider.GetRequiredService<InvestigationStore>(),

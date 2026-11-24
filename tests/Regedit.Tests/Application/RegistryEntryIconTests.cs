@@ -119,6 +119,15 @@ internal static class RegistryEntryIconTests
         }
 
         var hive = RegistryLocation.Parse("HKCU");
+        var noteMatch = new RegistrySearchMatch(hive, string.Empty, null, "Value note", "match");
+        var unsetDefault = new InvestigationRow(noteMatch);
+        check(
+            unsetDefault.Glyph == placeholder.Glyph && unsetDefault.IconFontFamily == placeholder.IconFontFamily
+            && unsetDefault is { HasStringIcon: true, HasDataIcon: false },
+            "A note on an unset default value uses the browser's default glyph and string color in search results");
+        check(new InvestigationRow(noteMatch with { ValueName = "(Default)" }) is { HasDataIcon: true, Glyph: "\uE943" },
+            "A note on a missing named value spelled (Default) uses the data icon in search results");
+
         foreach (var value in new RegistryValue?[]
                  {
                      null, new("Text", RegistryValueType.String, []), new("Link", RegistryValueType.Link, []),
@@ -128,7 +137,7 @@ internal static class RegistryEntryIconTests
                  })
         {
             var entry = new RegistryEntry(value is null ? hive : null, value);
-            var row = new InvestigationRow(new RegistrySearchMatch(hive, value?.Name ?? string.Empty, value, "Name", "match"));
+            var row = new InvestigationRow(new RegistrySearchMatch(hive, value?.Name, value, "Name", "match"));
             check(
                 row.Glyph == entry.Glyph
                 && row.IconFontFamily == entry.IconFontFamily

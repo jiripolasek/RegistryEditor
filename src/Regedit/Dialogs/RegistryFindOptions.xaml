@@ -172,9 +172,9 @@
                         Grid.Row="1"
                         Grid.Column="1"
                         AccessKey="E"
-                        AutomationProperties.AutomationId="SearchKeyNotes"
-                        AutomationProperties.HelpText="Matches text in saved notes for registry keys."
-                        Content="Key notes"
+                        AutomationProperties.AutomationId="SearchNotes"
+                        AutomationProperties.HelpText="Matches text in saved registry notes."
+                        Content="Notes"
                         IsChecked="{x:Bind ViewModel.MatchNotes, Mode=TwoWay}"
                         IsEnabled="{x:Bind ViewModel.CanMatchKeyFields, Mode=OneWay}" />
                 </Grid>

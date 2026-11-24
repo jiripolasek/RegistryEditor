@@ -487,7 +487,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     {
         var width = this.Layout.ActualWidth;
         var compact = this.ViewModel.Compact;
-        this.Layout.Padding = compact ? new Thickness(0) : new Thickness(width < 760 ? 16 : 24, 24, 12, 16);
+        this.Layout.Padding = ToolPageLayout.GetPadding(width, compact);
         this.TreeWidth.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(width < 760 ? 180 : 220);
         this.ListWidth.Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
         this.Collection.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;

@@ -42,7 +42,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
     private readonly bool _compact;
     private readonly List<ToolCommand> _commands = [];
     private readonly List<(ToolCommand Command, Func<bool> Enabled)> _conditionalCommands = [];
-    private readonly List<RelayCommand> _runCommands = [];
+    private readonly List<RelayCommand> _refreshableCommands = [];
     private bool _loaded, _refreshing, _busy;
     private bool _focusOnLoad, _focusSelection;
     private bool _showingJournalError;
@@ -69,6 +69,8 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
     internal JournalSurfaceViewModel? JournalSurface { get; }
 
     private InvestigationRow[] Selected => this.Results.SelectedItems.OfType<InvestigationRow>().ToArray();
+
+    private NoteDraft? SelectedNoteRow => (this.Results.SelectedItem as InvestigationRow)?.Source as NoteDraft;
 
     // The inner list of the column control; selection, menus, density and scrolling helpers act on it.
     private ListView Results => this.ResultColumns.ListView;
@@ -98,9 +100,9 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         {
             this.Notes = new NotesViewModel(
                 window.ViewModel.NoteStore, window.ViewModel.NavigateFromToolsAsync,
-                location => window.ViewModel.OpenBrowser(location, select: false), compact, ClipboardText.Set,
+                (location, value) => window.ViewModel.OpenBrowser(location, value, select: false), compact, ClipboardText.Set,
                 note => new RegistryDialogs(window).ConfirmAsync(
-                    "Delete note?", "Delete the note for " + ToolPresentation.Address(note.Location) + "?", "Delete note"));
+                    "Delete note?", $"Delete the {note.Kind.ToLowerInvariant()} for {note.Title}?", "Delete note"));
             this.Notes.ActionFailed += (operation, error) => window.Logger.LogFailure(LogLevel.Warning, operation, error);
             this.Notes.PropertyChanged += this.Notes_Changed;
             this.Notes.TargetRequested += this.RequestNoteAsync;
@@ -151,7 +153,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
                 ? "Changes made while running as administrator"
                 : "Changes made without administrator privileges",
             ToolKind.Watches => "Local watches. Rapid writes may coalesce; the writer is not identified.",
-            _ => "Local notes for registry locations"
+            _ => "Notes organizer for keys and values"
         };
         this.PageHeader.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         if (!compact)
@@ -192,13 +194,27 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
         if (tool == ToolKind.Notes)
         {
-            this.Search.PlaceholderText = "Find a note by path or text";
+            this.Search.PlaceholderText = "Find notes by name, path, or text";
             this.Results.SelectionMode = ListViewSelectionMode.Single;
             this.Collection.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             this.NotePanel.Visibility = Visibility.Visible;
+            this.NotePanel.Style = null;
             if (compact)
             {
-                this.NotePanel.Style = null;
+                this.CompactNoteScope.Visibility = Visibility.Visible;
+                this.NotePanel.ClearValue(Border.BackgroundProperty);
+            }
+            else
+            {
+                this.Workspace.Style = (Style)Application.Current.Resources["ToolListSurfaceStyle"];
+                this.CollectionSurface.Style = null;
+                this.NotePanel.Padding = new Thickness(12);
+                this.NotePath.MaxLines = 1;
+                this.NotePath.TextWrapping = TextWrapping.NoWrap;
+                this.NoteHeader.Children.Remove(this.NoteSaveFeedback);
+                this.NoteSaveFeedbackHost.Content = this.NoteSaveFeedback;
+                this.Workspace.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                this.NotesStatusBar.Visibility = Visibility.Visible;
             }
 
             this.Count.Visibility = Visibility.Collapsed;
@@ -292,6 +308,11 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         this._refreshing = false;
         if (this.Notes is { } notes)
         {
+            if (this._compact)
+            {
+                notes.CurrentLocation = this._window.ViewModel.ContextLocation;
+            }
+
             notes.Selected = source.Notes?.Selected;
         }
 
@@ -306,6 +327,15 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         this.UpdateDetails();
         this.RefreshCommands();
     }
+
+    private Style NoteSaveIconStyle(NoteSaveState state) => (Style)this.Resources[state switch
+    {
+        NoteSaveState.Saving => "NoteSavingIconStyle",
+        NoteSaveState.Failed => "NoteSaveFailedIconStyle",
+        NoteSaveState.Unsaved => "NoteUnsavedIconStyle",
+        NoteSaveState.Saved => "NoteSavedIconStyle",
+        _ => "NoteSaveEmptyIconStyle"
+    }];
 
     public static Visibility TextVisibility(string text)
     {
@@ -453,12 +483,55 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         var notes = this.Notes!;
         if (!this._compact)
         {
+            RelayCommand ForSelectedRow(IRelayCommand command)
+            {
+                var relay = new RelayCommand(() => command.Execute(null),
+                    () => this.SelectedNoteRow is { } row && row == notes.Selected && command.CanExecute(null));
+                command.CanExecuteChanged += (_, _) => relay.NotifyCanExecuteChanged();
+                this._refreshableCommands.Add(relay);
+                return relay;
+            }
+
             this._commands.Add(new ToolCommand("New note…", Symbol.Add) { Command = notes.NewCommand });
+            var open = new ToolCommand(notes.OpenLabel, Symbol.OpenFile)
+            {
+                AutomationId = "NotesOpen",
+                Command = ForSelectedRow(notes.OpenCommand),
+                Attach = button => MiddleClick.Attach(button, _ => this.SelectedNoteRow,
+                    note => notes.OpenBackgroundCommand.Execute(note))
+            };
+            notes.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(NotesViewModel.OpenLabel))
+                {
+                    open.Label = notes.OpenLabel;
+                }
+            };
+            this._commands.Add(new ToolCommand("Edit note", Symbol.Edit)
+            {
+                AutomationId = "NotesEdit", Command = ForSelectedRow(new RelayCommand(() => this.SetDetailsExpanded(true))),
+                ShortcutText = "Enter"
+            });
+            this._commands.Add(open);
+            this._commands.Add(new ToolCommand("Copy note", Symbol.Copy)
+            {
+                AutomationId = "NotesCopy", Command = ForSelectedRow(notes.CopyNoteCommand)
+            });
+            this._commands.Add(new ToolCommand("Copy path", Symbol.Copy, ToolCommandPlacement.Overflow)
+            {
+                AutomationId = "NotesCopyPath", Command = ForSelectedRow(notes.CopyPathCommand),
+                IconSource = new FontIconSource { Glyph = "\uE62F" }
+            });
+            this._commands.Add(new ToolCommand("Delete note", Symbol.Delete, ToolCommandPlacement.Overflow)
+            {
+                AutomationId = "NotesDelete", Command = ForSelectedRow(notes.DeleteCommand), ShortcutText = "Del"
+            });
+            return;
         }
 
         var current = new ToolCommand("Note for current key", Symbol.Edit)
         {
-            IsVisible = this._compact && notes.ShowUseCurrentKey,
+            IsVisible = notes.ShowContextNavigation,
             IconSource = new FontIconSource { FontFamily = new FontFamily(ToolPresentation.FluentSystemIconsFontFamily), Glyph = "\uF56D" },
             Command = notes.UseCurrentKeyCommand,
             ToolTip = notes.CurrentKeyHelp,
@@ -476,9 +549,9 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             {
                 current.ToolTip = notes.CurrentKeyHelp;
             }
-            else if (args.PropertyName == nameof(NotesViewModel.ShowUseCurrentKey))
+            else if (args.PropertyName == nameof(NotesViewModel.ShowContextNavigation))
             {
-                current.IsVisible = this._compact && notes.ShowUseCurrentKey;
+                current.IsVisible = notes.ShowContextNavigation;
             }
         };
         this._commands.Add(current);
@@ -488,7 +561,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
     {
         var relay = new RelayCommand(() => _ = this.RunAsync(action, command.Label), () => !this._busy);
         command.Command = relay;
-        this._runCommands.Add(relay);
+        this._refreshableCommands.Add(relay);
         this._commands.Add(command);
     }
 
@@ -525,7 +598,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         if (this.Tool == ToolKind.Notes)
         {
             var columns = this.ResultColumns.Columns;
-            columns.First(column => column.Id == "Subject").Header = "Key";
+            columns.First(column => column.Id == "Subject").Header = "Target";
             columns.First(column => column.Id == "Summary").Header = "Note";
             columns.Remove(columns.First(column => column.Id == "Time"));
         }
@@ -603,7 +676,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             command.IsEnabled = !this._busy && enabled();
         }
 
-        foreach (var relay in this._runCommands)
+        foreach (var relay in this._refreshableCommands)
         {
             relay.NotifyCanExecuteChanged();
         }
@@ -637,7 +710,11 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         this._loaded = true;
         this.Notes?.Activate();
         this._window.ViewModel.ToolsChanged += this.Tools_Changed;
-        this._window.ContextChanged += this.Context_Changed;
+        var tracksBrowserContext = this.Notes is null || this._compact;
+        if (tracksBrowserContext)
+        {
+            this._window.ContextChanged += this.Context_Changed;
+        }
         if (this.Tool == ToolKind.Journal)
         {
             this.JournalSurface!.Activate();
@@ -657,7 +734,11 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
             this.UpdateWatchError();
         }
 
-        this.Context_Changed(null, EventArgs.Empty);
+        if (tracksBrowserContext)
+        {
+            this.Context_Changed(null, EventArgs.Empty);
+        }
+
         this.RefreshRows();
         if (this._focusOnLoad)
         {
@@ -775,6 +856,12 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private void RestoreSelection(InvestigationRow[] previous)
     {
+        if (this.Notes is { } notes)
+        {
+            this.Results.SelectedItem = this.Rows.FirstOrDefault(row => ReferenceEquals(row.Source, notes.Selected));
+            return;
+        }
+
         var sources = previous.Select(row => row.Source).ToHashSet(ReferenceEqualityComparer.Instance);
         var ids = sources.OfType<JournalEntry>().Select(entry => entry.Id).ToHashSet();
         var matches = this.Rows.Where(row => sources.Contains(row.Source) || row.Source is JournalEntry entry && ids.Contains(entry.Id));
@@ -1057,7 +1144,7 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
         if (this.Tool == ToolKind.Notes && args.Key == VirtualKey.Enter && this.Selected.Length == 1)
         {
             args.Handled = true;
-            this.NoteEditor.Focus(FocusState.Keyboard);
+            this.SetDetailsExpanded(true);
         }
         else if (this.Notes is { } notes && args.Key == VirtualKey.Delete && this.Selected.Length == 1)
         {
@@ -1068,14 +1155,9 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private void Results_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args)
     {
-        if ((this.Tool is ToolKind.Journal or ToolKind.Watches && this.Selected.Length > 0)
-            || (this.Tool == ToolKind.Notes && this.Notes?.HasNote == true))
+        if (this.Results.SelectedItems.Count > 0)
         {
             this.SetDetailsExpanded(true);
-        }
-        else if (this.Tool == ToolKind.Notes && this.Selected.Length == 1)
-        {
-            this.NoteEditor.Focus(FocusState.Keyboard);
         }
     }
 
@@ -1120,25 +1202,21 @@ public sealed partial class ToolView : UserControl, IToolSurface, IPanelView
 
     private async void InspectValue(RegistryValue value)
     {
-        var dialog = new AppDialog("Value inspector", new ValueInspector(new ValueInspectorViewModel(value)), "Close", string.Empty);
-        await this._window.Dialogs.ShowAsync(dialog);
+        await ValueInspector.ShowDialogAsync(new ValueInspectorViewModel(value), this._window.Dialogs);
     }
 
     private void Notes_Changed(object? sender, PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(NotesViewModel.Selected))
+        {
+            this.NoteTitle.Visibility = !this._compact || this.Notes?.Selected?.ValueName is not null
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
         if (args.PropertyName == nameof(NotesViewModel.Selected) && this._loaded)
         {
             this.RefreshRows();
-            this._refreshing = true;
-            try
-            {
-                this.Results.SelectedItem = this.Rows.FirstOrDefault(row => ReferenceEquals(row.Source, this.Notes?.Selected));
-            }
-            finally
-            {
-                this._refreshing = false;
-            }
-
             if (this.Notes?.NewCommand.IsRunning == true)
             {
                 this.RequestFocus();

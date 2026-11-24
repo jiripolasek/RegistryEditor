@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
     x:Class="JPSoftworks.Regedit.Views.Tools.ToolView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -7,6 +7,38 @@
     xmlns:tools="using:JPSoftworks.Regedit.Models.Tools"
     xmlns:tools1="using:JPSoftworks.Regedit.Views.Tools">
     <UserControl.Resources>
+        <Style x:Key="NoteMetadataLabelStyle" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="NoteMetadataValueStyle" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="NoteIconStyle" TargetType="FontIcon">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Style>
+        <Style x:Key="NoteSavingIconStyle" BasedOn="{StaticResource NoteIconStyle}" TargetType="FontIcon">
+            <Setter Property="Glyph" Value="&#xE72C;" />
+        </Style>
+        <Style x:Key="NoteSaveFailedIconStyle" BasedOn="{StaticResource NoteIconStyle}" TargetType="FontIcon">
+            <Setter Property="Glyph" Value="&#xEA39;" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+        </Style>
+        <Style x:Key="NoteUnsavedIconStyle" BasedOn="{StaticResource NoteIconStyle}" TargetType="FontIcon">
+            <Setter Property="Glyph" Value="&#xE70F;" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+        </Style>
+        <Style x:Key="NoteSavedIconStyle" BasedOn="{StaticResource NoteIconStyle}" TargetType="FontIcon">
+            <Setter Property="Glyph" Value="&#xE73E;" />
+            <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Style>
+        <Style x:Key="NoteSaveEmptyIconStyle" TargetType="FontIcon">
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
         <DataTemplate x:Key="ToolGroupHeader" x:DataType="tools:ToolRowGroup">
             <TextBlock
                 Margin="0,12,0,4"
@@ -37,7 +69,7 @@
             <RowDefinition Height="*" MinHeight="60" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <local:ToolPageHeader x:Name="PageHeader" Margin="0,0,0,24" />
+        <local:ToolPageHeader x:Name="PageHeader" Style="{StaticResource ToolPageHeaderStyle}" />
         <local:ToolToolbar
             x:Name="LocalControls"
             Grid.Row="1"
@@ -333,7 +365,10 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Grid Grid.Row="1" Style="{StaticResource ToolListSurfaceStyle}">
+                <Grid
+                    x:Name="CollectionSurface"
+                    Grid.Row="1"
+                    Style="{StaticResource ToolListSurfaceStyle}">
                     <!--  Both presentations share selection and the virtualized list.  -->
                     <lists:ColumnListView
                         x:Name="ResultColumns"
@@ -425,6 +460,8 @@
             <Border
                 x:Name="NotePanel"
                 Grid.Column="1"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 Style="{StaticResource ToolInspectorStyle}"
                 Visibility="Collapsed">
                 <Grid RowSpacing="8">
@@ -437,7 +474,11 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel x:Name="NoteHeader" Spacing="4">
                             <TextBlock
                                 x:Name="NoteTitle"
                                 AutomationProperties.AutomationId="NoteTitle"
@@ -460,11 +501,13 @@
                                 TextWrapping="Wrap"
                                 ToolTipService.ToolTip="{x:Bind Notes.Path, Mode=OneWay}" />
                             <TextBlock
+                                x:Name="CompactNoteScope"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Text="{x:Bind Notes.Scope, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <StackPanel x:Name="NoteSaveFeedback" Orientation="Horizontal" Spacing="8">
                                 <TextBlock
                                     x:Name="NoteStatus"
                                     VerticalAlignment="Center"
@@ -506,6 +549,15 @@
                                     </AppBarButton.Icon>
                                 </AppBarButton>
                                 <AppBarButton
+                                    AutomationProperties.AutomationId="ChangeNoteScope"
+                                    Click="ChangeNoteScope_Click"
+                                    Label="{x:Bind Notes.ScopeLabel, Mode=OneWay}"
+                                    Visibility="{x:Bind Notes.CanChangeScope, Mode=OneWay}">
+                                    <AppBarButton.Icon>
+                                        <local:CommandIcon Symbol="Link" />
+                                    </AppBarButton.Icon>
+                                </AppBarButton>
+                                <AppBarButton
                                     AutomationProperties.AutomationId="DeleteNote"
                                     Command="{x:Bind Notes.DeleteCommand}"
                                     Label="Delete note">
@@ -517,13 +569,95 @@
                             <AppBarButton
                                 x:Name="OpenNoteButton"
                                 Command="{x:Bind Notes.OpenCommand}"
-                                Label="Open key"
-                                Visibility="{x:Bind Notes.ShowOpenKey, Mode=OneWay}">
+                                Label="{x:Bind Notes.OpenLabel, Mode=OneWay}"
+                                Visibility="{x:Bind Notes.ShowContextNavigation, Mode=OneWay}">
                                 <AppBarButton.Icon>
                                     <local:CommandIcon Symbol="OpenFile" />
                                 </AppBarButton.Icon>
                             </AppBarButton>
                         </local:ListCommandBar>
+                        <Grid
+                            Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Margin="0,8,0,0"
+                            ColumnSpacing="12"
+                            Visibility="{x:Bind Notes.ShowMetadata, Mode=OneWay}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource NoteMetadataLabelStyle}" Text="Note type" />
+                            <Grid Grid.Column="1" HorizontalAlignment="Right" ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                    Glyph="{x:Bind Notes.NoteTypeGlyph, Mode=OneWay}"
+                                    Style="{StaticResource NoteIconStyle}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Style="{StaticResource NoteMetadataValueStyle}"
+                                    Text="{x:Bind Notes.NoteType, Mode=OneWay}" />
+                            </Grid>
+                            <TextBlock
+                                Grid.Row="1"
+                                Margin="0,4,0,0"
+                                Style="{StaticResource NoteMetadataLabelStyle}"
+                                Text="Registry" />
+                            <Grid
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Margin="0,4,0,0"
+                                HorizontalAlignment="Right"
+                                ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Glyph="&#xE7F4;"
+                                    Style="{StaticResource NoteIconStyle}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Style="{StaticResource NoteMetadataValueStyle}"
+                                    Text="{x:Bind Notes.RegistryContext, Mode=OneWay}" />
+                            </Grid>
+                            <TextBlock
+                                Grid.Row="2"
+                                Margin="0,4,0,0"
+                                Style="{StaticResource NoteMetadataLabelStyle}"
+                                Text="Matches"
+                                Visibility="{x:Bind tools1:ToolView.TextVisibility(Notes.MatchScope), Mode=OneWay}" />
+                            <Grid
+                                Grid.Row="2"
+                                Grid.Column="1"
+                                Margin="0,4,0,0"
+                                HorizontalAlignment="Right"
+                                ColumnSpacing="6"
+                                Visibility="{x:Bind tools1:ToolView.TextVisibility(Notes.MatchScope), Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Glyph="&#xE70B;"
+                                    Style="{StaticResource NoteIconStyle}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Style="{StaticResource NoteMetadataValueStyle}"
+                                    Text="{x:Bind Notes.MatchScope, Mode=OneWay}" />
+                            </Grid>
+                        </Grid>
                     </Grid>
                     <TextBox
                         x:Name="NoteEditor"
@@ -534,13 +668,46 @@
                         AutomationProperties.Name="Local note"
                         IsEnabled="{x:Bind Notes.HasNote, Mode=OneWay}"
                         MaxLength="100000"
-                        PlaceholderText="Write what this key controls or why you changed it."
+                        PlaceholderText="Write what this controls or why you changed it."
                         Text="{x:Bind Notes.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap"
                         Visibility="{x:Bind Notes.HasNote, Mode=OneWay}" />
                 </Grid>
             </Border>
             <local:ToolPaneSplitter x:Name="DetailsSplitter" Visibility="Collapsed" />
+            <Grid
+                x:Name="NotesStatusBar"
+                Grid.Row="2"
+                Grid.ColumnSpan="2"
+                MinHeight="32"
+                Padding="8,2"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0"
+                Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    x:Name="NotesStatusText"
+                    Margin="8,0"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="NotesStatusText"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextTrimming="CharacterEllipsis" />
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="8,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="6">
+                    <FontIcon
+                        AutomationProperties.AccessibilityView="Raw"
+                        Style="{x:Bind NoteSaveIconStyle(Notes.SaveState), Mode=OneWay}" />
+                    <ContentPresenter x:Name="NoteSaveFeedbackHost" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
         </Grid>
         <InfoBar
             x:Name="Notice"

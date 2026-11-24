@@ -15,7 +15,7 @@ public static class SearchQueryText
         KeyNames = 1,
         ValueNames = 2,
         ValueData = 4,
-        KeyNotes = 8,
+        Notes = 8,
         ValueFields = ValueNames | ValueData,
         Default = KeyNames | ValueFields
     }
@@ -117,7 +117,7 @@ public static class SearchQueryText
         {
             validationError = "Use within: with an activity filter, for example activity:edited within:7d.";
         }
-        else if (activity != SearchActivity.None && (matchFields.GetValueOrDefault() & (MatchFields.KeyNames | MatchFields.KeyNotes)) != 0)
+        else if (activity != SearchActivity.None && (matchFields.GetValueOrDefault() & (MatchFields.KeyNames | MatchFields.Notes)) != 0)
         {
             validationError = "With an activity filter, choose match:names, match:data, or match:names,data.";
         }
@@ -145,7 +145,7 @@ public static class SearchQueryText
         return new SearchOptions(
             string.Join(' ', text), Keys: fields.HasFlag(MatchFields.KeyNames), Values: fields.HasFlag(MatchFields.ValueNames),
             Data: fields.HasFlag(MatchFields.ValueData), Activity: activity,
-            ActivityWithin: within, KeyModified: modified, Notes: fields.HasFlag(MatchFields.KeyNotes));
+            ActivityWithin: within, KeyModified: modified, Notes: fields.HasFlag(MatchFields.Notes));
 
         void AddText(ReadOnlySpan<char> part)
         {
@@ -169,7 +169,7 @@ public static class SearchQueryText
                 "KEYS" => MatchFields.KeyNames,
                 "NAMES" => MatchFields.ValueNames,
                 "DATA" => MatchFields.ValueData,
-                "NOTES" => MatchFields.KeyNotes,
+                "NOTES" => MatchFields.Notes,
                 _ => throw new ArgumentException("Choose fields from match:keys,names,data,notes. Use commas without spaces.")
             };
         }
@@ -219,7 +219,7 @@ public static class SearchQueryText
         var matchFields = (options.Activity == SearchActivity.None && options.Keys ? MatchFields.KeyNames : MatchFields.None)
                           | (options.Values ? MatchFields.ValueNames : MatchFields.None)
                           | (options.Data ? MatchFields.ValueData : MatchFields.None)
-                          | (options.Activity == SearchActivity.None && options.Notes ? MatchFields.KeyNotes : MatchFields.None);
+                          | (options.Activity == SearchActivity.None && options.Notes ? MatchFields.Notes : MatchFields.None);
         var hasMatchSelection = matchFields != MatchFields.None && matchFields != DefaultMatchFields(options.Activity);
         var hasFilters = options.Activity != SearchActivity.None || options.KeyModified is not null || hasMatchSelection;
         if (text.Length > 0 && (hasFilters || quotePlainText) && (ContainsFilterSyntax(text)
@@ -266,7 +266,7 @@ public static class SearchQueryText
             names.Add("data");
         }
 
-        if (fields.HasFlag(MatchFields.KeyNotes))
+        if (fields.HasFlag(MatchFields.Notes))
         {
             names.Add("notes");
         }

@@ -17,12 +17,13 @@ public sealed partial class ToolPaneSplitter : UserControl
     private RowDefinition? _row;
     private FrameworkElement? _pane;
     private Func<double>? _availableWidth;
+    private Func<double>? _availableHeight;
     private double? _width, _height;
     private bool _beside;
 
     private double Maximum => this._beside
         ? Math.Max(220, (this._availableWidth?.Invoke() ?? 0) - 200)
-        : Math.Max(100, ((this.Parent as FrameworkElement)?.ActualHeight ?? 0) - 120);
+        : Math.Max(100, (this._availableHeight?.Invoke() ?? (this.Parent as FrameworkElement)?.ActualHeight ?? 0) - 120);
 
     public ToolPaneSplitter()
     {
@@ -40,13 +41,15 @@ public sealed partial class ToolPaneSplitter : UserControl
         RowDefinition row,
         bool beside,
         bool visible,
-        Func<double> availableWidth)
+        Func<double> availableWidth,
+        Func<double>? availableHeight = null)
     {
         this._pane = pane;
         this._column = column;
         this._row = row;
         this._beside = beside;
         this._availableWidth = availableWidth;
+        this._availableHeight = availableHeight;
         this.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         Grid.SetColumn(this, Grid.GetColumn(pane));
         Grid.SetRow(this, Grid.GetRow(pane));

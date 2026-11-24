@@ -2,11 +2,10 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
-using System.ComponentModel;
-using System.Windows.Input;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Infrastructure;
 using JPSoftworks.Regedit.Models.Tools;
+using JPSoftworks.Regedit.Resources;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -17,120 +16,132 @@ namespace JPSoftworks.Regedit.Dialogs;
 
 public sealed partial class ValueInspector : UserControl
 {
-    private readonly WindowDialogPresenter? _dialogs;
+    private readonly WindowDialogPresenter _dialogs;
+    private Action<Func<Task>>? _requestByteDialog;
 
     internal ValueInspectorViewModel ViewModel { get; }
 
-    internal NoteDraft? Note { get; }
+    internal InspectorNotesViewModel? Notes { get; set; }
 
-    internal ICommand? OpenNoteCommand { get; }
+    private bool HasDetails => this.ViewModel.HasKeyPath || this.ViewModel.HasText || this.ViewModel.HasStoredValue;
 
-    internal bool IsInterpretationExpanded
-    {
-        get => this.InterpretationControls.Visibility == Visibility.Visible;
-        set
-        {
-            this.InterpretationControls.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
-            this.InterpretationChevron.Glyph = value ? "\uE70D" : "\uE76C";
-            AutomationProperties.SetName(this.InterpretBytesToggle, value ? "Hide byte interpretation" : "Show byte interpretation");
-        }
-    }
-
-    internal ValueInspector(
-        ValueInspectorViewModel viewModel,
-        WindowDialogPresenter? dialogs = null,
-        NoteDraft? note = null,
-        ICommand? openNoteCommand = null)
+    internal ValueInspector(ValueInspectorViewModel viewModel, WindowDialogPresenter dialogs)
     {
         this.ViewModel = viewModel;
         this._dialogs = dialogs;
-        this.Note = note;
-        this.OpenNoteCommand = openNoteCommand;
         this.InitializeComponent();
-        this.RawBytesView.Width = HexView.DialogWidth;
-        this.Loaded += (_, _) => viewModel.PropertyChanged += this.ViewModel_PropertyChanged;
-        this.Unloaded += (_, _) => viewModel.PropertyChanged -= this.ViewModel_PropertyChanged;
+        this.Loaded += (_, _) => this.Notes?.Activate();
+        this.Unloaded += (_, _) => this.Notes?.Deactivate();
+        RevealOnHover(this.PrimaryNote, this.EditNote);
+        RevealOnHover(this.KeyNotePreview, this.EditKeyNote);
+        // x:Bind would share one geometry instance with the type icon.
+        this.RawActionIcon.IconSource = ToolRowResources.BinaryIcon;
     }
 
-    private void ToggleByteInterpretation_Click(object sender, RoutedEventArgs args)
+    internal static async Task ShowDialogAsync(
+        ValueInspectorViewModel viewModel,
+        WindowDialogPresenter dialogs,
+        Action<ValueInspector, AppDialog>? configure = null)
     {
-        this.IsInterpretationExpanded = !this.IsInterpretationExpanded;
-    }
-
-    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        // Keep the hex view on the byte range chosen for interpretation.
-        if (e.PropertyName is nameof(ValueInspectorViewModel.Offset) or nameof(ValueInspectorViewModel.Length))
+        Func<Task>? openByteDialog;
+        do
         {
-            this.HighlightBytes(this.RawBytesView);
-        }
+            openByteDialog = null;
+            var inspector = new ValueInspector(viewModel, dialogs);
+            var dialog = new AppDialog("Value inspector", inspector, "Close", string.Empty);
+            configure?.Invoke(inspector, dialog);
+            inspector._requestByteDialog = open =>
+            {
+                openByteDialog = open;
+                dialog.Hide();
+            };
+            await dialogs.ShowAsync(dialog);
+
+            if (openByteDialog is not null)
+            {
+                await openByteDialog();
+            }
+        } while (openByteDialog is not null);
     }
 
-    private void HighlightBytes(HexView view)
+    private async void OpenByteInterpreter_Click(object sender, RoutedEventArgs args)
     {
-        if (double.IsFinite(this.ViewModel.Offset) && double.IsFinite(this.ViewModel.Length))
-        {
-            view.Highlight((long)this.ViewModel.Offset, (long)this.ViewModel.Length);
-        }
-    }
-
-    private void Inspector_SizeChanged(object sender, SizeChangedEventArgs args)
-    {
-        var compact = this._dialogs is not null && args.NewSize.Width < HexView.DialogWidth + 4;
-        this.RawBytesFrame.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        this.OpenRawBytes.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+        await this.OpenByteDialogAsync(this.ShowInterpreterAsync);
     }
 
     private async void OpenRawBytes_Click(object sender, RoutedEventArgs args)
     {
-        if (this._dialogs is null)
+        await this.OpenByteDialogAsync(this.ShowRawBytesAsync);
+    }
+
+    private async Task OpenByteDialogAsync(Func<Task> open)
+    {
+        if (this._requestByteDialog is { } request)
+        {
+            request(open);
+        }
+        else
+        {
+            await open();
+        }
+    }
+
+    private Task ShowInterpreterAsync()
+    {
+        var view = new ByteInterpreter(this.ViewModel);
+        var layout = new DialogLayout(
+            "Interpret bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading,
+            defaultButton: ContentDialogButton.None)
+        {
+            OnOpened = view.FocusOffset
+        };
+        return this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 64, 704));
+    }
+
+    private void MoreNotes_Click(object sender, RoutedEventArgs args)
+    {
+        if (this.Notes is not { } notes)
         {
             return;
         }
 
+        var menu = new MenuFlyout();
+        NoteDraft? selected = null;
+        foreach (var note in notes.OtherMatches)
+        {
+            var item = new MenuFlyoutItem { Text = note.RuleSummary };
+            ToolTipService.SetToolTip(item, note.Location.Address);
+            item.Click += (_, _) => selected = note;
+            menu.Items.Add(item);
+        }
+
+        menu.Closed += (_, _) =>
+        {
+            if (selected is { } note)
+            {
+                this.DispatcherQueue.TryEnqueue(() => notes.OpenMatchCommand.Execute(note));
+            }
+        };
+        menu.ShowAt(this.MoreNotes);
+    }
+
+    internal static void HighlightBytes(ValueInspectorViewModel viewModel, HexView view)
+    {
+        if (double.IsFinite(viewModel.Offset) && double.IsFinite(viewModel.Length))
+        {
+            view.Highlight((long)viewModel.Offset, (long)viewModel.Length);
+        }
+    }
+
+    private Task ShowRawBytesAsync()
+    {
         var view = new HexView { Bytes = this.ViewModel.Bytes, MinWidth = HexView.DialogWidth };
         AutomationProperties.SetAutomationId(view, "ExpandedValueHexView");
         AutomationProperties.SetName(view, "Raw bytes");
-        view.Loaded += (_, _) => this.HighlightBytes(view);
+        view.Loaded += (_, _) => HighlightBytes(this.ViewModel, view);
         var layout = new DialogLayout("Raw bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading, fillBody: true);
         layout.EnableHorizontalScrolling();
-        await this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 16, 588));
-    }
-
-    private void CopyReadout_Loaded(object sender, RoutedEventArgs args)
-    {
-        var button = (Button)sender;
-        button.Loaded -= this.CopyReadout_Loaded;
-        var row = button.Parent is StackPanel actions ? (Grid)actions.Parent : (Grid)button.Parent;
-        var pointerOver = false;
-        var focusWithin = false;
-
-        // Opacity keeps the button's space and keyboard/automation access intact.
-        void UpdateOpacity()
-        {
-            button.Opacity = pointerOver || focusWithin ? 1 : 0;
-        }
-
-        row.PointerEntered += (_, _) =>
-        {
-            pointerOver = true;
-            UpdateOpacity();
-        };
-        row.PointerExited += (_, _) =>
-        {
-            pointerOver = false;
-            UpdateOpacity();
-        };
-        row.GotFocus += (_, _) =>
-        {
-            focusWithin = true;
-            UpdateOpacity();
-        };
-        row.LostFocus += (_, _) =>
-        {
-            focusWithin = false;
-            UpdateOpacity();
-        };
+        return this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 16, 588));
     }
 
     private void OpenTarget_Click(object sender, RoutedEventArgs args)
@@ -143,6 +154,33 @@ public sealed partial class ValueInspector : UserControl
                 break;
             }
         }
+    }
+
+    private void CopyReadout_Loaded(object sender, RoutedEventArgs args)
+    {
+        var button = (Button)sender;
+        button.Loaded -= this.CopyReadout_Loaded;
+        RevealOnHover((Grid)button.Parent, button);
+    }
+
+    private static void RevealOnHover(FrameworkElement area, Button button)
+    {
+        var pointerOver = false;
+
+        void Refresh() => button.Opacity = pointerOver || button.FocusState == FocusState.Keyboard ? 1 : 0;
+
+        area.PointerEntered += (_, _) =>
+        {
+            pointerOver = true;
+            Refresh();
+        };
+        area.PointerExited += (_, _) =>
+        {
+            pointerOver = false;
+            Refresh();
+        };
+        button.GotFocus += (_, _) => Refresh();
+        button.LostFocus += (_, _) => Refresh();
     }
 
     private void CopyReadout_Click(object sender, RoutedEventArgs args)
