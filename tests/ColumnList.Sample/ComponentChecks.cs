@@ -17,7 +17,7 @@ using Microsoft.UI.Xaml.Input;
 
 namespace JPSoftworks.ColumnList.Sample;
 
-internal static class ComponentChecks
+internal static partial class ComponentChecks
 {
     internal static async Task RunAsync(MainPage page, Window window, string output)
     {
@@ -463,8 +463,12 @@ internal static class ComponentChecks
                 && editor.FocusState != FocusState.Unfocused
                 && AutomationProperties.GetHelpText(editor) == "A name cannot be empty.",
                 "Rejected text keeps the editor open with the host's error");
+            var errorTip = (ToolTip)ToolTipService.GetToolTip(editor);
             editor.Text = page.Entries[6].Name;
             Check(!registry.CommitEdit() && registry.IsEditing, "The host can reject duplicate names");
+            Check(
+                errorTip.IsOpen && ReferenceEquals(errorTip, ToolTipService.GetToolTip(editor)),
+                "Repeated validation errors reuse the open tooltip");
             editor.Text = "Renamed value";
             Check(
                 registry.CommitEdit()
@@ -472,6 +476,7 @@ internal static class ComponentChecks
                 && target.Name == "Renamed value"
                 && ended[^1] is { Committed: true, ColumnId: "Name" }
                 && !editedRow.Children.Contains(editor), "Committing applies the host rename and removes the editor");
+            Check(!errorTip.IsOpen, "Finishing an edit closes the validation tooltip over the rows");
             await WaitAsync(() => ((TextBlock)RowOf(registry, target).CellFor(nameColumn)!).Text == "Renamed value");
             Check(RowOf(registry, target).CellFor(nameColumn)!.Opacity == 1, "The row shows the renamed value");
             registry.BeginEdit(target);
@@ -616,10 +621,12 @@ internal static class ComponentChecks
             await WaitAsync(() => tools.ListView.ContainerFromIndex(0) is ListViewItem { ContentTemplateRoot: ColumnRow });
             await WaitAsync(() => Aligned(tools), () => Misalignment(tools));
             Check(tools.HeaderRow.Visibility == Visibility.Visible, "Showing columns restores aligned column rows");
+            await CheckSelectionBoxesAsync(page, Check);
 
             if (App.InputTests)
             {
                 await RunMouseChecksAsync(page, window, Check);
+                await CheckDragSelectionAsync(page, window, Check);
             }
 
             // Persistence.

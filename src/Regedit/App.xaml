@@ -81,15 +81,6 @@
             <Style x:Key="CommandIconAccentStyle" TargetType="IconElement">
                 <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
             </Style>
-            <Style x:Key="PanelResizeThumbStyle" TargetType="Thumb">
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Thumb">
-                            <Border Background="Transparent" />
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
             <Style
                 x:Key="ToolbarButtonStyle"
                 BasedOn="{StaticResource SubtleButtonStyle}"

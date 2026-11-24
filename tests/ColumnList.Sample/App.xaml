@@ -11,16 +11,6 @@
             <Style x:Key="CommandIconAccentStyle" TargetType="IconElement">
                 <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
             </Style>
-            <!--  Mirrors src/Regedit/App.xaml; ResizeThumb looks this style up application-wide.  -->
-            <Style x:Key="PanelResizeThumbStyle" TargetType="Thumb">
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Thumb">
-                            <Border Background="Transparent" />
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

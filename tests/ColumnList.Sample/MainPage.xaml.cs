@@ -10,6 +10,7 @@ using JPSoftworks.Regedit.Infrastructure.Collections;
 using JPSoftworks.Regedit.Models.Lists;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace JPSoftworks.ColumnList.Sample;
 
@@ -62,6 +63,46 @@ public sealed partial class MainPage : Page
         this.ToolSelection.CollectionChanged += (_, _) => this.UpdateInspector();
         ListContextMenu.Attach(this.Registry.ListView, this.RowMenu);
         this.Loaded += (_, _) => this.UpdateInspector();
+    }
+
+    private void EntryName_DragStarting(UIElement sender, DragStartingEventArgs args)
+    {
+        var item = ((FrameworkElement)sender).DataContext;
+        var entries = this.Registry.PrepareItemDrag(item).Cast<SampleEntry>();
+        args.AllowedOperations = args.Data.RequestedOperation = DataPackageOperation.Copy;
+        args.Data.SetText(string.Join(Environment.NewLine, entries.Select(entry => entry.Name)));
+    }
+
+    private void Names_DragOver(object sender, DragEventArgs args)
+    {
+        args.AcceptedOperation = args.DataView.Contains(StandardDataFormats.Text)
+            ? args.AllowedOperations & DataPackageOperation.Copy
+            : DataPackageOperation.None;
+        args.Handled = true;
+    }
+
+    private async void Names_Drop(object sender, DragEventArgs args)
+    {
+        this.Names_DragOver(sender, args);
+        if (args.AcceptedOperation == DataPackageOperation.None)
+        {
+            return;
+        }
+
+        var deferral = args.GetDeferral();
+        try
+        {
+            this.DroppedNames.Text = await args.DataView.GetTextAsync();
+        }
+        catch (Exception)
+        {
+            args.AcceptedOperation = DataPackageOperation.None;
+            this.DroppedNames.Text = "Couldn't read the dropped text.";
+        }
+        finally
+        {
+            deferral.Complete();
+        }
     }
 
     internal void SaveLayout()
@@ -146,6 +187,19 @@ public sealed partial class MainPage : Page
     {
         this.Registry.ResetLayout();
         this.Tools.ResetLayout();
+    }
+
+    private void SelectionCheckBoxes_Changed(object sender, SelectionChangedEventArgs args)
+    {
+        if (this.Registry is not null && ((ComboBox)sender).SelectedIndex is var index and >= 0)
+        {
+            this.Registry.SelectionCheckBoxes = (SelectionCheckBoxMode)index;
+        }
+    }
+
+    private void DragSelectionOption_Click(object sender, RoutedEventArgs args)
+    {
+        this.Registry.IsDragSelectionEnabled = this.DragSelectionOption.IsChecked == true;
     }
 
     private void FitAll_Click(object sender, RoutedEventArgs args)

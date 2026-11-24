@@ -1,0 +1,10 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)*.cs" Link="Controls\Lists\%(Filename)%(Extension)" />
+    <Page Include="$(MSBuildThisFileDirectory)ColumnListView.xaml" Link="Controls\Lists\ColumnListView.xaml" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\Shared\ResizeThumb.xaml.cs" Link="Controls\Shared\ResizeThumb.xaml.cs" />
+    <Page Include="$(MSBuildThisFileDirectory)..\Shared\ResizeThumb.xaml" Link="Controls\Shared\ResizeThumb.xaml" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\..\Models\Lists\*.cs" Link="Models\Lists\%(Filename)%(Extension)" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\..\Infrastructure\Collections\IRangeList.cs" Link="Infrastructure\Collections\IRangeList.cs" />
+  </ItemGroup>
+</Project>

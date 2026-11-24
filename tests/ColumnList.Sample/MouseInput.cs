@@ -27,31 +27,18 @@ internal static partial class MouseInput
         if (GetForegroundWindow() != _targetWindow)
         {
             var caption = ToScreen(window, window.Content, new Point(window.Content.RenderSize.Width / 2, -16));
-            const uint keepBounds = 0x0013;
-            if (!SetWindowPos(_targetWindow, -1, 0, 0, 0, 0, keepBounds))
+            await MoveAsync(caption);
+            mouse_event(LeftDown, 0, 0, 0, 0);
+            mouse_event(LeftUp, 0, 0, 0, 0);
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (GetForegroundWindow() != _targetWindow && DateTime.UtcNow < deadline)
             {
-                throw new InvalidOperationException("Could not raise the component test window.");
+                await Task.Delay(20);
             }
 
-            try
+            if (GetForegroundWindow() != _targetWindow)
             {
-                await MoveAsync(caption);
-                mouse_event(LeftDown, 0, 0, 0, 0);
-                mouse_event(LeftUp, 0, 0, 0, 0);
-                var deadline = DateTime.UtcNow.AddSeconds(2);
-                while (GetForegroundWindow() != _targetWindow && DateTime.UtcNow < deadline)
-                {
-                    await Task.Delay(20);
-                }
-
-                if (GetForegroundWindow() != _targetWindow)
-                {
-                    throw new InvalidOperationException("The component test window could not receive foreground input.");
-                }
-            }
-            finally
-            {
-                SetWindowPos(_targetWindow, -2, 0, 0, 0, 0, keepBounds);
+                throw new InvalidOperationException("The component test window could not receive foreground input.");
             }
         }
     }
@@ -129,6 +116,11 @@ internal static partial class MouseInput
         await Task.Delay(60);
     }
 
+    internal static void SetKey(byte virtualKey, bool down)
+    {
+        keybd_event(virtualKey, 0, down ? 0 : KeyUp, 0);
+    }
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetCursorPos(int x, int y);
@@ -155,10 +147,6 @@ internal static partial class MouseInput
 
     [LibraryImport("user32.dll")]
     private static partial nint GetAncestor(nint window, uint flags);
-
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetWindowPos(nint window, nint after, int x, int y, int width, int height, uint flags);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

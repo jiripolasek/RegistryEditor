@@ -5,6 +5,7 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 
 namespace JPSoftworks.Regedit.Controls.Lists;
@@ -20,6 +21,10 @@ public sealed partial class ColumnRow : Grid
     private ColumnListView? _owner;
     private (ListColumn Column, TextBox Box)? _editor;
     private INotifyPropertyChanged? _observedItem;
+    private CheckBox? _selectionBox;
+    private Border? _leadingCell;
+    private ListViewItem? _container;
+    private bool _pointerOver;
 
     internal IEnumerable<(ListColumn Column, FrameworkElement Cell)> Cells =>
         this._cells.Select(pair => (pair.Key, pair.Value));
@@ -59,6 +64,7 @@ public sealed partial class ColumnRow : Grid
     {
         this._owner = owner;
         this.UpdateAutomationName();
+        this.UpdateOverlay();
     }
 
     // The list item's accessible name comes from its template root.
@@ -66,7 +72,12 @@ public sealed partial class ColumnRow : Grid
     {
         if (this._owner?.ItemAutomationName is { } name)
         {
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, name(this.DataContext) ?? string.Empty);
+            var itemName = name(this.DataContext) ?? string.Empty;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, itemName);
+            if (this._selectionBox is { } box)
+            {
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(box, "Select " + itemName);
+            }
         }
     }
 
@@ -139,7 +150,7 @@ public sealed partial class ColumnRow : Grid
     {
         foreach (var (column, cell) in this._cells)
         {
-            column.RefreshCell(cell, this.DataContext);
+            column.RefreshCell(cell == this._leadingCell ? (FrameworkElement)this._leadingCell.Child : cell, this.DataContext);
         }
     }
 
@@ -152,10 +163,17 @@ public sealed partial class ColumnRow : Grid
 
         if (arrangement.ColumnsVersion != this._applied.ColumnsVersion)
         {
-            foreach (var stale in this._cells.Keys.Where(column => !arrangement.Declared.Contains(column)).ToArray())
+            foreach (var (column, cell) in this._cells.ToArray())
             {
-                this.Children.Remove(this._cells[stale]);
-                this._cells.Remove(stale);
+                if (!arrangement.Declared.Contains(column) || (column == this._owner?.LeadingColumn) != (cell == this._leadingCell))
+                {
+                    this.Children.Remove(cell);
+                    this._cells.Remove(column);
+                    if (cell == this._leadingCell)
+                    {
+                        this._leadingCell = null;
+                    }
+                }
             }
         }
 
@@ -172,9 +190,19 @@ public sealed partial class ColumnRow : Grid
         for (var slot = 0; slot < arrangement.Slots.Count; slot++)
         {
             var column = arrangement.Slots[slot];
+            if (column is null)
+            {
+                continue;
+            }
+
             if (!this._cells.TryGetValue(column, out var cell))
             {
                 cell = column.CreateCell();
+                if (column == this._owner?.LeadingColumn)
+                {
+                    cell = this._leadingCell = new Border { Child = cell };
+                }
+
                 this._cells.Add(column, cell);
                 this.Children.Add(cell);
             }
@@ -189,6 +217,53 @@ public sealed partial class ColumnRow : Grid
         }
 
         this._applied = arrangement;
+        this.ApplyCheckBox();
+    }
+
+    private void ApplyCheckBox()
+    {
+        if (this._owner is not { } owner || owner.EffectiveCheckBoxes == SelectionCheckBoxMode.Default)
+        {
+            if (this._selectionBox is { } unused)
+            {
+                unused.Visibility = Visibility.Collapsed;
+                this.UpdateOverlay();
+            }
+
+            return;
+        }
+
+        if (this._selectionBox is null)
+        {
+            this._selectionBox = owner.CreateRowCheckBox();
+            this._selectionBox.RegisterPropertyChangedCallback(CheckBox.IsCheckedProperty, (_, _) => this.UpdateOverlay());
+            this.Children.Add(this._selectionBox);
+            this.UpdateAutomationName();
+        }
+
+        this._selectionBox.Visibility = Visibility.Visible;
+        this.UpdateOverlay();
+    }
+
+    private void UpdateOverlay()
+    {
+        if (this._selectionBox is not { } box || this._owner is not { } owner)
+        {
+            return;
+        }
+
+        var show = true;
+        if (this._leadingCell is { } cell)
+        {
+            var overlay = owner.EffectiveCheckBoxes == SelectionCheckBoxMode.Overlay;
+            show = !overlay || this._pointerOver || box.IsChecked == true;
+            var covered = overlay && show;
+            cell.Opacity = covered ? 0 : 1;
+            cell.IsHitTestVisible = !covered;
+        }
+
+        box.Opacity = show ? 1 : 0;
+        box.IsHitTestVisible = show;
     }
 
     internal static void SetWidths(Grid grid, IReadOnlyList<double> widths)
@@ -220,6 +295,13 @@ public sealed partial class ColumnRow : Grid
         this.ObserveItem();
         for (DependencyObject? parent = VisualTreeHelper.GetParent(this); parent is not null; parent = VisualTreeHelper.GetParent(parent))
         {
+            if (parent is ListViewItem container && this._container is null)
+            {
+                this._container = container;
+                container.AddHandler(PointerEnteredEvent, new PointerEventHandler(this.RowEntered), true);
+                container.AddHandler(PointerExitedEvent, new PointerEventHandler(this.RowExited), true);
+            }
+
             if (parent is ColumnListView owner)
             {
                 this._owner = owner;
@@ -229,8 +311,28 @@ public sealed partial class ColumnRow : Grid
         }
     }
 
+    private void RowEntered(object sender, PointerRoutedEventArgs args)
+    {
+        this._pointerOver = true;
+        this.UpdateOverlay();
+    }
+
+    private void RowExited(object sender, PointerRoutedEventArgs args)
+    {
+        this._pointerOver = false;
+        this.UpdateOverlay();
+    }
+
     private void RowUnloaded(object sender, RoutedEventArgs args)
     {
+        if (this._container is { } container)
+        {
+            container.RemoveHandler(PointerEnteredEvent, new PointerEventHandler(this.RowEntered));
+            container.RemoveHandler(PointerExitedEvent, new PointerEventHandler(this.RowExited));
+            this._container = null;
+        }
+
+        this._pointerOver = false;
         if (this._observedItem is not null)
         {
             this._observedItem.PropertyChanged -= this.ItemPropertyChanged;

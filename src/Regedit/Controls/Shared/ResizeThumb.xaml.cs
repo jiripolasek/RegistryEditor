@@ -3,7 +3,6 @@
 // ------------------------------------------------------------
 
 using Microsoft.UI.Input;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
@@ -15,17 +14,15 @@ public sealed partial class ResizeThumb : UserControl
 {
     public event DragDeltaEventHandler DragDelta
     {
-        add => this._thumb.DragDelta += value;
-        remove => this._thumb.DragDelta -= value;
+        add => this.Grip.DragDelta += value;
+        remove => this.Grip.DragDelta -= value;
     }
 
     public event DragCompletedEventHandler DragCompleted
     {
-        add => this._thumb.DragCompleted += value;
-        remove => this._thumb.DragCompleted -= value;
+        add => this.Grip.DragCompleted += value;
+        remove => this.Grip.DragCompleted -= value;
     }
-
-    private readonly Thumb _thumb;
 
     private Orientation _direction;
 
@@ -42,22 +39,14 @@ public sealed partial class ResizeThumb : UserControl
 
     public ResizeThumb()
     {
-        this._thumb = new Thumb
-        {
-            Style = (Style)Application.Current.Resources["PanelResizeThumbStyle"],
-            IsTabStop = true,
-            UseSystemFocusVisuals = true,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch
-        };
-        this.Content = this._thumb;
+        this.InitializeComponent();
         this.ResizeDirection = Orientation.Horizontal;
         AutomationProperties.SetAccessibilityView(this, AccessibilityView.Raw);
         this.Loaded += (_, _) =>
         {
             this.IsTabStop = false;
-            AutomationProperties.SetAutomationId(this._thumb, AutomationProperties.GetAutomationId(this));
-            AutomationProperties.SetName(this._thumb, AutomationProperties.GetName(this));
+            AutomationProperties.SetAutomationId(this.Grip, AutomationProperties.GetAutomationId(this));
+            AutomationProperties.SetName(this.Grip, AutomationProperties.GetName(this));
         };
     }
 }

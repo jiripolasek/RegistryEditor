@@ -10,7 +10,11 @@
             x:Key="IconCell"
             x:DataType="models:RegistryEntry"
             x:DefaultBindMode="OneWay">
-            <Grid VerticalAlignment="Center">
+            <Grid
+                VerticalAlignment="Center"
+                lists:ColumnListView.IsDragHandle="{x:Bind IsStored}"
+                Background="Transparent"
+                DragStarting="Entry_DragStarting">
                 <FontIcon
                     FontFamily="/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"
                     FontSize="16"
@@ -53,7 +57,10 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
+                    HorizontalAlignment="Left"
                     VerticalAlignment="Center"
+                    lists:ColumnListView.IsDragHandle="{x:Bind IsStored, Mode=OneWay}"
+                    DragStarting="Entry_DragStarting"
                     Text="{x:Bind NamePreview, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis"
                     ToolTipService.ToolTip="{x:Bind NamePreview, Mode=OneWay}" />
@@ -161,6 +168,7 @@
             EditOnF2="False"
             ItemsSource="{x:Bind ViewModel.Entries, Mode=OneWay}"
             LayoutChanged="Entries_LayoutChanged"
+            SelectionCheckBoxes="Overlay"
             SortRequested="Entries_SortRequested"
             VisibleItemsChanged="Entries_VisibleItemsChanged">
             <lists:ColumnListView.LeadingColumn>

@@ -2,6 +2,7 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -30,7 +31,18 @@ public partial class App : Application
         FrameworkElement page = iconCheckIndex >= 0 ? new Page() : new MainPage();
         this._window = MainWindow = new Window { Title = "Column list sample", Content = page };
         this._window.AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 820));
-        InputTests = arguments.Contains("--input-test");
+        InputTests = arguments.Contains("--self-test") && arguments.Contains("--input-test");
+        if (InputTests && this._window.AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            var appWindow = this._window.AppWindow;
+            var area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+            appWindow.Move(
+                new Windows.Graphics.PointInt32(
+                    area.X + Math.Max(0, area.Width - appWindow.Size.Width - 20),
+                    area.Y + Math.Clamp(area.Height - appWindow.Size.Height, 0, 28)));
+            presenter.IsAlwaysOnTop = true;
+        }
+
         var checkIndex = iconCheckIndex >= 0 ? iconCheckIndex : Array.IndexOf(arguments, "--self-test");
         if (checkIndex >= 0 && checkIndex + 1 < arguments.Length)
         {
