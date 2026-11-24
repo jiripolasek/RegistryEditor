@@ -11,7 +11,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
+using Windows.Foundation.Collections;
 
 namespace JPSoftworks.Regedit.Controls.Lists;
 
@@ -58,6 +60,10 @@ public sealed partial class ColumnListView : UserControl
         nameof(SelectedItems), typeof(object), typeof(ColumnListView),
         new PropertyMetadata(null, (owner, args) => ((ColumnListView)owner).SelectedItemsChanged(args.OldValue)));
 
+    public static readonly DependencyProperty SelectionCheckBoxesProperty = DependencyProperty.Register(
+        nameof(SelectionCheckBoxes), typeof(SelectionCheckBoxMode), typeof(ColumnListView),
+        new PropertyMetadata(SelectionCheckBoxMode.Default, (owner, _) => ((ColumnListView)owner).UpdatePresentation()));
+
     public static readonly DependencyProperty SortColumnIdProperty = DependencyProperty.Register(
         nameof(SortColumnId), typeof(string), typeof(ColumnListView),
         new PropertyMetadata(null, (owner, _) => ((ColumnListView)owner).UpdateSort()));
@@ -86,6 +92,7 @@ public sealed partial class ColumnListView : UserControl
     private int _columnsVersion;
     private ColumnLayout _layout = new([]);
     private ListColumn? _leading;
+    private ScrollViewer? _itemsScroll;
     private INotifyCollectionChanged? _observedSelection;
     private bool _publishing;
 
@@ -125,6 +132,12 @@ public sealed partial class ColumnListView : UserControl
     {
         get => (ListViewSelectionMode)this.GetValue(SelectionModeProperty);
         set => this.SetValue(SelectionModeProperty, value);
+    }
+
+    public SelectionCheckBoxMode SelectionCheckBoxes
+    {
+        get => (SelectionCheckBoxMode)this.GetValue(SelectionCheckBoxesProperty);
+        set => this.SetValue(SelectionCheckBoxesProperty, value);
     }
 
     /// <summary>
@@ -195,6 +208,8 @@ public sealed partial class ColumnListView : UserControl
             {
                 row.UpdateAutomationName();
             }
+
+            this.CompactAutomationNameChanged?.Invoke();
         }
     }
 
@@ -237,14 +252,49 @@ public sealed partial class ColumnListView : UserControl
         this.HorizontalScroll.SizeChanged += (_, _) => this.Arrange();
         this.Items.SelectionChanged += this.ItemsSelectionChanged;
         this.Items.GettingFocus += this.ItemsGettingFocus;
+        this.Items.Loaded += (_, _) =>
+        {
+            if (FindScrollViewer(this.Items) is { } scroll)
+            {
+                this._itemsScroll = scroll;
+                scroll.ViewChanged += this.ItemsViewChanged;
+            }
+        };
+        this.Items.Unloaded += (_, _) =>
+        {
+            this.EndSelectionDrag();
+            if (this._itemsScroll is { } scroll)
+            {
+                scroll.ViewChanged -= this.ItemsViewChanged;
+                this._itemsScroll = null;
+            }
+        };
         // An empty list has no remembered row to restore when tabbing into it.
-        this.Items.Items.VectorChanged += (_, _) => this.Items.TabFocusNavigation = this.Items.Items.Count == 0
-            ? KeyboardNavigationMode.Local
-            : KeyboardNavigationMode.Once;
+        this.Items.Items.VectorChanged += (_, change) =>
+        {
+            var index = (int)change.Index;
+            if (change.CollectionChange != CollectionChange.ItemInserted || index != this.Items.Items.Count - 1)
+            {
+                this.EndSelectionDrag();
+                this._selectionAnchor = change.CollectionChange switch
+                {
+                    CollectionChange.ItemInserted when index <= this._selectionAnchor => this._selectionAnchor + 1,
+                    CollectionChange.ItemRemoved when index < this._selectionAnchor => this._selectionAnchor - 1,
+                    CollectionChange.Reset => -1,
+                    CollectionChange.ItemRemoved or CollectionChange.ItemChanged when index == this._selectionAnchor => -1,
+                    _ => this._selectionAnchor
+                };
+            }
+
+            this.UpdateSelectAll();
+            this.Items.TabFocusNavigation = this.Items.Items.Count == 0 ? KeyboardNavigationMode.Local : KeyboardNavigationMode.Once;
+        };
         this.Items.ItemTemplate = this.RowTemplate;
         this.Items.RegisterPropertyChangedCallback(ListView.ItemContainerStyleProperty, (_, _) => this.InvalidateChrome());
         this.Loaded += (_, _) => this.InvalidateChrome();
         this.InitializeEditing();
+        this.InitializeDragSelection();
+        this.Items.RegisterPropertyChangedCallback(ListView.SelectionModeProperty, (_, _) => this.UpdatePresentation());
         this.RebuildColumns();
     }
 
@@ -326,7 +376,7 @@ public sealed partial class ColumnListView : UserControl
     public void AutoFitAllColumns()
     {
         var layout = this._layout;
-        foreach (var column in this._arrangement.Slots.Where(column => !ReferenceEquals(column, this._leading)))
+        foreach (var column in this._arrangement.Slots.OfType<ListColumn>().Where(column => !ReferenceEquals(column, this._leading)))
         {
             if (this.FitWidth(column) is { } width)
             {
@@ -465,7 +515,7 @@ public sealed partial class ColumnListView : UserControl
         }
 
         var viewport = this.HorizontalScroll.ActualWidth;
-        if (!this.ShowColumns)
+        if (!this.ShowColumns && this.CompactItemTemplate is not null)
         {
             this.Surface.Width = viewport > 0 ? viewport : double.NaN;
             return;
@@ -473,12 +523,19 @@ public sealed partial class ColumnListView : UserControl
 
         var spacing = Math.Max(0, this.ColumnSpacing);
         var byId = this.Columns.ToDictionary(column => column.Id, StringComparer.Ordinal);
-        var slots = new List<ListColumn>();
+        var slots = new List<ListColumn?>();
         var widths = new List<double>();
+        if (this.EffectiveCheckBoxes == SelectionCheckBoxMode.Inline)
+        {
+            slots.Add(null);
+            widths.Add(DefaultLeadingWidth);
+        }
+
         if (this._leading is not null)
         {
             slots.Add(this._leading);
-            widths.Add(this._leading.DefaultWidth > 0 ? this._leading.DefaultWidth : DefaultLeadingWidth);
+            var leadingWidth = this._leading.DefaultWidth > 0 ? this._leading.DefaultWidth : DefaultLeadingWidth;
+            widths.Add(this.EffectiveCheckBoxes == SelectionCheckBoxMode.Overlay ? Math.Max(20, leadingWidth) : leadingWidth);
         }
 
         var visible = this._layout.Visible.Where(column => byId.ContainsKey(column.Id)).ToArray();
@@ -535,20 +592,32 @@ public sealed partial class ColumnListView : UserControl
 
     private void UpdatePresentation()
     {
+        this.EndSelectionDrag();
+        this.UpdateCheckBoxPresentation();
         var columns = this.ShowColumns;
         if (!columns)
         {
             this.CancelEdit();
 
             // Column rows leave with the old template; parked recycled containers may never raise Unloaded.
-            foreach (var row in this._rows.ToArray())
+            if (this.CompactItemTemplate is not null)
             {
-                this.Unregister(row);
+                foreach (var row in this._rows.ToArray())
+                {
+                    this.Unregister(row);
+                }
             }
         }
 
         this.Header.Visibility = columns ? Visibility.Visible : Visibility.Collapsed;
-        this.Items.ItemTemplate = columns || this.CompactItemTemplate is null ? this.RowTemplate : this.CompactItemTemplate;
+        var template = columns || this.CompactItemTemplate is null ? this.RowTemplate :
+            this.EffectiveCheckBoxes == SelectionCheckBoxMode.Default ? this.CompactItemTemplate :
+            (DataTemplate)this.Resources["CheckedCompactTemplate"];
+        if (this.Items.ItemTemplate != template)
+        {
+            this.Items.ItemTemplate = template;
+        }
+
         this.Arrange();
         this.InvalidateChrome();
     }
@@ -624,6 +693,27 @@ public sealed partial class ColumnListView : UserControl
                 this._visibleQueued = false;
                 this.VisibleItemsChanged?.Invoke(this, EventArgs.Empty);
             });
+    }
+
+    private void ItemsViewChanged(object? sender, ScrollViewerViewChangedEventArgs args)
+    {
+        this.UpdateSelectionDrag();
+        this.QueueVisibleChanged();
+        this.DismissOffscreenEditor();
+    }
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject element)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+        {
+            var child = VisualTreeHelper.GetChild(element, index);
+            if ((child as ScrollViewer ?? FindScrollViewer(child)) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private void SelectedItemsChanged(object? previous)
@@ -756,6 +846,11 @@ public sealed partial class ColumnListView : UserControl
 
     private void ItemsGettingFocus(UIElement sender, GettingFocusEventArgs args)
     {
+        if (args.FocusState == FocusState.Keyboard && args.NewFocusedElement is ListViewItem focused && !ModifierDown())
+        {
+            this._selectionAnchor = this.Items.IndexFromContainer(focused);
+        }
+
         if (args.NewFocusedElement != this.Items || args.FocusState != FocusState.Keyboard || this.Items.Items.Count == 0)
         {
             return;
@@ -798,6 +893,12 @@ public sealed partial class ColumnListView : UserControl
 
     private void ItemsSelectionChanged(object sender, SelectionChangedEventArgs args)
     {
+        if (this._selectionDrag is null && args.AddedItems.Count == 1 && this.Items.SelectedItems.Count == 1 && !ModifierDown())
+        {
+            this._selectionAnchor = this.Items.SelectedIndex;
+        }
+
+        this.UpdateSelectAll();
         if (this._syncingSelection || this.SelectedItems is not IList { IsReadOnly: false, IsFixedSize: false } target)
         {
             return;

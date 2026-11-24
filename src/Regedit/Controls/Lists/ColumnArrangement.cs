@@ -12,7 +12,7 @@ namespace JPSoftworks.Regedit.Controls.Lists;
 internal sealed record ColumnArrangement(
     int ColumnsVersion,
     IReadOnlyCollection<ListColumn> Declared,
-    IReadOnlyList<ListColumn> Slots,
+    IReadOnlyList<ListColumn?> Slots,
     IReadOnlyList<double> Widths,
     double Spacing)
 {

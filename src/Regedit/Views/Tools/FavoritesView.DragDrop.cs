@@ -29,8 +29,9 @@ public sealed partial class FavoritesView
 
     private void FavoriteRow_DragStarting(UIElement sender, DragStartingEventArgs args)
     {
-        if (!this.CanDragFavorite || ((FrameworkElement)sender).DataContext is not TreeViewNode
-            { Content: FavoriteRow row })
+        var source = ((FrameworkElement)sender).DataContext;
+        var row = source is TreeViewNode node ? node.Content as FavoriteRow : source as FavoriteRow;
+        if (!this.CanDragFavorite || row is null || source is FavoriteRow && this.ResultColumns.PrepareItemDrag(row).Count != 1)
         {
             args.Cancel = true;
             return;
@@ -45,35 +46,23 @@ public sealed partial class FavoritesView
         this._itemDrag.Clear();
     }
 
-    private void Results_DragItemsStarting(object sender, DragItemsStartingEventArgs args)
-    {
-        if (!this.CanDragFavorite || args.Items is not [FavoriteRow row])
-        {
-            args.Cancel = true;
-            return;
-        }
-
-        this._itemDrag.Start(row.Key, args.Data);
-    }
-
     private void FavoriteRow_DragOver(object sender, DragEventArgs args)
     {
         var target = (FrameworkElement)sender;
-        this.AcceptFavoriteReorder(args, target, (target.DataContext as TreeViewNode)?.Content as FavoriteRow,
-            preview: true);
+        this.AcceptFavoriteReorder(args, target, (target.DataContext as TreeViewNode)?.Content as FavoriteRow, preview: true);
     }
 
     private async void FavoriteRow_Drop(object sender, DragEventArgs args)
     {
-        await this._itemDrag.CompleteDropAsync(args, async () =>
-        {
-            var target = (FrameworkElement)sender;
-            if (this.AcceptFavoriteReorder(args, target, (target.DataContext as TreeViewNode)?.Content as FavoriteRow)
-                is { } move)
+        await this._itemDrag.CompleteDropAsync(
+            args, async () =>
             {
-                await this.ViewModel.ReorderAsync(move.Item, move.Offset);
-            }
-        });
+                var target = (FrameworkElement)sender;
+                if (this.AcceptFavoriteReorder(args, target, (target.DataContext as TreeViewNode)?.Content as FavoriteRow) is { } move)
+                {
+                    await this.ViewModel.ReorderAsync(move.Item, move.Offset);
+                }
+            });
     }
 
     private void Results_DragOver(object sender, DragEventArgs args)
@@ -84,24 +73,28 @@ public sealed partial class FavoritesView
 
     private async void Results_Drop(object sender, DragEventArgs args)
     {
-        await this._itemDrag.CompleteDropAsync(args, async () =>
-        {
-            var container = this.FavoriteResultAt(args);
-            if (this.AcceptFavoriteReorder(args, container, container?.Content as FavoriteRow) is { } move)
+        await this._itemDrag.CompleteDropAsync(
+            args, async () =>
             {
-                await this.ViewModel.ReorderAsync(move.Item, move.Offset);
-            }
-        });
+                var container = this.FavoriteResultAt(args);
+                if (this.AcceptFavoriteReorder(args, container, container?.Content as FavoriteRow) is { } move)
+                {
+                    await this.ViewModel.ReorderAsync(move.Item, move.Offset);
+                }
+            });
     }
 
     private ListViewItem? FavoriteResultAt(DragEventArgs args)
     {
-        return VisualTreeHelper.FindElementsInHostCoordinates(args.GetPosition(this.XamlRoot.Content), this.Results)
-            .OfType<ListViewItem>().FirstOrDefault();
+        return VisualTreeHelper.FindElementsInHostCoordinates(args.GetPosition(this.XamlRoot.Content), this.Results).OfType<ListViewItem>()
+            .FirstOrDefault();
     }
 
     private (FavoriteItemId Item, int Offset)? AcceptFavoriteReorder(
-        DragEventArgs args, FrameworkElement? target, FavoriteRow? row, bool preview = false)
+        DragEventArgs args,
+        FrameworkElement? target,
+        FavoriteRow? row,
+        bool preview = false)
     {
         if (this._itemDrag.GetSource(args) is not { } item || !this.CanDragFavorite || target is null || row is null)
         {

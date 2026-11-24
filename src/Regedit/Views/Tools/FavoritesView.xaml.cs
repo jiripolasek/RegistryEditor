@@ -43,6 +43,8 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     internal FavoritesViewModel ViewModel { get; }
 
+    internal MenuFlyout FolderActionsMenu => this.ItemMenu;
+
     internal FavoritesView(
         FavoritesStore store,
         WindowDialogPresenter dialogs,
@@ -62,10 +64,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         AutomationProperties.SetName(this.Results, "Tool items");
         AutomationProperties.SetAutomationId(this.Results, "Results");
         this.Results.DoubleTapped += this.Results_DoubleTapped;
-        this.Results.CanDragItems = true;
         this.Results.AllowDrop = true;
-        this.Results.DragItemsStarting += this.Results_DragItemsStarting;
-        this.Results.DragItemsCompleted += (_, _) => this._itemDrag.Clear();
         this.Results.DragOver += this.Results_DragOver;
         this.Results.Drop += this.Results_Drop;
         this.Results.PreviewKeyDown += this.Results_KeyDown;
@@ -151,8 +150,6 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     public Button MenuButton => this.PageHeader.MenuButton;
 
     public IReadOnlyList<ToolCommand> PanelCommands { get; }
-
-    internal MenuFlyout FolderActionsMenu => this.ItemMenu;
 
     void IToolSurface.CopyContextFrom(IToolSurface source)
     {
@@ -628,8 +625,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
     {
         ICommand? command = args.Key switch
         {
-            VirtualKey.Enter when ReferenceEquals(sender, this.Results) || !this.ViewModel.Compact
-                => this.ViewModel.OpenCommand,
+            VirtualKey.Enter when ReferenceEquals(sender, this.Results) || !this.ViewModel.Compact => this.ViewModel.OpenCommand,
             VirtualKey.F2 => this.ViewModel.RenameCommand,
             VirtualKey.Delete => this.ViewModel.RemoveCommand,
             _ => null

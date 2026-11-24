@@ -115,6 +115,7 @@ public sealed partial class ColumnHeaderRow : Grid
         this._drag = null;
         this._owner = owner;
         this.Children.Clear();
+        this.Children.Add(owner.SelectAllBox);
         this._headers.Clear();
         foreach (var column in columns)
         {
@@ -522,7 +523,7 @@ public sealed partial class ColumnHeaderRow : Grid
     {
         foreach (var column in this._arrangement.Slots)
         {
-            if (this.LabelFor(column) is { Visibility: Visibility.Visible } label)
+            if (column is not null && this.LabelFor(column) is { Visibility: Visibility.Visible } label)
             {
                 yield return (column, label);
             }

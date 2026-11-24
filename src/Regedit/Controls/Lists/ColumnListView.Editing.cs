@@ -28,7 +28,6 @@ public sealed partial class ColumnListView
     private EditSession? _edit;
     private DispatcherQueueTimer? _slowClickTimer;
     private DateTime _lastSelectionChange = DateTime.MinValue;
-    private ScrollViewer? _itemsScroll;
 
     public bool EditOnF2 { get; set; } = true;
 
@@ -119,7 +118,7 @@ public sealed partial class ColumnListView
         this.EditCommitting?.Invoke(this, args);
         if (args.Cancel)
         {
-            ShowError(edit.Box, args.Error);
+            ShowError(edit, args.Error);
             if (refocusOnRejection)
             {
                 edit.Box.Focus(FocusState.Programmatic);
@@ -144,14 +143,6 @@ public sealed partial class ColumnListView
     private void InitializeEditing()
     {
         this.Items.KeyDown += this.ItemsKeyDown;
-        this.Items.Loaded += (_, _) =>
-        {
-            if (this._itemsScroll is null && FindScrollViewer(this.Items) is { } scroll)
-            {
-                this._itemsScroll = scroll;
-                scroll.ViewChanged += this.ItemsViewChanged;
-            }
-        };
         this.Items.AddHandler(TappedEvent, new TappedEventHandler(this.ItemsTapped), true);
         this.Items.AddHandler(DoubleTappedEvent, new DoubleTappedEventHandler((_, _) => this.StopSlowClick()), true);
         this.Items.SelectionChanged += (_, _) =>
@@ -184,6 +175,11 @@ public sealed partial class ColumnListView
         edit.Box.KeyDown -= this.EditorKeyDown;
         edit.Box.LostFocus -= this.EditorLostFocus;
         var hadFocus = edit.Box.FocusState != FocusState.Unfocused;
+        if (edit.ErrorTip is { } tip)
+        {
+            tip.IsOpen = false;
+        }
+
         edit.Row.HideEditor();
         if (committed)
         {
@@ -306,9 +302,8 @@ public sealed partial class ColumnListView
     }
 
     // Like the Win32 control, scrolling the edited row out of view dismisses the edit (commit, or cancel if rejected).
-    private void ItemsViewChanged(object? sender, ScrollViewerViewChangedEventArgs args)
+    private void DismissOffscreenEditor()
     {
-        this.QueueVisibleChanged();
         if (this._edit is not { } edit || this._itemsScroll is not { } scroll)
         {
             return;
@@ -331,20 +326,6 @@ public sealed partial class ColumnListView
         {
             this.CancelEdit();
         }
-    }
-
-    private static ScrollViewer? FindScrollViewer(DependencyObject element)
-    {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
-        {
-            var child = VisualTreeHelper.GetChild(element, index);
-            if ((child as ScrollViewer ?? FindScrollViewer(child)) is { } found)
-            {
-                return found;
-            }
-        }
-
-        return null;
     }
 
     private static ColumnRow? FindRow(DependencyObject? element)
@@ -375,18 +356,26 @@ public sealed partial class ColumnListView
         }
     }
 
-    private static void ShowError(TextBox box, string? error)
+    private static void ShowError(EditSession edit, string? error)
     {
         if (string.IsNullOrWhiteSpace(error))
         {
             return;
         }
 
-        var tip = new ToolTip { Content = error, Placement = Microsoft.UI.Xaml.Controls.Primitives.PlacementMode.Bottom };
-        ToolTipService.SetToolTip(box, tip);
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(box, error);
-        tip.IsOpen = true;
+        if (edit.ErrorTip is null)
+        {
+            edit.ErrorTip = new ToolTip { Placement = Microsoft.UI.Xaml.Controls.Primitives.PlacementMode.Bottom };
+            ToolTipService.SetToolTip(edit.Box, edit.ErrorTip);
+        }
+
+        edit.ErrorTip.Content = error;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(edit.Box, error);
+        edit.ErrorTip.IsOpen = true;
     }
 
-    private sealed record EditSession(object Item, ListColumn Column, ColumnRow Row, TextBox Box, string Original);
+    private sealed record EditSession(object Item, ListColumn Column, ColumnRow Row, TextBox Box, string Original)
+    {
+        internal ToolTip? ErrorTip { get; set; }
+    }
 }

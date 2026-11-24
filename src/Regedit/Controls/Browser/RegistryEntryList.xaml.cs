@@ -17,6 +17,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 using Windows.UI.Core;
 
@@ -54,6 +55,11 @@ public sealed partial class RegistryEntryList : UserControl
         list.PreviewKeyDown += this.Entries_KeyDown;
         list.SelectionChanged += this.Entries_SelectionChanged;
         this.Entries.ItemAutomationName = item => (item as RegistryEntry)?.AccessibleName;
+        this.Entries.RegisterPropertyChangedCallback(
+            ColumnListView.LayoutProperty,
+            (_, _) => this.Entries.SelectionCheckBoxes = this.Entries.IsColumnVisible(nameof(RegistrySortColumn.Name))
+                ? SelectionCheckBoxMode.Overlay
+                : SelectionCheckBoxMode.Inline);
         this.Entries.CanEditItem = (item, _) => item is RegistryEntry entry && this.ViewModel?.CanRenameEntry(entry) == true;
         this.Entries.FindColumn(nameof(RegistrySortColumn.Name))!.EditText = item => (item as RegistryEntry)?.Name;
         this.EntriesList.AddHandler(PointerPressedEvent, new PointerEventHandler(this.Entries_PointerPressed), true);
@@ -380,6 +386,22 @@ public sealed partial class RegistryEntryList : UserControl
         return this.ViewModel.SelectedEntries.Count == 1
                && this.ViewModel.SelectedEntry is { } entry
                && this.Entries.BeginEdit(entry, nameof(RegistrySortColumn.Name));
+    }
+
+    private void Entry_DragStarting(UIElement sender, DragStartingEventArgs args)
+    {
+        var entry = (RegistryEntry)((FrameworkElement)sender).DataContext;
+        var paths = this.Entries.PrepareItemDrag(entry).OfType<RegistryEntry>().Where(row => row.IsStored).Select(row =>
+            row.Key?.Address ?? $"{(row.SourceLocation ?? this.ViewModel.Location).Address}\\{row.Name}");
+        var text = string.Join(Environment.NewLine, paths);
+        if (text.Length == 0)
+        {
+            args.Cancel = true;
+            return;
+        }
+
+        args.AllowedOperations = args.Data.RequestedOperation = DataPackageOperation.Copy;
+        args.Data.SetText(text);
     }
 
     private void Entries_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args)

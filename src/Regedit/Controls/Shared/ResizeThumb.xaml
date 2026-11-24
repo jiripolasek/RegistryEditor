@@ -1,0 +1,17 @@
+<UserControl
+    x:Class="JPSoftworks.Regedit.Controls.Shared.ResizeThumb"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Thumb
+        x:Name="Grip"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch"
+        IsTabStop="True"
+        UseSystemFocusVisuals="True">
+        <Thumb.Template>
+            <ControlTemplate TargetType="Thumb">
+                <Border Background="Transparent" />
+            </ControlTemplate>
+        </Thumb.Template>
+    </Thumb>
+</UserControl>

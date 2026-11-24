@@ -24,6 +24,10 @@
                     Glyph="{x:Bind Glyph}" />
                 <StackPanel Grid.Column="1" Spacing="3">
                     <TextBlock
+                        HorizontalAlignment="Left"
+                        lists:ColumnListView.IsDragHandle="True"
+                        DragStarting="FavoriteRow_DragStarting"
+                        DropCompleted="FavoriteRow_DropCompleted"
                         Style="{StaticResource BodyTextBlockStyle}"
                         Text="{x:Bind Title}"
                         TextTrimming="CharacterEllipsis"
@@ -48,7 +52,11 @@
         </DataTemplate>
         <DataTemplate x:Key="FavoriteNameCell" x:DataType="vm:FavoriteRow">
             <TextBlock
+                HorizontalAlignment="Left"
                 VerticalAlignment="Center"
+                lists:ColumnListView.IsDragHandle="True"
+                DragStarting="FavoriteRow_DragStarting"
+                DropCompleted="FavoriteRow_DropCompleted"
                 Text="{x:Bind Title}"
                 TextTrimming="CharacterEllipsis" />
         </DataTemplate>

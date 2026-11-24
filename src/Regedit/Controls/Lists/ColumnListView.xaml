@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="JPSoftworks.Regedit.Controls.Lists.ColumnListView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -25,6 +25,21 @@
         <DataTemplate x:Key="ColumnRowTemplate">
             <local:ColumnRow Padding="0,3" />
         </DataTemplate>
+        <DataTemplate x:Key="CheckedCompactTemplate">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <CheckBox
+                    AutomationProperties.Name="Select item"
+                    Click="RowCheckBoxClicked"
+                    DoubleTapped="RowCheckBoxDoubleTapped"
+                    IsTabStop="False"
+                    Loaded="SelectionCheckBoxLoaded" />
+                <Border Grid.Column="1" Loaded="CompactContentLoaded" />
+            </Grid>
+        </DataTemplate>
     </UserControl.Resources>
     <ScrollViewer
         x:Name="HorizontalScroll"
@@ -42,7 +57,19 @@
                 Padding="12,0,12,0"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1"
-                TabFocusNavigation="Local" />
+                TabFocusNavigation="Local">
+                <CheckBox
+                    x:Name="SelectAllBox"
+                    x:FieldModifier="internal"
+                    AutomationProperties.AutomationId="SelectAllItems"
+                    AutomationProperties.Name="Select all items"
+                    Checked="SelectAllToggled"
+                    Loaded="SelectionCheckBoxLoaded"
+                    TabIndex="0"
+                    ToolTipService.ToolTip="Select or clear all items"
+                    Unchecked="SelectAllToggled"
+                    Visibility="Collapsed" />
+            </local:ColumnHeaderRow>
             <ListView
                 x:Name="Items"
                 Grid.Row="1"
@@ -65,6 +92,33 @@
                     </Style>
                 </ListView.ItemContainerStyle>
             </ListView>
+            <Canvas
+                x:Name="SelectionLayer"
+                Grid.Row="1"
+                Background="Transparent"
+                PointerCanceled="SelectionCanceled"
+                PointerMoved="SelectionMoved"
+                PointerReleased="SelectionReleased"
+                Visibility="Collapsed">
+                <Border
+                    x:Name="SelectionRectangle"
+                    AutomationProperties.AccessibilityView="Raw"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                    BorderThickness="1"
+                    IsHitTestVisible="False">
+                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" Opacity="0.16" />
+                </Border>
+            </Canvas>
         </Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="SelectionCheckBoxStates">
+                <VisualState x:Name="NativeCheckBoxes" />
+                <VisualState x:Name="CustomCheckBoxes">
+                    <VisualState.Setters>
+                        <Setter Target="Items.IsMultiSelectCheckBoxEnabled" Value="False" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
     </ScrollViewer>
 </UserControl>

@@ -15,7 +15,10 @@
         </DataTemplate>
         <DataTemplate x:Key="NameCell" x:DataType="local:SampleEntry">
             <TextBlock
+                HorizontalAlignment="Left"
                 VerticalAlignment="Center"
+                lists:ColumnListView.IsDragHandle="True"
+                DragStarting="EntryName_DragStarting"
                 FontWeight="SemiBold"
                 Text="{x:Bind Name, Mode=OneWay}"
                 TextTrimming="CharacterEllipsis" />
@@ -28,7 +31,10 @@
                 TextTrimming="CharacterEllipsis" />
         </DataTemplate>
         <DataTemplate x:Key="CompactEvent" x:DataType="local:SampleEvent">
-            <StackPanel Padding="0,4" Spacing="2">
+            <StackPanel
+                Padding="0,4"
+                AutomationProperties.Name="{x:Bind Path}"
+                Spacing="2">
                 <TextBlock FontWeight="SemiBold" Text="{x:Bind Subject}" />
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -60,6 +66,7 @@
             AutomationProperties.Name="Registry-like list"
             EditCommitting="Registry_EditCommitting"
             LayoutChanged="Registry_LayoutChanged"
+            SelectionCheckBoxes="Overlay"
             SortRequested="Registry_SortRequested">
             <lists:ColumnListView.LeadingColumn>
                 <lists:ListColumn
@@ -154,6 +161,42 @@
                 <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Inspector" />
                 <TextBlock x:Name="SelectionText" AutomationProperties.AutomationId="SelectionText" />
                 <TextBlock x:Name="SortText" AutomationProperties.AutomationId="SortText" />
+                <Border
+                    x:Name="DropTarget"
+                    MinHeight="56"
+                    Padding="12"
+                    x:FieldModifier="internal"
+                    AllowDrop="True"
+                    AutomationProperties.Name="Item drop target"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{ThemeResource ControlCornerRadius}"
+                    DragOver="Names_DragOver"
+                    Drop="Names_Drop">
+                    <TextBlock
+                        x:Name="DroppedNames"
+                        VerticalAlignment="Center"
+                        x:FieldModifier="internal"
+                        MaxLines="3"
+                        Text="Drop item names here"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap" />
+                </Border>
+                <ComboBox
+                    Header="Selection check boxes"
+                    SelectedIndex="2"
+                    SelectionChanged="SelectionCheckBoxes_Changed">
+                    <x:String>Default</x:String>
+                    <x:String>Before each item</x:String>
+                    <x:String>Over the leading cell</x:String>
+                </ComboBox>
+                <CheckBox
+                    x:Name="DragSelectionOption"
+                    x:FieldModifier="internal"
+                    Click="DragSelectionOption_Click"
+                    Content="Drag to select rows"
+                    IsChecked="True" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Click="Reset_Click" Content="Reset" />
                     <Button Click="FitAll_Click" Content="Fit all" />
@@ -180,7 +223,7 @@
                     TextWrapping="Wrap" />
                 <TextBlock
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="Drag header edges to resize, double-click an edge to fit, drag a header onto another to reorder, Ctrl+Shift+Left/Right moves the focused header, right-click a header for visibility and reset. F2 or a slow second click on a selected row renames it inline (Enter commits, Esc cancels; empty and duplicate names are rejected). Ctrl+A and Shift/Ctrl+click select multiple rows."
+                    Text="Drag a name to copy the selected items. Drag beside a name to select rows. Ctrl toggles rows and Shift extends from the last selected row. F2 or a slow second click renames a selected row. Drag a header to reorder it or press Ctrl+Shift+Left/Right. Drag a header edge to resize or double-click it to fit. Right-click a header to show or reset columns."
                     TextWrapping="Wrap" />
             </StackPanel>
         </ScrollViewer>
