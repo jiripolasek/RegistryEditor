@@ -1,0 +1,182 @@
+<UserControl
+    x:Class="JPSoftworks.Controls.HexEditor"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    AutomationProperties.HelpText="Use arrows to move by byte. Hold Shift to select. F6 switches hex and ASCII. Ctrl+End moves to the end. Ctrl+G goes to an offset. Ctrl+Shift+C copies the current offset."
+    AutomationProperties.Name="Hex editor"
+    FlowDirection="LeftToRight"
+    IsTabStop="True">
+    <UserControl.Resources>
+        <DataTemplate x:Key="ByteRowTemplate">
+            <RichTextBlock HorizontalAlignment="Left" IsTextSelectionEnabled="False" TextWrapping="NoWrap">
+                <RichTextBlock.TextHighlighters>
+                    <TextHighlighter Background="Transparent" Foreground="{ThemeResource HexEditorOffsetBrush}" />
+                    <TextHighlighter Background="Transparent" />
+                    <TextHighlighter Background="Transparent" Foreground="{ThemeResource HexEditorInactiveSelectionForegroundBrush}" />
+                    <TextHighlighter Background="{ThemeResource HexEditorSelectionBackgroundBrush}" Foreground="{ThemeResource HexEditorSelectionForegroundBrush}" />
+                </RichTextBlock.TextHighlighters>
+                <Paragraph><Run x:Name="ByteText" /></Paragraph>
+            </RichTextBlock>
+        </DataTemplate>
+        <DataTemplate x:Key="SelectionOutlineTemplate">
+            <Border BorderBrush="{ThemeResource HexEditorInactiveSelectionBorderBrush}" BorderThickness="1" />
+        </DataTemplate>
+        <Style x:Key="ColumnLabelStyle" TargetType="TextBlock">
+            <Setter Property="CharacterSpacing" Value="0" />
+            <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource HexEditorHeaderForegroundBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="HoverMarkStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource HexEditorHoverBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource HexEditorHoverStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+        </Style>
+    </UserControl.Resources>
+    <UserControl.ContextFlyout>
+        <MenuFlyout Opening="Menu_Opening" Closed="Menu_Closed">
+            <MenuFlyoutItem Text="Go to offset…" Click="GoTo_Click" />
+            <MenuFlyoutItem x:Name="CopyOffsetItem" Click="CopyOffset_Click" Text="Copy offset" KeyboardAcceleratorTextOverride="Ctrl+Shift+C" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem x:Name="UndoItem" Click="Undo_Click" KeyboardAcceleratorTextOverride="Ctrl+Z" Text="Undo" />
+            <MenuFlyoutItem x:Name="RedoItem" Click="Redo_Click" KeyboardAcceleratorTextOverride="Ctrl+Y" Text="Redo" />
+            <MenuFlyoutItem x:Name="CopyHexItem" Click="CopyHex_Click" Text="Copy as hex" />
+            <MenuFlyoutItem x:Name="CopyAsciiItem" Click="CopyAscii_Click" Text="Copy as ASCII" />
+            <MenuFlyoutItem x:Name="PasteItem" AutomationProperties.AcceleratorKey="Ctrl+V" Click="Paste_Click" KeyboardAcceleratorTextOverride="Ctrl+V" Text="Paste" />
+            <MenuFlyoutItem x:Name="PasteOverwriteItem" AutomationProperties.AcceleratorKey="Ctrl+Shift+V" Click="PasteOverwrite_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+V" Text="Paste overwrite" />
+        </MenuFlyout>
+    </UserControl.ContextFlyout>
+    <Grid CornerRadius="{x:Bind CornerRadius, Mode=OneWay}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="PointerOver">
+                    <VisualState.Setters>
+                        <Setter Target="FieldChrome.Background" Value="{ThemeResource TextControlBackgroundPointerOver}" />
+                        <Setter Target="FieldChrome.BorderBrush" Value="{ThemeResource TextControlBorderBrushPointerOver}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Focused">
+                    <VisualState.Setters>
+                        <Setter Target="FieldChrome.Background" Value="{ThemeResource TextControlBackgroundFocused}" />
+                        <Setter Target="FieldChrome.BorderBrush" Value="{ThemeResource TextControlBorderBrushFocused}" />
+                        <Setter Target="FieldChrome.BorderThickness" Value="{ThemeResource TextControlBorderThemeThicknessFocused}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Disabled">
+                    <VisualState.Setters>
+                        <Setter Target="FieldChrome.Background" Value="{ThemeResource TextControlBackgroundDisabled}" />
+                        <Setter Target="FieldChrome.BorderBrush" Value="{ThemeResource TextControlBorderBrushDisabled}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <Border
+            x:Name="FieldChrome"
+            Background="{x:Bind Background, Mode=OneWay}"
+            BorderBrush="{x:Bind BorderBrush, Mode=OneWay}"
+            BorderThickness="{x:Bind BorderThickness, Mode=OneWay}"
+            CornerRadius="{x:Bind CornerRadius, Mode=OneWay}" />
+        <Grid RowDefinitions="*,Auto,Auto" ColumnDefinitions="*,Auto" Margin="{x:Bind BorderThickness, Mode=OneWay}">
+            <ScrollViewer
+                x:Name="Viewport"
+                HorizontalScrollBarVisibility="Auto"
+                HorizontalScrollMode="Enabled"
+                HorizontalContentAlignment="Stretch"
+                IsTabStop="False"
+                VerticalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Disabled">
+                <StackPanel VerticalAlignment="Top">
+                    <Grid
+                        x:Name="Header"
+                        MinHeight="28"
+                        Background="{ThemeResource HexEditorHeaderBackgroundBrush}"
+                        BorderBrush="{ThemeResource HexEditorHeaderDividerBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="{x:Bind Padding, Mode=OneWay}"
+                        Visibility="{x:Bind ShowColumnHeaders, Mode=OneWay}">
+                        <Grid x:Name="ColumnLabels">
+                            <TextBlock Style="{StaticResource ColumnLabelStyle}" Text="Offset" />
+                            <TextBlock x:Name="AsciiLabel" Style="{StaticResource ColumnLabelStyle}" Text="ASCII" />
+                            <Border x:Name="OffsetDivider" Width="1" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Background="{ThemeResource HexEditorHeaderDividerBrush}" />
+                            <Border x:Name="AsciiDivider" Width="1" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Background="{ThemeResource HexEditorHeaderDividerBrush}" />
+                        </Grid>
+                    </Grid>
+                    <Grid Margin="{x:Bind Padding, Mode=OneWay}">
+                        <TextBlock x:Name="ColumnRuler" Height="0" HorizontalAlignment="Left" AutomationProperties.AccessibilityView="Raw" CharacterSpacing="{x:Bind CharacterSpacing, Mode=OneWay}" IsHitTestVisible="False" />
+                        <Canvas x:Name="ColumnBands" AutomationProperties.AccessibilityView="Raw" IsHitTestVisible="False" />
+                        <StackPanel x:Name="Rows" Background="Transparent" ManipulationMode="TranslateY,TranslateInertia" />
+                        <Canvas x:Name="SelectionOutlines" AutomationProperties.AccessibilityView="Raw" IsHitTestVisible="False" />
+                        <Canvas x:Name="HoverMarks" AutomationProperties.AccessibilityView="Raw" IsHitTestVisible="False" Visibility="Collapsed">
+                            <Border x:Name="HexHover" Style="{StaticResource HoverMarkStyle}" />
+                            <Border x:Name="AsciiHover" Style="{StaticResource HoverMarkStyle}" />
+                        </Canvas>
+                        <Border
+                            x:Name="EditCaret"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AccessibilityView="Raw"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="CaretPosition" />
+                            </Border.RenderTransform>
+                        </Border>
+                        <TextBlock x:Name="EmptyMessage" CharacterSpacing="0" Foreground="{ThemeResource HexEditorOffsetBrush}" Text="No data" />
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+            <Grid Grid.Column="1" RowDefinitions="Auto,*" Visibility="{x:Bind RowScroll.Visibility, Mode=OneWay}">
+                <Border
+                    Height="{x:Bind Header.ActualHeight, Mode=OneWay}"
+                    Background="{ThemeResource HexEditorHeaderBackgroundBrush}"
+                    BorderBrush="{ThemeResource HexEditorHeaderDividerBrush}"
+                    BorderThickness="0,0,0,1"
+                    Visibility="{x:Bind ShowColumnHeaders, Mode=OneWay}" />
+                <ScrollBar
+                    x:Name="RowScroll"
+                    Grid.Row="1"
+                    AutomationProperties.Name="Scroll byte rows"
+                    IsTabStop="False"
+                    Orientation="Vertical"
+                    SmallChange="1"
+                    ValueChanged="RowScroll_ValueChanged" />
+            </Grid>
+            <Grid
+                x:Name="OffsetPanel"
+                Grid.Row="1"
+                Grid.ColumnSpan="2"
+                Margin="{x:Bind Padding, Mode=OneWay}"
+                ColumnDefinitions="*,Auto,Auto"
+                ColumnSpacing="4"
+                KeyDown="OffsetPanel_KeyDown"
+                Visibility="Collapsed">
+                <TextBox x:Name="OffsetBox" AutomationProperties.AutomationId="HexGoToOffset" CharacterSpacing="0" Header="Go to byte offset (hex)" />
+                <Button Grid.Column="1" VerticalAlignment="Bottom" Click="SubmitOffset_Click" Content="Go" AutomationProperties.Name="Go to offset" />
+                <Button Grid.Column="2" VerticalAlignment="Bottom" AutomationProperties.Name="Close Go to offset" Click="CloseOffset_Click" Style="{StaticResource SubtleButtonStyle}" ToolTipService.ToolTip="Close">
+                    <FontIcon FontSize="14" Glyph="&#xE711;" />
+                </Button>
+            </Grid>
+            <Border
+                x:Name="StatusBar"
+                Grid.Row="2"
+                Grid.ColumnSpan="2"
+                BorderBrush="{ThemeResource HexEditorHeaderDividerBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="{x:Bind Padding, Mode=OneWay}"
+                Visibility="{x:Bind ShowStatusBar, Mode=OneWay}">
+                <TextBlock
+                    x:Name="Status"
+                    AutomationProperties.AutomationId="HexEditorStatus"
+                    AutomationProperties.LiveSetting="Polite"
+                    CharacterSpacing="0"
+                    FontFamily="{ThemeResource ContentControlThemeFontFamily}"
+                    Foreground="{ThemeResource HexEditorOffsetBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    TextWrapping="Wrap" />
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

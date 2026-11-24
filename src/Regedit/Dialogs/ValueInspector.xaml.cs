@@ -135,12 +135,11 @@ public sealed partial class ValueInspector : UserControl
 
     private Task ShowRawBytesAsync()
     {
-        var view = new HexView { Bytes = this.ViewModel.Bytes, MinWidth = HexView.DialogWidth };
+        var view = new HexView { Bytes = this.ViewModel.Bytes };
         AutomationProperties.SetAutomationId(view, "ExpandedValueHexView");
         AutomationProperties.SetName(view, "Raw bytes");
         view.Loaded += (_, _) => HighlightBytes(this.ViewModel, view);
         var layout = new DialogLayout("Raw bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading, fillBody: true);
-        layout.EnableHorizontalScrolling();
         return this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 16, 588));
     }
 

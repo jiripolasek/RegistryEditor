@@ -4,7 +4,9 @@
 
 using JPSoftworks.Regedit.ViewModels.Browser;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace JPSoftworks.Regedit.Dialogs;
@@ -17,22 +19,20 @@ public sealed partial class RegistryValueEditor : UserControl
     {
         this.ViewModel = viewModel;
         this.InitializeComponent();
+        this.FindName(viewModel.IsRaw ? nameof(this.RawPanel) : nameof(this.DataPanel));
         if (viewModel.IsRaw)
         {
-            this.FindName(nameof(this.RawPanel));
-            this.Bindings.Update();
-            // The hex view is the primary surface; the text editor opens on request (or straight away for a new value).
-            this.DataBox.MaxHeight = 160;
-            this.EditBytesToggle.IsChecked = viewModel.IsCreating;
-            this.UpdateRawEditing();
+            this.ByteEditor.PrepareHexPasteAsync = this.PrepareHexPasteAsync;
+            this.ByteEditor.ReadCustomHexPaste = viewModel.ReadRegistryHex;
         }
+
+        this.Bindings.Update();
     }
 
     private Style GetDataEditorStyle(bool multiline)
     {
         return (Style)this.Resources[
             this.ViewModel.IsNumeric ? "NumericDataEditor" :
-            this.ViewModel.IsRaw ? "RawDataEditor" :
             multiline ? "TextDataEditor" : "SingleLineDataEditor"];
     }
 
@@ -74,14 +74,14 @@ public sealed partial class RegistryValueEditor : UserControl
             this.NameBox.Focus(FocusState.Keyboard);
             this.NameBox.SelectAll();
         }
-        else if (this.DataPanel.Visibility == Visibility.Visible)
+        else if (this.ViewModel.IsRaw)
         {
-            this.DataBox.Focus(FocusState.Keyboard);
-            this.DataBox.SelectAll();
+            this.ByteEditor.Focus(FocusState.Keyboard);
         }
         else
         {
-            this.EditBytesToggle.Focus(FocusState.Keyboard);
+            this.DataBox.Focus(FocusState.Keyboard);
+            this.DataBox.SelectAll();
         }
     }
 
@@ -90,18 +90,43 @@ public sealed partial class RegistryValueEditor : UserControl
         this.ViewModel.ApplyBytes(bytes);
     }
 
-    private void EditBytesToggle_Changed(object sender, RoutedEventArgs e)
+    private async Task<string?> PrepareHexPasteAsync(string text)
     {
-        this.UpdateRawEditing();
-        if (this.EditBytesToggle.IsChecked == true && this.IsLoaded)
+        if (text.AsSpan().IndexOfAny(',', ':') < 0)
         {
-            this.DataBox.Focus(FocusState.Programmatic);
+            return text;
         }
-    }
+        var byteCount = await Task.Run(() => this.ViewModel.ReadRegistryHex(text, []));
+        if (!this.IsLoaded) { return null; }
+        if (byteCount < 0) { return text; }
 
-    private void UpdateRawEditing()
-    {
-        this.DataPanel.Visibility = this.EditBytesToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        var confirmation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var apply = new Button { Content = "Apply conversion" };
+        AutomationProperties.SetAutomationId(apply, "ApplyHexPasteConversion");
+        var flyout = new Flyout
+        {
+            Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft,
+            Content = new StackPanel
+            {
+                Spacing = 8,
+                Children = { new TextBlock { Text = RegistryValueEditorViewModel.ByteConversionHelp(byteCount), TextWrapping = TextWrapping.Wrap, MaxWidth = 320 }, apply }
+            }
+        };
+        apply.Click += (_, _) => confirmation.TrySetResult(true);
+        flyout.Closed += (_, _) => confirmation.TrySetResult(false);
+        void OnUnloaded(object sender, RoutedEventArgs args) => confirmation.TrySetResult(false);
+        this.Unloaded += OnUnloaded;
+        try
+        {
+            flyout.ShowAt(this.ByteEditor);
+            if (!await confirmation.Task) { return null; }
+            return byteCount == 0 ? string.Empty : text;
+        }
+        finally
+        {
+            this.Unloaded -= OnUnloaded;
+            flyout.Hide();
+        }
     }
 
     private void Base_SelectionChanged(object sender, SelectionChangedEventArgs e)

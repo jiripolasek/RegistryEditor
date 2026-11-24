@@ -13,13 +13,6 @@
         <DataTemplate x:Key="UiFontHeaderTemplate">
             <TextBlock FontFamily="{ThemeResource ContentControlThemeFontFamily}" Text="{Binding}" />
         </DataTemplate>
-        <Style
-            x:Key="RawDataEditor"
-            BasedOn="{StaticResource TextDataEditor}"
-            TargetType="TextBox">
-            <Setter Property="FontFamily" Value="Consolas" />
-            <Setter Property="HeaderTemplate" Value="{StaticResource UiFontHeaderTemplate}" />
-        </Style>
         <Style x:Key="NumericDataEditor" TargetType="TextBox">
             <Setter Property="FontFamily" Value="Consolas" />
             <Setter Property="TextWrapping" Value="NoWrap" />
@@ -46,32 +39,17 @@
             x:Name="RawPanel"
             x:Load="False"
             Spacing="8">
-            <TextBlock Text="Bytes" />
-            <Border Style="{StaticResource HexViewFrameStyle}">
-                <shared:HexView
-                    Height="180"
-                    AutomationProperties.AutomationId="ValueHexPreview"
-                    AutomationProperties.Name="Bytes"
-                    Bytes="{x:Bind ViewModel.PreviewBytes, Mode=OneWay}"
-                    BytesEdited="HexView_BytesEdited"
-                    IsEditable="True" />
-            </Border>
-            <TextBlock
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{ThemeResource CaptionTextBlockStyle}"
-                Text="Click a byte and type hex digits to overwrite it." />
-            <ToggleButton
-                x:Name="EditBytesToggle"
-                AutomationProperties.AutomationId="EditBytesToggle"
-                Checked="EditBytesToggle_Changed"
-                Unchecked="EditBytesToggle_Changed">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon FontSize="14" Glyph="&#xE70F;" />
-                    <TextBlock Text="Edit as hexadecimal text" />
-                </StackPanel>
-            </ToggleButton>
+            <TextBlock Text="{x:Bind ViewModel.DataHelp, Mode=OneWay}" />
+            <shared:HexView
+                x:Name="ByteEditor"
+                Height="188"
+                AutomationProperties.AutomationId="ValueHexPreview"
+                AutomationProperties.Name="Bytes"
+                Bytes="{x:Bind ViewModel.PreviewBytes, Mode=OneWay}"
+                BytesEdited="HexView_BytesEdited"
+                IsReadOnly="False" />
         </StackPanel>
-        <StackPanel x:Name="DataPanel" Spacing="4">
+        <StackPanel x:Name="DataPanel" x:Load="False" Spacing="4">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -86,7 +64,7 @@
                     AutomationProperties.AutomationId="ValueDataEditor"
                     AutomationProperties.HelpText="{x:Bind ViewModel.DataHelp, Mode=OneWay}"
                     BorderThickness="1,1,1,2"
-                    Header="{x:Bind ViewModel.DataHeader}"
+                    Header="Value data"
                     Paste="DataBox_Paste"
                     Style="{x:Bind GetDataEditorStyle(ViewModel.IsMultiline), Mode=OneWay}"
                     Text="{x:Bind ViewModel.Data, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -110,15 +88,8 @@
                 IsEnabled="{x:Bind ViewModel.CanToggleMultiline, Mode=OneWay}"
                 ToolTipService.ToolTip="Remove existing line breaks before turning this off."
                 Visibility="{x:Bind ViewModel.IsString}" />
-            <TextBlock
-                x:Name="RawHint"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{ThemeResource CaptionTextBlockStyle}"
-                Text="Type byte pairs such as 0A FF. Spaces and line breaks are ignored. The view above updates as you type."
-                TextWrapping="Wrap"
-                Visibility="{x:Bind ViewModel.IsRaw}" />
         </StackPanel>
-        <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HasDataHelp, Mode=OneWay}">
+        <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.IsNumeric}">
             <TextBlock
                 AutomationProperties.AutomationId="ValueDataHelp"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"

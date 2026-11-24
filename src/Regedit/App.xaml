@@ -9,6 +9,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="Controls/HexEditor/HexEditorResources.xaml" />
                 <ResourceDictionary Source="Resources/Icons.xaml" />
                 <controls:ToolRowResources />
                 <!--  Other merged dictionaries here  -->
@@ -69,13 +70,6 @@
                 <Setter Property="MinWidth" Value="420" />
                 <Setter Property="MaxWidth" Value="480" />
                 <Setter Property="Spacing" Value="16" />
-            </Style>
-            <!--  Frames a HexView like a text field so it reads as a bounded data area.  -->
-            <Style x:Key="HexViewFrameStyle" TargetType="Border">
-                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
-                <Setter Property="Padding" Value="1" />
             </Style>
             <Style x:Key="DialogFieldsPanelStyle" TargetType="StackPanel">
                 <Setter Property="Spacing" Value="16" />

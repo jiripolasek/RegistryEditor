@@ -12,6 +12,8 @@ dotnet run --project tests/Regedit.Tests
 
 Open `JPSoftworks.Regedit.slnx` in Visual Studio for the full solution.
 
+The standalone hex editor accepts seekable streams and supports host theme overrides. [Hosting, keyboard and accessibility guide](../../src/Regedit/Controls/HexEditor/README.md)
+
 Format C# and XAML with Roslyn, ReSharper cleanup (including Apply file layout), and XAML Styler:
 
 ```powershell

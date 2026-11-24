@@ -14,7 +14,7 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
     private readonly string _initialData;
     private int _baseIndex;
     private bool _isMultiline;
-    private string _data;
+    private string? _data;
     private byte[] _previewBytes = [];
 
     internal RegistryValue Value { get; private set; }
@@ -39,8 +39,6 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
         }
     }
 
-    public string DataHeader => this.IsRaw ? "Hexadecimal text" : "Value data";
-
     public string Name { get; set; }
 
     public string DisplayName => this.Name.Length == 0 ? "(Default)" : this.Name;
@@ -63,7 +61,7 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
 
     public string Data
     {
-        get => this._data;
+        get => this._data ?? FormatHex(this.PreviewBytes);
         set
         {
             if (this.SetProperty(ref this._data, value))
@@ -81,7 +79,14 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
     public byte[] PreviewBytes
     {
         get => this._previewBytes;
-        private set => this.SetProperty(ref this._previewBytes, value);
+        private set
+        {
+            // Keep the editor's document when a different hex string represents the same bytes.
+            if (!ReferenceEquals(this._previewBytes, value) && !this._previewBytes.AsSpan().SequenceEqual(value))
+            {
+                this.SetProperty(ref this._previewBytes, value);
+            }
+        }
     }
 
     public int BaseIndex
@@ -131,8 +136,8 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
             : string.Empty;
         this.IsNumeric = !this.IsRaw && type is RegistryValueType.DWord or RegistryValueType.DWordBigEndian or RegistryValueType.QWord;
         this._original = original;
-        this._data = this.IsRaw ? FormatHex(value.Data) : value.EditText(true);
-        this._initialData = this._data;
+        this._data = this.IsRaw ? null : value.EditText(true);
+        this._initialData = this._data ?? string.Empty;
         this._isMultiline = !this.IsNumeric && (!this.IsString || HasLineBreaks(this.Data));
         this.UpdateDataHelp(this.IsRaw ? value.Data : null);
     }
@@ -169,7 +174,7 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
     {
         try
         {
-            if (!this.ValidateLineBreaks(this.Data))
+            if (this.IsString && !this.ValidateLineBreaks(this.Data))
             {
                 return null;
             }
@@ -188,6 +193,11 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
 
     private byte[] ParseDraft()
     {
+        if (this.IsRaw && this._data is null)
+        {
+            return this.PreviewBytes;
+        }
+
         return this._original is not null && !this.IsRaw && !this.IsNumeric && this.Data == this._initialData
             ? this._original.Data
             : RegistryValue.ParseData(this._type, this.Data, this.BaseIndex == 0, this.IsRaw);
@@ -218,13 +228,12 @@ public sealed partial class RegistryValueEditorViewModel : RegistryEditPrompt
         return builder.ToString();
     }
 
-    /// <summary>Applies bytes edited directly in the hex view, keeping the text in sync.</summary>
+    /// <summary>Uses the edited bytes directly for validation and saving.</summary>
     internal void ApplyBytes(byte[] bytes)
     {
+        this._data = null;
         this._previewBytes = bytes;
         this.OnPropertyChanged(nameof(this.PreviewBytes));
-        // Set the field so the text does not re-parse into a new array and reload the view.
-        this._data = FormatHex(bytes);
         this.OnPropertyChanged(nameof(this.Data));
         this.UpdateDataHelp(bytes);
     }
