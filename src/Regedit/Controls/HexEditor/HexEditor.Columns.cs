@@ -16,10 +16,13 @@ public partial class HexEditor
         nameof(ColumnBandSize), typeof(int), typeof(HexEditor), new PropertyMetadata(0, OnBandChanged));
 
     public static readonly DependencyProperty ColumnBandBrushProperty = DependencyProperty.Register(
-        nameof(ColumnBandBrush), typeof(Brush), typeof(HexEditor), new PropertyMetadata(null, (sender, _) => ((HexEditor)sender).UpdateColumns()));
+        nameof(ColumnBandBrush), typeof(Brush), typeof(HexEditor),
+        new PropertyMetadata(null, (sender, _) => ((HexEditor)sender).UpdateColumns()));
 
     public static readonly DependencyProperty ColumnBandForegroundProperty = DependencyProperty.Register(
         nameof(ColumnBandForeground), typeof(Brush), typeof(HexEditor), new PropertyMetadata(null, OnBandChanged));
+
+    private readonly TextBlock[] _byteLabels = new TextBlock[HexEditorRow.BytesPerRow];
 
     /// <summary>Number of bytes in each alternating column group. Zero disables banding.</summary>
     public int ColumnBandSize
@@ -41,22 +44,23 @@ public partial class HexEditor
         set => this.SetValue(ColumnBandForegroundProperty, value);
     }
 
-    private readonly TextBlock[] _byteLabels = new TextBlock[HexEditorRow.BytesPerRow];
+    private double CellWidth => this.ColumnRuler.Text.Length == 0 ? 0 : this.ColumnRuler.ActualWidth / this.ColumnRuler.Text.Length;
 
     private void InitializeColumns()
     {
         var style = (Style)this.Resources["ColumnLabelStyle"];
         for (var i = 0; i < this._byteLabels.Length; i++)
         {
-            var label = new TextBlock { Style = style, Text = i.ToString("X2", CultureInfo.InvariantCulture), TextAlignment = TextAlignment.Center };
+            var label = new TextBlock
+            {
+                Style = style, Text = i.ToString("X2", CultureInfo.InvariantCulture), TextAlignment = TextAlignment.Center
+            };
             this._byteLabels[i] = label;
             this.ColumnLabels.Children.Add(label);
         }
 
         this.ColumnRuler.SizeChanged += (_, _) => this.UpdateColumns();
     }
-
-    private double CellWidth => this.ColumnRuler.Text.Length == 0 ? 0 : this.ColumnRuler.ActualWidth / this.ColumnRuler.Text.Length;
 
     private static void OnBandChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
@@ -83,6 +87,7 @@ public partial class HexEditor
                 ranges.Clear();
                 row.InvalidateArrange();
             }
+
             return;
         }
 
@@ -96,6 +101,7 @@ public partial class HexEditor
             ranges.Add(new TextRange { StartIndex = HexEditorRow.HexStart(this._digits) + column * 3, Length = bytes * 3 - 1 });
             ranges.Add(new TextRange { StartIndex = ascii + column, Length = bytes });
         }
+
         row.InvalidateArrange();
     }
 

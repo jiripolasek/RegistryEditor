@@ -74,7 +74,10 @@
         <Setter Property="ColumnBandBrush" Value="{ThemeResource HexEditorColumnBandBrush}" />
         <Setter Property="ColumnBandForeground" Value="{ThemeResource HexEditorColumnBandForegroundBrush}" />
     </Style>
-    <Style x:Key="DefaultHexEditorStyle" BasedOn="{StaticResource PlainHexEditorStyle}" TargetType="hex:HexEditor">
+    <Style
+        x:Key="DefaultHexEditorStyle"
+        BasedOn="{StaticResource PlainHexEditorStyle}"
+        TargetType="hex:HexEditor">
         <Setter Property="Background" Value="{ThemeResource HexEditorBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource TextControlBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource TextControlBorderThemeThickness}" />

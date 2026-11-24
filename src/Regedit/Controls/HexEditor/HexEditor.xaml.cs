@@ -15,6 +15,9 @@ namespace JPSoftworks.Controls;
 /// <summary>A keyboard-accessible editor for a seekable byte document.</summary>
 public partial class HexEditor : UserControl
 {
+    /// <summary>Raised after a user edit has been applied to the draft.</summary>
+    public event EventHandler? Edited;
+
     public static readonly DependencyProperty DocumentProperty = DependencyProperty.Register(
         nameof(Document), typeof(HexDocument), typeof(HexEditor), new PropertyMetadata(null, OnDocumentChanged));
 
@@ -71,8 +74,15 @@ public partial class HexEditor : UserControl
 
     public long SelectionLength => this._buffer.SelectionLength;
 
-    /// <summary>Raised after a user edit has been applied to the draft.</summary>
-    public event EventHandler? Edited;
+    private long RowCount => this.Document is null || (!this._buffer.CanResize && this._buffer.Length == 0)
+        ? 0
+        : (this._buffer.LastPosition / HexEditorRow.BytesPerRow) + 1;
+
+    private long MaxFirstRow => Math.Max(0, this.RowCount - this._visibleRows);
+
+    private double RowHeight => this.Rows.Children.Count > 0 && this.Rows.Children[0] is FrameworkElement { ActualHeight: > 0 } row
+        ? row.ActualHeight
+        : this.FontSize * 1.5;
 
     public HexEditor()
     {
@@ -81,8 +91,16 @@ public partial class HexEditor : UserControl
         this.InitializeHover();
         this.CharacterReceived += this.Editor_CharacterReceived;
         this.KeyDown += this.Editor_KeyDown;
-        this.PointerEntered += (_, _) => { this._pointerOver = true; this.UpdateFieldState(); };
-        this.PointerExited += (_, _) => { this._pointerOver = false; this.UpdateFieldState(); };
+        this.PointerEntered += (_, _) =>
+        {
+            this._pointerOver = true;
+            this.UpdateFieldState();
+        };
+        this.PointerExited += (_, _) =>
+        {
+            this._pointerOver = false;
+            this.UpdateFieldState();
+        };
         this.GotFocus += (_, args) =>
         {
             if (ReferenceEquals(args.OriginalSource, this) && this.OffsetPanel.Visibility == Visibility.Visible)
@@ -93,15 +111,21 @@ public partial class HexEditor : UserControl
             this._focusWithin = true;
             this.UpdateFieldState();
         };
-        this.LostFocus += (_, _) => { this._focusWithin = false; this.UpdateFieldState(); };
-        this.RegisterPropertyChangedCallback(CharacterSpacingProperty, (_, _) =>
+        this.LostFocus += (_, _) =>
         {
-            foreach (RichTextBlock row in this.Rows.Children)
+            this._focusWithin = false;
+            this.UpdateFieldState();
+        };
+        this.RegisterPropertyChangedCallback(
+            CharacterSpacingProperty, (_, _) =>
             {
-                row.CharacterSpacing = this.CharacterSpacing;
-            }
-            this.RequestSelectionLayout();
-        });
+                foreach (RichTextBlock row in this.Rows.Children)
+                {
+                    row.CharacterSpacing = this.CharacterSpacing;
+                }
+
+                this.RequestSelectionLayout();
+            });
         this.RegisterPropertyChangedCallback(PaddingProperty, (_, _) => this.UpdateViewport());
         this.RegisterPropertyChangedCallback(BorderThicknessProperty, (_, _) => this.UpdateFieldState());
         this.RegisterPropertyChangedCallback(FocusStateProperty, (_, _) => this.RequestSelectionLayout());
@@ -112,6 +136,7 @@ public partial class HexEditor : UserControl
             {
                 this.ClearHover();
             }
+
             this.RequestSelectionLayout();
         };
         this.ActualThemeChanged += (_, _) => this.RequestSelectionLayout();
@@ -161,14 +186,6 @@ public partial class HexEditor : UserControl
     }
 
     protected override AutomationPeer OnCreateAutomationPeer() => new HexEditorAutomationPeer(this);
-
-    private long RowCount => this.Document is null || (!this._buffer.CanResize && this._buffer.Length == 0)
-        ? 0 : (this._buffer.LastPosition / HexEditorRow.BytesPerRow) + 1;
-
-    private long MaxFirstRow => Math.Max(0, this.RowCount - this._visibleRows);
-
-    private double RowHeight => this.Rows.Children.Count > 0 && this.Rows.Children[0] is FrameworkElement { ActualHeight: > 0 } row
-        ? row.ActualHeight : this.FontSize * 1.5;
 
     private static void OnDocumentChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
@@ -258,8 +275,10 @@ public partial class HexEditor : UserControl
             return false;
         }
 
-        var dataHeight = this.Viewport.ViewportHeight - this.Padding.Top - this.Padding.Bottom
-            - (this.ShowColumnHeaders ? this.Header.ActualHeight : 0);
+        var dataHeight = this.Viewport.ViewportHeight
+                         - this.Padding.Top
+                         - this.Padding.Bottom
+                         - (this.ShowColumnHeaders ? this.Header.ActualHeight : 0);
         var caretRow = this._buffer.Caret / HexEditorRow.BytesPerRow;
         var caretWasVisible = caretRow >= this._firstRow && caretRow - this._firstRow < this._visibleRows;
         this._visibleRows = Math.Max(1, (int)(dataHeight / this.RowHeight));
@@ -289,6 +308,7 @@ public partial class HexEditor : UserControl
             dataChanged = true;
             this.ColumnRuler.Text = new string('0', HexEditorRow.AsciiStart(digits) + HexEditorRow.BytesPerRow);
         }
+
         var count = (int)Math.Min(this._visibleRows, this.RowCount);
         this.EmptyMessage.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
         while (this.Rows.Children.Count > count)
@@ -357,7 +377,10 @@ public partial class HexEditor : UserControl
             return;
         }
 
-        var hex = new TextRange { StartIndex = HexEditorRow.HexStart(this._digits) + ((int)start * 3), Length = (int)((end - start) * 3) + 2 };
+        var hex = new TextRange
+        {
+            StartIndex = HexEditorRow.HexStart(this._digits) + ((int)start * 3), Length = (int)((end - start) * 3) + 2
+        };
         var ascii = new TextRange { StartIndex = HexEditorRow.AsciiStart(this._digits) + (int)start, Length = (int)(end - start) + 1 };
         active.Add(this._ascii ? ascii : hex);
         inactive.Add(this._ascii ? hex : ascii);
@@ -413,6 +436,7 @@ public partial class HexEditor : UserControl
             this.ShowStatus(ex.Message);
             return;
         }
+
         var readOnly = !this._buffer.CanWriteByte(this._buffer.Caret);
         if (FrameworkElementAutomationPeer.FromElement(this) is { } peer)
         {
@@ -420,11 +444,13 @@ public partial class HexEditor : UserControl
             {
                 peer.RaisePropertyChangedEvent(ValuePatternIdentifiers.ValueProperty, this._automationValue, value);
             }
+
             if (readOnly != this._automationReadOnly)
             {
                 peer.RaisePropertyChangedEvent(ValuePatternIdentifiers.IsReadOnlyProperty, this._automationReadOnly, readOnly);
             }
         }
+
         this._automationValue = value;
         this._automationReadOnly = readOnly;
 

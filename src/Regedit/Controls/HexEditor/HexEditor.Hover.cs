@@ -70,6 +70,7 @@ public partial class HexEditor
             {
                 this.HideHover();
             }
+
             return;
         }
 
@@ -99,6 +100,7 @@ public partial class HexEditor
             var active = this._ascii ? this.AsciiHover : this.HexHover;
             active.BorderBrush = row.TextHighlighters[ActiveHighlight].Foreground;
         }
+
         this.HoverMarks.Visibility = Visibility.Visible;
     }
 }

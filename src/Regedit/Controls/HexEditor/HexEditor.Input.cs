@@ -174,7 +174,9 @@ public partial class HexEditor
                 this.ApplyOffset(offset.Value);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
             if (this._offsetRequest == request)
@@ -261,9 +263,14 @@ public partial class HexEditor
             var left = cell.Row.TransformToVisual(this.Viewport).TransformBounds(cell.Bounds).X + offset;
             if (!this._ascii && this._buffer.Caret < this._buffer.Length && this.Viewport.ViewportWidth >= 2 * width)
             {
-                if (this._buffer.LowNibble) { left -= this.CellWidth; }
+                if (this._buffer.LowNibble)
+                {
+                    left -= this.CellWidth;
+                }
+
                 width += this.CellWidth;
             }
+
             if (left < offset || left + width > offset + this.Viewport.ViewportWidth)
             {
                 var target = left < offset ? left : Math.Min(left, left + width - this.Viewport.ViewportWidth);
@@ -319,7 +326,8 @@ public partial class HexEditor
 
     private void Rows_PointerPressed(object sender, PointerRoutedEventArgs args)
     {
-        if (args.Pointer.PointerDeviceType == PointerDeviceType.Mouse && args.GetCurrentPoint(this.Rows).Properties.IsLeftButtonPressed
+        if (args.Pointer.PointerDeviceType == PointerDeviceType.Mouse
+            && args.GetCurrentPoint(this.Rows).Properties.IsLeftButtonPressed
             && this.SelectAt(args.GetCurrentPoint(this.Rows).Position, IsDown(VirtualKey.Shift)))
         {
             if (this.Rows.CapturePointer(args.Pointer))
@@ -455,13 +463,14 @@ public partial class HexEditor
             var bytes = new byte[(int)this.SelectionLength];
             this.Document.Read(this.SelectionStart, bytes);
             var text = ascii
-                ? string.Create(bytes.Length, bytes, static (chars, values) =>
-                {
-                    for (var i = 0; i < chars.Length; i++)
+                ? string.Create(
+                    bytes.Length, bytes, static (chars, values) =>
                     {
-                        chars[i] = HexEditorRow.Printable(values[i]);
-                    }
-                })
+                        for (var i = 0; i < chars.Length; i++)
+                        {
+                            chars[i] = HexEditorRow.Printable(values[i]);
+                        }
+                    })
                 : BitConverter.ToString(bytes).Replace('-', ' ');
             this.CopyText(text);
         }
@@ -497,10 +506,18 @@ public partial class HexEditor
         var revision = document.Revision;
         var canResize = this._buffer.CanResize;
         var selection = CurrentSelection();
+
         (long, long, long, bool, bool, bool) CurrentSelection() =>
             (this._buffer.Caret, this.SelectionStart, this.SelectionLength, this._buffer.HasSelection, this._buffer.LowNibble, this._ascii);
-        bool CanApply() => this.IsLoaded && this.IsEnabled && this._buffer.CanWrite && canResize == this._buffer.CanResize
-            && document == this.Document && document.Revision == revision && selection == CurrentSelection();
+
+        bool CanApply() => this.IsLoaded
+                           && this.IsEnabled
+                           && this._buffer.CanWrite
+                           && canResize == this._buffer.CanResize
+                           && document == this.Document
+                           && document.Revision == revision
+                           && selection == CurrentSelection();
+
         try
         {
             var content = Clipboard.GetContent();
@@ -564,7 +581,8 @@ public partial class HexEditor
     {
         private readonly HexEditor _editor;
 
-        internal HexEditorAutomationPeer(HexEditor editor) : base(editor)
+        internal HexEditorAutomationPeer(HexEditor editor)
+            : base(editor)
         {
             this._editor = editor;
         }

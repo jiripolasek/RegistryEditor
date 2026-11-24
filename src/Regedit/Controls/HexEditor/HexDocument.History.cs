@@ -8,46 +8,6 @@ public sealed partial class HexDocument
 {
     private const int HistoryByteLimit = 4 * 1024 * 1024;
     private const int HistoryEntryLimit = 128;
-    private sealed record HistoryEntry(Change Change, Piece[] Restore, int Cost);
-
-    private sealed class History
-    {
-        private readonly List<HistoryEntry> _entries = [];
-        private int _cost;
-
-        internal HistoryEntry? Last => this._entries.Count > 0 ? this._entries[^1] : null;
-
-        internal void Clear()
-        {
-            this._entries.Clear();
-            this._cost = 0;
-        }
-
-        internal void Pop()
-        {
-            this._cost -= this._entries[^1].Cost;
-            this._entries.RemoveAt(this._entries.Count - 1);
-        }
-
-        internal void Push(HistoryEntry? entry)
-        {
-            if (entry is null)
-            {
-                // Older inverses depend on the edit that did not fit.
-                this.Clear();
-                return;
-            }
-
-            while (this._entries.Count >= HistoryEntryLimit || this._cost + entry.Cost > HistoryByteLimit)
-            {
-                this._cost -= this._entries[0].Cost;
-                this._entries.RemoveAt(0);
-            }
-
-            this._entries.Add(entry);
-            this._cost += entry.Cost;
-        }
-    }
 
     private readonly History _undo = new();
     private readonly History _redo = new();
@@ -113,5 +73,46 @@ public sealed partial class HexDocument
         to.Push(inverse);
         this.LastChange = entry.Change;
         this.Revision++;
+    }
+
+    private sealed record HistoryEntry(Change Change, Piece[] Restore, int Cost);
+
+    private sealed class History
+    {
+        private readonly List<HistoryEntry> _entries = [];
+        private int _cost;
+
+        internal HistoryEntry? Last => this._entries.Count > 0 ? this._entries[^1] : null;
+
+        internal void Clear()
+        {
+            this._entries.Clear();
+            this._cost = 0;
+        }
+
+        internal void Pop()
+        {
+            this._cost -= this._entries[^1].Cost;
+            this._entries.RemoveAt(this._entries.Count - 1);
+        }
+
+        internal void Push(HistoryEntry? entry)
+        {
+            if (entry is null)
+            {
+                // Older inverses depend on the edit that did not fit.
+                this.Clear();
+                return;
+            }
+
+            while (this._entries.Count >= HistoryEntryLimit || this._cost + entry.Cost > HistoryByteLimit)
+            {
+                this._cost -= this._entries[0].Cost;
+                this._entries.RemoveAt(0);
+            }
+
+            this._entries.Add(entry);
+            this._cost += entry.Cost;
+        }
     }
 }

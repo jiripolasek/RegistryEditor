@@ -49,7 +49,10 @@
                 BytesEdited="HexView_BytesEdited"
                 IsReadOnly="False" />
         </StackPanel>
-        <StackPanel x:Name="DataPanel" x:Load="False" Spacing="4">
+        <StackPanel
+            x:Name="DataPanel"
+            x:Load="False"
+            Spacing="4">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

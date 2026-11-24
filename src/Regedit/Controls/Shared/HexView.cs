@@ -10,6 +10,8 @@ namespace JPSoftworks.Regedit.Controls.Shared;
 /// <summary>Adapts the stream-backed editor to the registry dialogs' byte-array snapshots.</summary>
 public sealed partial class HexView : HexEditor
 {
+    public event EventHandler<byte[]>? BytesEdited;
+
     internal const double DialogWidth = 744;
 
     public static readonly DependencyProperty BytesProperty = DependencyProperty.Register(
@@ -22,8 +24,6 @@ public sealed partial class HexView : HexEditor
         get => (byte[]?)this.GetValue(BytesProperty);
         set => this.SetValue(BytesProperty, value);
     }
-
-    public event EventHandler<byte[]>? BytesEdited;
 
     public HexView()
     {

@@ -32,8 +32,7 @@ public sealed partial class RegistryValueEditor : UserControl
     private Style GetDataEditorStyle(bool multiline)
     {
         return (Style)this.Resources[
-            this.ViewModel.IsNumeric ? "NumericDataEditor" :
-            multiline ? "TextDataEditor" : "SingleLineDataEditor"];
+            this.ViewModel.IsNumeric ? "NumericDataEditor" : multiline ? "TextDataEditor" : "SingleLineDataEditor"];
     }
 
     private async void DataBox_Paste(object sender, TextControlPasteEventArgs e)
@@ -96,9 +95,17 @@ public sealed partial class RegistryValueEditor : UserControl
         {
             return text;
         }
+
         var byteCount = await Task.Run(() => this.ViewModel.ReadRegistryHex(text, []));
-        if (!this.IsLoaded) { return null; }
-        if (byteCount < 0) { return text; }
+        if (!this.IsLoaded)
+        {
+            return null;
+        }
+
+        if (byteCount < 0)
+        {
+            return text;
+        }
 
         var confirmation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var apply = new Button { Content = "Apply conversion" };
@@ -109,7 +116,16 @@ public sealed partial class RegistryValueEditor : UserControl
             Content = new StackPanel
             {
                 Spacing = 8,
-                Children = { new TextBlock { Text = RegistryValueEditorViewModel.ByteConversionHelp(byteCount), TextWrapping = TextWrapping.Wrap, MaxWidth = 320 }, apply }
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = RegistryValueEditorViewModel.ByteConversionHelp(byteCount),
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxWidth = 320
+                    },
+                    apply
+                }
             }
         };
         apply.Click += (_, _) => confirmation.TrySetResult(true);
@@ -119,7 +135,11 @@ public sealed partial class RegistryValueEditor : UserControl
         try
         {
             flyout.ShowAt(this.ByteEditor);
-            if (!await confirmation.Task) { return null; }
+            if (!await confirmation.Task)
+            {
+                return null;
+            }
+
             return byteCount == 0 ? string.Empty : text;
         }
         finally

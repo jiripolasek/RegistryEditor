@@ -45,10 +45,12 @@ internal sealed class HexEditorBuffer
 
     private long GrowthAvailable => (this.MaxLength == 0 ? long.MaxValue : Math.Max(this.Length, this.MaxLength)) - this.Length;
 
-    public bool CanWriteByte(long offset) => this.CanWrite && offset >= 0 &&
-        (offset < this.Length || (offset == this.Length && this.CanResize && this.GrowthAvailable > 0));
-
     public long LastPosition => this.CanResize ? this.Length : Math.Max(0, this.Length - 1);
+
+    public bool CanWriteByte(long offset) => this.CanWrite
+                                             && offset >= 0
+                                             && (offset < this.Length
+                                                 || (offset == this.Length && this.CanResize && this.GrowthAvailable > 0));
 
     public void Load(HexDocument? document)
     {
@@ -86,6 +88,7 @@ internal sealed class HexEditorBuffer
                 anchor = firstDeleted - 1;
             }
         }
+
         this.LowNibble &= !change.Replaces(this.Caret);
         this.Caret = Math.Min(caret, last);
         this._anchor = Math.Min(anchor, last);
@@ -156,8 +159,10 @@ internal sealed class HexEditorBuffer
         return true;
     }
 
-    public bool CanReplayHistory(bool redo) => !this.IsReadOnly && this.Document?.NextHistoryChange(redo) is { } change
-        && (change.Inserted == change.Removed || (this.CanResize && change.Inserted - change.Removed <= this.GrowthAvailable));
+    public bool CanReplayHistory(bool redo) => !this.IsReadOnly
+                                               && this.Document?.NextHistoryChange(redo) is { } change
+                                               && (change.Inserted == change.Removed
+                                                   || (this.CanResize && change.Inserted - change.Removed <= this.GrowthAvailable));
 
     public bool ReplayHistory(bool redo)
     {
@@ -173,6 +178,7 @@ internal sealed class HexEditorBuffer
         {
             this.Select(change.Offset, change.Inserted);
         }
+
         return true;
     }
 
@@ -214,9 +220,7 @@ internal sealed class HexEditorBuffer
             return false;
         }
 
-        var byteCount = ascii
-            ? (text.AsSpan().ContainsAnyExceptInRange(' ', '~') ? 0 : text.Length)
-            : CountHexBytes(text);
+        var byteCount = ascii ? (text.AsSpan().ContainsAnyExceptInRange(' ', '~') ? 0 : text.Length) : CountHexBytes(text);
         if (ascii || byteCount > 0)
         {
             readCustom = null;
@@ -225,6 +229,7 @@ internal sealed class HexEditorBuffer
         {
             byteCount = readCustom(text, []);
         }
+
         if (byteCount <= 0)
         {
             message = ascii ? "Paste printable ASCII characters." : "Paste complete hexadecimal byte pairs.";
@@ -297,6 +302,7 @@ internal sealed class HexEditorBuffer
     private static void DecodeHex(string text, Span<byte> bytes)
     {
         var position = 0;
+
         int NextDigit()
         {
             while (char.IsWhiteSpace(text[position]))

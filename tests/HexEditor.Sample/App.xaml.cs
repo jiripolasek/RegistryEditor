@@ -103,7 +103,9 @@ public partial class App : Application
                     await CheckModesAndNavigationAsync(host, editor);
                     await CheckFieldStyleAsync(host, editor);
                     await CheckSharedViewportAsync(host, editor);
-                    File.WriteAllText(report, $"PASS. {editor.Document!.Length:N0} bytes. Field and plain styles, spacing, column headings and bands, light and dark themes, mirrored selection, insertion caret, far navigation, editing modes and UI Automation.");
+                    File.WriteAllText(
+                        report,
+                        $"PASS. {editor.Document!.Length:N0} bytes. Field and plain styles, spacing, column headings and bands, light and dark themes, mirrored selection, insertion caret, far navigation, editing modes and UI Automation.");
                 }
                 catch (Exception ex)
                 {
@@ -148,37 +150,61 @@ public partial class App : Application
         var bandStart = bands.Children.Count == 4 ? Canvas.GetLeft((Border)bands.Children[0]) : double.PositiveInfinity;
         if (Math.Abs(headerX - expected) > 1 || Math.Abs(bandStart - (gap + expected) / 2) > 1)
         {
-            throw new InvalidOperationException($"Header or bands are misaligned at {last:X}. Byte {expected}, header {headerX} (margin {label.Margin.Left}, width {label.ActualWidth}), band {bandStart}, count {bands.Children.Count}.");
+            throw new InvalidOperationException(
+                $"Header or bands are misaligned at {last:X}. Byte {expected}, header {headerX} (margin {label.Margin.Left}, width {label.ActualWidth}), band {bandStart}, count {bands.Children.Count}.");
         }
+
         editor.ColumnBandSize = 1;
-        if (bands.Children.Count != 16) { throw new InvalidOperationException("Single-byte banding should shade eight columns in each pane."); }
+        if (bands.Children.Count != 16)
+        {
+            throw new InvalidOperationException("Single-byte banding should shade eight columns in each pane.");
+        }
+
         var highlights = row.TextHighlighters[ByteEditor.BandHighlight];
         var color = new SolidColorBrush(Microsoft.UI.Colors.Teal);
         editor.ColumnBandForeground = color;
         var rowBytes = Math.Min(HexEditorRow.BytesPerRow, document.Length - (long)row.Tag);
-        if (highlights.Foreground != color || highlights.Ranges.Count != rowBytes / 2 * 2 || (rowBytes >= 2
-            && (!highlights.Ranges.Any(r => r.StartIndex == HexEditorRow.HexStart(digits) + 3 && r.Length == 2)
-                || !highlights.Ranges.Any(r => r.StartIndex == HexEditorRow.AsciiStart(digits) + 1 && r.Length == 1))))
+        if (highlights.Foreground != color
+            || highlights.Ranges.Count != rowBytes / 2 * 2
+            || (rowBytes >= 2
+                && (!highlights.Ranges.Any(r => r.StartIndex == HexEditorRow.HexStart(digits) + 3 && r.Length == 2)
+                    || !highlights.Ranges.Any(r => r.StartIndex == HexEditorRow.AsciiStart(digits) + 1 && r.Length == 1))))
         {
             throw new InvalidOperationException("The host foreground should tint alternating bytes in both panes.");
         }
+
         editor.ColumnBandForeground = null;
-        if (highlights.Ranges.Count != 0 || bands.Children.Count != 16) { throw new InvalidOperationException("Background-only bands lost their fill."); }
+        if (highlights.Ranges.Count != 0 || bands.Children.Count != 16)
+        {
+            throw new InvalidOperationException("Background-only bands lost their fill.");
+        }
+
         editor.ClearValue(ByteEditor.ColumnBandForegroundProperty);
         editor.ColumnBandSize = 0;
-        if (bands.Children.Count != 0 || highlights.Ranges.Count != 0) { throw new InvalidOperationException("Disabling banding should remove all bands."); }
+        if (bands.Children.Count != 0 || highlights.Ranges.Count != 0)
+        {
+            throw new InvalidOperationException("Disabling banding should remove all bands.");
+        }
 
-        editor.OffsetPromptAsync = (current, maximum) =>
-            current == last && maximum == last ? Task.FromResult<long?>(0) : throw new InvalidOperationException("Incorrect offset range.");
+        editor.OffsetPromptAsync = (current, maximum) => current == last && maximum == last
+            ? Task.FromResult<long?>(0)
+            : throw new InvalidOperationException("Incorrect offset range.");
         await editor.GoToOffsetAsync();
-        if (editor.SelectionStart != 0) { throw new InvalidOperationException("Host offset prompt did not navigate."); }
+        if (editor.SelectionStart != 0)
+        {
+            throw new InvalidOperationException("Host offset prompt did not navigate.");
+        }
+
         editor.OffsetPromptAsync = (_, _) => Task.FromResult<long?>(last);
         await editor.GoToOffsetAsync();
         editor.OffsetPromptAsync = (_, _) => Task.FromResult<long?>(null);
         await editor.GoToOffsetAsync();
         editor.OffsetPromptAsync = (_, _) => Task.FromResult<long?>(-1);
         await editor.GoToOffsetAsync();
-        if (editor.SelectionStart != last) { throw new InvalidOperationException("An invalid or canceled host prompt moved the selection."); }
+        if (editor.SelectionStart != last)
+        {
+            throw new InvalidOperationException("An invalid or canceled host prompt moved the selection.");
+        }
 
         var delayed = new TaskCompletionSource<long?>();
         editor.OffsetPromptAsync = (_, _) => delayed.Task;
@@ -190,6 +216,7 @@ public partial class App : Application
         {
             throw new InvalidOperationException("A stale host prompt or empty fixed-length document exposed an editable byte.");
         }
+
         editor.Document = document;
         editor.IsFixedLength = false;
         editor.OffsetPromptAsync = (_, maximum) => Task.FromResult<long?>(maximum);
@@ -200,26 +227,57 @@ public partial class App : Application
         var endRow = rows.Children.OfType<RichTextBlock>().Last();
         var endText = ByteEditor.RowText(endRow).Text;
         var caret = (Border)editor.FindName("EditCaret");
-        if (value.Value != "" || editor.SelectionLength != 0 || endText.Length != HexEditorRow.AsciiStart(digits) + document.Length % 16
-            || endRow.TextHighlighters[ByteEditor.ActiveHighlight].Ranges.Count != 0 || ((Canvas)editor.FindName("SelectionOutlines")).Children.Count != 0
-            || caret.Visibility != Visibility.Visible || caret.Background != editor.Foreground || !AutomationProperties.GetItemStatus(editor).Contains("type to append"))
+        if (value.Value != ""
+            || editor.SelectionLength != 0
+            || endText.Length != HexEditorRow.AsciiStart(digits) + document.Length % 16
+            || endRow.TextHighlighters[ByteEditor.ActiveHighlight].Ranges.Count != 0
+            || ((Canvas)editor.FindName("SelectionOutlines")).Children.Count != 0
+            || caret.Visibility != Visibility.Visible
+            || caret.Background != editor.Foreground
+            || !AutomationProperties.GetItemStatus(editor).Contains("type to append"))
         {
-            throw new InvalidOperationException("The insertion position should have a visible caret and status, with no byte or mirrored selection.");
+            throw new InvalidOperationException(
+                "The insertion position should have a visible caret and status, with no byte or mirrored selection.");
         }
+
         editor.MaxLength = document.Length;
-        if (!value.IsReadOnly || caret.Visibility != Visibility.Collapsed) { throw new InvalidOperationException("An append caret was offered at MaxLength."); }
+        if (!value.IsReadOnly || caret.Visibility != Visibility.Collapsed)
+        {
+            throw new InvalidOperationException("An append caret was offered at MaxLength.");
+        }
+
         var beforeAppend = document.Revision;
-        try { value.SetValue("FF"); }
-        catch (InvalidOperationException) { }
-        if (document.Revision != beforeAppend) { throw new InvalidOperationException("Automation appended past MaxLength."); }
+        try
+        {
+            value.SetValue("FF");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        if (document.Revision != beforeAppend)
+        {
+            throw new InvalidOperationException("Automation appended past MaxLength.");
+        }
+
         editor.MaxLength = 1;
         editor.Highlight(last, 1);
-        if (value.IsReadOnly || document.Length != last + 1) { throw new InvalidOperationException("Lowering MaxLength changed existing bytes or blocked overwrite."); }
+        if (value.IsReadOnly || document.Length != last + 1)
+        {
+            throw new InvalidOperationException("Lowering MaxLength changed existing bytes or blocked overwrite.");
+        }
+
         editor.ClearValue(ByteEditor.MaxLengthProperty);
         editor.IsReadOnly = true;
         var readOnlyRevision = document.Revision;
-        try { value.SetValue("FF"); }
-        catch (InvalidOperationException) { }
+        try
+        {
+            value.SetValue("FF");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
         if (!value.IsReadOnly || document.Revision != readOnlyRevision)
         {
             throw new InvalidOperationException("The viewer accepted an automation edit.");
@@ -229,11 +287,16 @@ public partial class App : Application
         editor.IsReadOnly = false;
         await editor.GoToOffsetAsync();
         await NextFrameAsync();
-        if (value.IsReadOnly || value.Value.Length != 0 || editor.SelectionLength != 0 || caret.Visibility != Visibility.Visible
-            || rows.Children.Count != 1 || ((Canvas)editor.FindName("SelectionOutlines")).Children.Count != 0)
+        if (value.IsReadOnly
+            || value.Value.Length != 0
+            || editor.SelectionLength != 0
+            || caret.Visibility != Visibility.Visible
+            || rows.Children.Count != 1
+            || ((Canvas)editor.FindName("SelectionOutlines")).Children.Count != 0)
         {
             throw new InvalidOperationException("An empty editable document should start with just the insertion caret.");
         }
+
         editor.Document = document;
     }
 
@@ -273,6 +336,7 @@ public partial class App : Application
         {
             throw new InvalidOperationException("A remote overwrite should preserve the viewer's scroll position.");
         }
+
         host.Children.Remove(viewer);
         editor.Document = original;
     }
@@ -314,25 +378,35 @@ public partial class App : Application
         var statusBar = (Border)editor.FindName("StatusBar");
         var viewport = (ScrollViewer)editor.FindName("Viewport");
         var heightWithStatus = viewport.ActualHeight;
-        if (!editor.ShowStatusBar || statusBar.Visibility != Visibility.Visible || statusBar.BorderThickness.Top <= 0 || status.FontFamily.Source == editor.FontFamily.Source)
+        if (!editor.ShowStatusBar
+            || statusBar.Visibility != Visibility.Visible
+            || statusBar.BorderThickness.Top <= 0
+            || status.FontFamily.Source == editor.FontFamily.Source)
         {
             throw new InvalidOperationException("The default status should use the UI font.");
         }
+
         editor.ShowStatusBar = false;
         host.UpdateLayout();
         editor.Highlight(0, 1);
-        if (statusBar.Visibility != Visibility.Collapsed || viewport.ActualHeight <= heightWithStatus
-            || !AutomationProperties.GetItemStatus(editor).Contains("offset 0,") || status.Text != AutomationProperties.GetItemStatus(editor))
+        if (statusBar.Visibility != Visibility.Collapsed
+            || viewport.ActualHeight <= heightWithStatus
+            || !AutomationProperties.GetItemStatus(editor).Contains("offset 0,")
+            || status.Text != AutomationProperties.GetItemStatus(editor))
         {
             throw new InvalidOperationException("Hiding the status should free its space and retain the current automation status.");
         }
+
         editor.ClearValue(ByteEditor.ShowStatusBarProperty);
         editor.Highlight(offset, 1);
         host.UpdateLayout();
-        if (statusBar.Visibility != Visibility.Visible || viewport.ActualHeight != heightWithStatus || status.Text != AutomationProperties.GetItemStatus(editor))
+        if (statusBar.Visibility != Visibility.Visible
+            || viewport.ActualHeight != heightWithStatus
+            || status.Text != AutomationProperties.GetItemStatus(editor))
         {
             throw new InvalidOperationException("Showing the status again should restore the current text and layout.");
         }
+
         var scroll = (ScrollBar)editor.FindName("RowScroll");
         var pageWithHeaders = scroll.ViewportSize;
         var topWithHeaders = rows.TransformToVisual(editor).TransformPoint(default).Y;
@@ -343,8 +417,10 @@ public partial class App : Application
 
         editor.ShowColumnHeaders = false;
         host.UpdateLayout();
-        if (header.Visibility != Visibility.Collapsed || scroll.ViewportSize <= pageWithHeaders
-            || rows.TransformToVisual(editor).TransformPoint(default).Y >= topWithHeaders || editor.SelectionStart != offset)
+        if (header.Visibility != Visibility.Collapsed
+            || scroll.ViewportSize <= pageWithHeaders
+            || rows.TransformToVisual(editor).TransformPoint(default).Y >= topWithHeaders
+            || editor.SelectionStart != offset)
         {
             throw new InvalidOperationException("Hiding the header should reclaim its row and preserve the selection.");
         }
@@ -361,6 +437,7 @@ public partial class App : Application
         {
             throw new InvalidOperationException("The sample could not focus the editor.");
         }
+
         await NextFrameAsync();
         host.UpdateLayout();
         var caret = (Border)editor.FindName("EditCaret");
@@ -368,22 +445,29 @@ public partial class App : Application
         var character = HexEditorRow.HexStart(digits) + ((int)(offset % 16) * 3);
         var expected = run.ContentStart.GetPositionAtOffset(character, LogicalDirection.Forward).GetCharacterRect(LogicalDirection.Forward);
         var actual = caret.TransformToVisual(farRow).TransformPoint(default);
-        if (caret.Visibility != Visibility.Visible || caret.ActualWidth <= 0 || caret.ActualHeight <= 0
-            || Math.Abs(actual.X - expected.X) > 1 || Math.Abs(actual.Y - expected.Y) > 1)
+        if (caret.Visibility != Visibility.Visible
+            || caret.ActualWidth <= 0
+            || caret.ActualHeight <= 0
+            || Math.Abs(actual.X - expected.X) > 1
+            || Math.Abs(actual.Y - expected.Y) > 1)
         {
-            throw new InvalidOperationException($"The edit caret should be at the high digit of byte {offset:X}. Expected {expected}, got {actual}, {caret.Visibility}, focus {editor.FocusState}.");
+            throw new InvalidOperationException(
+                $"The edit caret should be at the high digit of byte {offset:X}. Expected {expected}, got {actual}, {caret.Visibility}, focus {editor.FocusState}.");
         }
 
         var actualBrush = ((SolidColorBrush)outlines.Children.OfType<Border>().Single().BorderBrush).Color;
         var expectedBrush = ((SolidColorBrush)overrideBrush).Color;
-        if (editor.FontSize != 16 || ((SolidColorBrush)farRow.TextHighlighters[ByteEditor.OffsetHighlight].Foreground).Color != Microsoft.UI.Colors.CornflowerBlue)
+        if (editor.FontSize != 16
+            || ((SolidColorBrush)farRow.TextHighlighters[ByteEditor.OffsetHighlight].Foreground).Color
+            != Microsoft.UI.Colors.CornflowerBlue)
         {
             throw new InvalidOperationException("The host font style or application offset brush was not applied.");
         }
 
         if (rows.Children.Count > 50 || actualBrush != expectedBrush)
         {
-            throw new InvalidOperationException($"Realized {rows.Children.Count} rows. The host selection brush was {expectedBrush}, the row used {actualBrush}.");
+            throw new InvalidOperationException(
+                $"Realized {rows.Children.Count} rows. The host selection brush was {expectedBrush}, the row used {actualBrush}.");
         }
 
         var value = FrameworkElementAutomationPeer.CreatePeerForElement(editor)?.GetPattern(PatternInterface.Value) as IValueProvider;
@@ -409,7 +493,9 @@ public partial class App : Application
             throw new InvalidOperationException("A read-only editor displayed an edit caret.");
         }
 
-        if (!value.IsReadOnly || value.Value != "A5" || !AutomationProperties.GetItemStatus(editor).Contains("A5", StringComparison.Ordinal))
+        if (!value.IsReadOnly
+            || value.Value != "A5"
+            || !AutomationProperties.GetItemStatus(editor).Contains("A5", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Automation did not report the edited byte and read-only mode.");
         }
@@ -426,11 +512,17 @@ public partial class App : Application
         await Task.Yield();
         var darkBand = ((SolidColorBrush)editor.ColumnBandForeground!).Color;
         if (!new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast
-            && (light == ((SolidColorBrush)editor.Foreground).Color || lightMirror == ((SolidColorBrush)mirror.BorderBrush).Color
-                || lightBand == light || lightBand == darkBand || lightBand.R != lightBand.G || lightBand.G != lightBand.B
-                || darkBand.R != darkBand.G || darkBand.G != darkBand.B))
+            && (light == ((SolidColorBrush)editor.Foreground).Color
+                || lightMirror == ((SolidColorBrush)mirror.BorderBrush).Color
+                || lightBand == light
+                || lightBand == darkBand
+                || lightBand.R != lightBand.G
+                || lightBand.G != lightBand.B
+                || darkBand.R != darkBand.G
+                || darkBand.G != darkBand.B))
         {
-            throw new InvalidOperationException("The default bands should be neutral in both themes and the selection should follow the host theme.");
+            throw new InvalidOperationException(
+                "The default bands should be neutral in both themes and the selection should follow the host theme.");
         }
     }
 
@@ -450,11 +542,15 @@ public partial class App : Application
             var stroke = nativeField.BorderThickness;
             editor.Focus(FocusState.Keyboard);
             await NextFrameAsync(() => states.CurrentState?.Name == "Focused");
-            if (states.CurrentState?.Name != "Focused" || field.BorderThickness != stroke || ((SolidColorBrush)field.Background).Color != fill)
+            if (states.CurrentState?.Name != "Focused"
+                || field.BorderThickness != stroke
+                || ((SolidColorBrush)field.Background).Color != fill)
             {
-                throw new InvalidOperationException($"Focused {theme} TextBox: {fill}, {stroke}. Hex editor: {((SolidColorBrush)field.Background).Color}, {field.BorderThickness}.");
+                throw new InvalidOperationException(
+                    $"Focused {theme} TextBox: {fill}, {stroke}. Hex editor: {((SolidColorBrush)field.Background).Color}, {field.BorderThickness}.");
             }
         }
+
         host.UpdateLayout();
         var header = (Grid)editor.FindName("Header");
         var labels = (Grid)editor.FindName("ColumnLabels");
@@ -465,8 +561,10 @@ public partial class App : Application
             || Math.Abs(labels.TransformToVisual(header).TransformPoint(default).X - editor.Padding.Left) > 1
             || Math.Abs(statusBar.ActualWidth - (field.ActualWidth - editor.BorderThickness.Left - editor.BorderThickness.Right)) > 1)
         {
-            throw new InvalidOperationException("The header and status divider should reach the frame, with labels aligned to the inset byte rows.");
+            throw new InvalidOperationException(
+                "The header and status divider should reach the frame, with labels aligned to the inset byte rows.");
         }
+
         editor.IsEnabled = false;
         await NextFrameAsync(() => states.CurrentState?.Name == "Disabled");
         editor.IsEnabled = true;
@@ -477,13 +575,20 @@ public partial class App : Application
         var width = ruler.ActualWidth;
         editor.CharacterSpacing = 0;
         await NextFrameAsync(() => ruler.ActualWidth < width);
-        if (row.CharacterSpacing != 0) { throw new InvalidOperationException("The rows did not adopt the host's compact spacing."); }
+        if (row.CharacterSpacing != 0)
+        {
+            throw new InvalidOperationException("The rows did not adopt the host's compact spacing.");
+        }
+
         editor.ClearValue(Control.CharacterSpacingProperty);
         await NextFrameAsync(() => ruler.ActualWidth == width);
 
         editor.Style = (Style)Current.Resources["PlainHexEditorStyle"];
         host.UpdateLayout();
-        if (!editor.Focus(FocusState.Keyboard) || !editor.UseSystemFocusVisuals || field.BorderThickness != default || states.CurrentState?.Name != "Normal")
+        if (!editor.Focus(FocusState.Keyboard)
+            || !editor.UseSystemFocusVisuals
+            || field.BorderThickness != default
+            || states.CurrentState?.Name != "Normal")
         {
             throw new InvalidOperationException("The plain editor should use the system focus visual without the field frame.");
         }
@@ -492,6 +597,7 @@ public partial class App : Application
     private static async Task NextFrameAsync(Func<bool>? ready = null)
     {
         var frame = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
         void OnRendering(object? sender, object args)
         {
             if (ready?.Invoke() != false)
@@ -499,6 +605,7 @@ public partial class App : Application
                 frame.TrySetResult();
             }
         }
+
         CompositionTarget.Rendering += OnRendering;
         try
         {
@@ -510,7 +617,14 @@ public partial class App : Application
         }
     }
 
-    private static void CheckRowSelection(RichTextBlock row, Border outline, int hexStart, int hexLength, int asciiStart, int asciiLength, double cellWidth)
+    private static void CheckRowSelection(
+        RichTextBlock row,
+        Border outline,
+        int hexStart,
+        int hexLength,
+        int asciiStart,
+        int asciiLength,
+        double cellWidth)
     {
         var hex = row.TextHighlighters[ByteEditor.ActiveHighlight].Ranges.Single();
         var ascii = row.TextHighlighters[ByteEditor.InactiveHighlight].Ranges.Single();
@@ -520,11 +634,15 @@ public partial class App : Application
         }
 
         var origin = outline.TransformToVisual(row).TransformPoint(default);
-        if (outline.Background is not null || ((SolidColorBrush)row.TextHighlighters[ByteEditor.InactiveHighlight].Background).Color.A != 0
-            || Math.Abs(origin.X - (asciiStart * cellWidth)) > 1 || Math.Abs(origin.Y) > 1
-            || Math.Abs(outline.ActualWidth - (asciiLength * cellWidth)) > 1 || Math.Abs(outline.ActualHeight - row.ActualHeight) > 1)
+        if (outline.Background is not null
+            || ((SolidColorBrush)row.TextHighlighters[ByteEditor.InactiveHighlight].Background).Color.A != 0
+            || Math.Abs(origin.X - (asciiStart * cellWidth)) > 1
+            || Math.Abs(origin.Y) > 1
+            || Math.Abs(outline.ActualWidth - (asciiLength * cellWidth)) > 1
+            || Math.Abs(outline.ActualHeight - row.ActualHeight) > 1)
         {
-            throw new InvalidOperationException($"Row {row.Tag:X}: expected ASCII outline at {asciiStart * cellWidth:F1}, width {asciiLength * cellWidth:F1}. Got {origin}, width {outline.ActualWidth:F1}, height {outline.ActualHeight:F1} of {row.ActualHeight:F1}.");
+            throw new InvalidOperationException(
+                $"Row {row.Tag:X}: expected ASCII outline at {asciiStart * cellWidth:F1}, width {asciiLength * cellWidth:F1}. Got {origin}, width {outline.ActualWidth:F1}, height {outline.ActualHeight:F1} of {row.ActualHeight:F1}.");
         }
     }
 }

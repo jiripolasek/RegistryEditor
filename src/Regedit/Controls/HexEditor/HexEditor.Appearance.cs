@@ -20,7 +20,8 @@ public partial class HexEditor
     internal const int ActiveHighlight = 3;
 
     public static readonly DependencyProperty ShowColumnHeadersProperty = DependencyProperty.Register(
-        nameof(ShowColumnHeaders), typeof(bool), typeof(HexEditor), new PropertyMetadata(true, (sender, _) => ((HexEditor)sender).UpdateViewport()));
+        nameof(ShowColumnHeaders), typeof(bool), typeof(HexEditor),
+        new PropertyMetadata(true, (sender, _) => ((HexEditor)sender).UpdateViewport()));
 
     public static readonly DependencyProperty ShowStatusBarProperty = DependencyProperty.Register(
         nameof(ShowStatusBar), typeof(bool), typeof(HexEditor), new PropertyMetadata(true));
@@ -37,15 +38,6 @@ public partial class HexEditor
     private bool _revealColumnAfterLayout;
     private bool _pointerOver;
     private bool _focusWithin;
-
-    private void UpdateFieldState()
-    {
-        var state = this.BorderThickness == default ? "Normal"
-            : !this.IsEnabled ? "Disabled"
-            : this._focusWithin ? "Focused"
-            : this._pointerOver ? "PointerOver" : "Normal";
-        VisualStateManager.GoToState(this, state, false);
-    }
 
     /// <summary>Shows the offset, hex byte and ASCII headings above the data rows.</summary>
     public bool ShowColumnHeaders
@@ -92,17 +84,32 @@ public partial class HexEditor
         set => this.SetValue(InactiveSelectionForegroundProperty, value);
     }
 
+    private bool CanShowCaret => this.IsEnabled
+                                 && this._buffer.CanWriteByte(this._buffer.Caret)
+                                 && this.FocusState != FocusState.Unfocused
+                                 && this.OffsetPanel.Visibility == Visibility.Collapsed;
+
+    private void UpdateFieldState()
+    {
+        var state = this.BorderThickness == default ? "Normal" :
+            !this.IsEnabled ? "Disabled" :
+            this._focusWithin ? "Focused" :
+            this._pointerOver ? "PointerOver" : "Normal";
+        VisualStateManager.GoToState(this, state, false);
+    }
+
     private static DependencyProperty RegisterBrush(string name) => DependencyProperty.Register(
-        name, typeof(Brush), typeof(HexEditor), new PropertyMetadata(null, (sender, _) =>
-        {
-            var editor = (HexEditor)sender;
-            if (editor.IsLoaded)
+        name, typeof(Brush), typeof(HexEditor), new PropertyMetadata(
+            null, (sender, _) =>
             {
-                editor.Rows.Children.Clear();
-                editor.SelectionOutlines.Children.Clear();
-                editor.UpdateViewport(dataChanged: true);
-            }
-        }));
+                var editor = (HexEditor)sender;
+                if (editor.IsLoaded)
+                {
+                    editor.Rows.Children.Clear();
+                    editor.SelectionOutlines.Children.Clear();
+                    editor.UpdateViewport(dataChanged: true);
+                }
+            }));
 
     private RichTextBlock CreateRow()
     {
@@ -138,7 +145,8 @@ public partial class HexEditor
 
         var row = (RichTextBlock)this.Rows.Children[(int)index];
         var column = (int)(offset % HexEditorRow.BytesPerRow);
-        var character = this._ascii ? HexEditorRow.AsciiStart(this._digits) + column
+        var character = this._ascii
+            ? HexEditorRow.AsciiStart(this._digits) + column
             : HexEditorRow.HexStart(this._digits) + (column * 3) + (this._buffer.LowNibble ? 1 : 0);
         var start = RowText(row).ContentStart;
         if (offset == this._buffer.Length)
@@ -147,6 +155,7 @@ public partial class HexEditor
             insertion.X = character * this.CellWidth;
             return insertion.Height > 0 ? (row, insertion) : null;
         }
+
         var position = start.GetPositionAtOffset(character, LogicalDirection.Forward);
         return position?.GetCharacterRect(LogicalDirection.Forward) is { Height: > 0 } bounds ? (row, bounds) : null;
     }
@@ -156,9 +165,6 @@ public partial class HexEditor
         this._caretBlink.Stop();
         this.EditCaret.Visibility = Visibility.Collapsed;
     }
-
-    private bool CanShowCaret => this.IsEnabled && this._buffer.CanWriteByte(this._buffer.Caret)
-        && this.FocusState != FocusState.Unfocused && this.OffsetPanel.Visibility == Visibility.Collapsed;
 
     private void ClearSelectionVisuals()
     {
@@ -283,7 +289,9 @@ public partial class HexEditor
         this.CaretPosition.Y = bounds.Y;
         this.EditCaret.Height = bounds.Height;
         this.EditCaret.Width = Math.Max(1u, this._caretSettings.CaretWidth);
-        this.EditCaret.Background = this._buffer.Caret == this._buffer.Length ? this.Foreground : cell.Row.TextHighlighters[ActiveHighlight].Foreground;
+        this.EditCaret.Background = this._buffer.Caret == this._buffer.Length
+            ? this.Foreground
+            : cell.Row.TextHighlighters[ActiveHighlight].Foreground;
         this.EditCaret.Opacity = 1;
         this.EditCaret.Visibility = Visibility.Visible;
 

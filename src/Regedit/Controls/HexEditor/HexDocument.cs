@@ -10,16 +10,17 @@ namespace JPSoftworks.Controls;
 /// </summary>
 public sealed partial class HexDocument
 {
+    internal event EventHandler<Change>? ViewEdited;
+
     private const int PageSize = 8192;
-    private readonly record struct Piece(long Start, long Offset, long Length, byte[]? Edits);
 
     private readonly Stream _source;
     private readonly List<Piece> _pieces = [];
     private readonly byte[] _page = new byte[PageSize];
+    private readonly long _sourceLength;
     private long _pageOffset = -1;
     private byte[] _editBlock = [];
     private int _used;
-    private readonly long _sourceLength;
 
     public long Length { get; private set; }
 
@@ -28,22 +29,10 @@ public sealed partial class HexDocument
 
     internal long Revision { get; private set; }
 
-    internal readonly record struct Change(long Offset, long Removed, long Inserted)
-    {
-        internal long MapPosition(long position) => position < this.Offset ? position :
-            position - this.Offset >= this.Removed ? position - this.Removed + this.Inserted :
-            this.Offset + Math.Min(position - this.Offset, this.Inserted);
-
-        internal bool Replaces(long position) => position >= this.Offset && position - this.Offset < this.Removed;
-    }
-
     internal Change LastChange { get; private set; }
 
-    internal event EventHandler<Change>? ViewEdited;
-
-    internal void NotifyEdit(object origin) => this.ViewEdited?.Invoke(origin, this.LastChange);
-
-    public HexDocument(Stream source) : this(source, isFixedLength: false)
+    public HexDocument(Stream source)
+        : this(source, isFixedLength: false)
     {
     }
 
@@ -63,6 +52,8 @@ public sealed partial class HexDocument
             this._pieces.Add(new Piece(0, 0, this.Length, null));
         }
     }
+
+    internal void NotifyEdit(object origin) => this.ViewEdited?.Invoke(origin, this.LastChange);
 
     /// <summary>Reads up to the end of the draft. The source stream's position can change.</summary>
     public int Read(long offset, Span<byte> destination)
@@ -297,5 +288,16 @@ public sealed partial class HexDocument
         }
 
         return index;
+    }
+
+    private readonly record struct Piece(long Start, long Offset, long Length, byte[]? Edits);
+
+    internal readonly record struct Change(long Offset, long Removed, long Inserted)
+    {
+        internal long MapPosition(long position) => position < this.Offset ? position :
+            position - this.Offset >= this.Removed ? position - this.Removed + this.Inserted :
+            this.Offset + Math.Min(position - this.Offset, this.Inserted);
+
+        internal bool Replaces(long position) => position >= this.Offset && position - this.Offset < this.Removed;
     }
 }

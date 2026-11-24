@@ -129,8 +129,16 @@ public sealed partial class RegistryValueEditorViewModel
             var high = 0;
             foreach (var ch in text)
             {
-                if (char.IsWhiteSpace(ch)) { continue; }
-                if (!char.IsAsciiHexDigit(ch)) { return -1; }
+                if (char.IsWhiteSpace(ch))
+                {
+                    continue;
+                }
+
+                if (!char.IsAsciiHexDigit(ch))
+                {
+                    return -1;
+                }
+
                 var digit = char.IsAsciiDigit(ch) ? ch - '0' : char.ToUpperInvariant(ch) - 'A' + 10;
                 if (digits % 2 == 0)
                 {
@@ -140,8 +148,10 @@ public sealed partial class RegistryValueEditorViewModel
                 {
                     destination[digits / 2] = (byte)((high << 4) | digit);
                 }
+
                 digits++;
             }
+
             return digits % 2 == 0 ? digits / 2 : -1;
         }
 
@@ -157,19 +167,27 @@ public sealed partial class RegistryValueEditorViewModel
             if (count > 0 && token.StartsWith('\\'))
             {
                 var nextLine = token[1..].TrimStart(" \t");
-                if (nextLine.IsEmpty || nextLine[0] is not ('\r' or '\n')) { return -1; }
+                if (nextLine.IsEmpty || nextLine[0] is not ('\r' or '\n'))
+                {
+                    return -1;
+                }
+
                 token = nextLine.TrimStart();
             }
+
             if (token.Length != 2 || !char.IsAsciiHexDigit(token[0]) || !char.IsAsciiHexDigit(token[1]))
             {
                 return -1;
             }
+
             if (count < destination.Length)
             {
                 destination[count] = byte.Parse(token, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
             }
+
             count++;
         }
+
         return count;
     }
 
