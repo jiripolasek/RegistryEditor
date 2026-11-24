@@ -44,6 +44,20 @@ using System.Windows.Automation;
 public sealed record UxNotification(int Kind, int Processing, string Text, string Activity);
 
 public static class UxTestAccessibility {
+    public static bool SetByteAndObserveValue(AutomationElement editor, string value) {
+        using var changed = new System.Threading.ManualResetEventSlim();
+        AutomationPropertyChangedEventHandler handler = (_, args) => {
+            if (Equals(args.NewValue, value)) changed.Set();
+        };
+        Automation.AddAutomationPropertyChangedEventHandler(editor, TreeScope.Element, handler, ValuePattern.ValueProperty);
+        try {
+            ((ValuePattern)editor.GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
+            return changed.Wait(TimeSpan.FromSeconds(5));
+        } finally {
+            Automation.RemoveAutomationPropertyChangedEventHandler(editor, handler);
+        }
+    }
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr SendMessageTimeoutW(IntPtr target, uint message, UIntPtr wParam,
         string value, uint flags, uint timeout, out UIntPtr result);
@@ -514,7 +528,11 @@ function Read-ContextMenu([string] $Expected = '', [string[]] $Types = @('MenuIt
         $candidates = @($windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.label -eq 'popup' } | ForEach-Object hwnd) + @($script:mainWindow)
         foreach ($window in $candidates) {
             try { $items = @(Read-Ui -Window $window | Where-Object { $_.type -in $Types }) }
-            catch { if ($_ -match 'AppNotFoundException|stale_element|different process') { continue }; throw }
+            catch {
+                if ($_ -match 'AppNotFoundException|stale_element|different process' -or
+                    ($window -ne $script:mainWindow -and $_ -match 'GetDpiForWindow failed for HWND')) { continue }
+                throw
+            }
             if ($items.Count -and (-not $Expected -or $items.name -contains $Expected)) { return @{ Window = $window; Items = $items } }
         }
         Start-Sleep -Milliseconds 100
@@ -630,6 +648,23 @@ function Snapshot-Action([string] $Name) {
     Ui @('invoke', ($menu.Items | Where-Object name -eq $Name).selector, '--action', 'invoke') -Window $menu.Window | Out-Null
 }
 function Close-ContextMenu($Menu) { Ui @('send-keys', 'esc', '--via', 'send-input') -Window $Menu.Window | Out-Null }
+function Wait-ByteToolWindow([string]$hexView) {
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
+        $window = $windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -eq 'Registry Editor' } |
+            Select-Object -First 1
+        if ($window) { break }
+        Start-Sleep -Milliseconds 100
+    } while ($timer.Elapsed.TotalSeconds -lt 15)
+    if (-not $window) { throw 'The byte tool did not open as a separate window.' }
+    $hwnd = [long]$window.hwnd
+    if (-not [UxTestWindow]::IsOwnedBy($hwnd, $mainWindow) -or [UxTestWindow]::IsWindowEnabled($mainWindow)) {
+        throw 'The byte tool window is not modal to the editor.'
+    }
+    Wait-Ui { param($items) $items.automationId -contains $hexView } -Window $hwnd
+    $hwnd
+}
 function Expect-HistoryLocation([string] $Target) {
     Wait-Ui {
         param($items)
@@ -1178,24 +1213,6 @@ try {
     }
 
     Test-Ui 'Byte tools open owned dialogs and return to the inspector' {
-        function Wait-ByteToolWindow([string]$hexView) {
-            $timer = [Diagnostics.Stopwatch]::StartNew()
-            do {
-                $windows = @(Invoke-WinAppChecked @('ui', 'list-windows', '--json') | ConvertFrom-Json)
-                $window = $windows | Where-Object { $_.processId -eq $appProcess.Id -and $_.title -eq 'Registry Editor' } |
-                    Select-Object -First 1
-                if ($window) { break }
-                Start-Sleep -Milliseconds 100
-            } while ($timer.Elapsed.TotalSeconds -lt 15)
-            if (-not $window) { throw 'The byte tool did not open as a separate window.' }
-            $hwnd = [long]$window.hwnd
-            if (-not [UxTestWindow]::IsOwnedBy($hwnd, $mainWindow) -or [UxTestWindow]::IsWindowEnabled($mainWindow)) {
-                throw 'The byte tool window is not modal to the editor.'
-            }
-            Wait-Ui { param($items) $items.automationId -contains $hexView } -Window $hwnd
-            $hwnd
-        }
-
         Browser
         [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1380, 900, 0x16) | Out-Null
         Select-Row 'Bytes' | Out-Null
@@ -1210,7 +1227,10 @@ try {
         Ui @('set-value', 'InspectorByteOffset', '1') -Window $dialogWindow | Out-Null
         Ui @('set-value', 'InspectorByteCount', '4') -Window $dialogWindow | Out-Null
         Ui @('invoke', 'InterpretBytes', '--action', 'invoke') -Window $dialogWindow | Out-Null
-        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'InspectorInterpretation' -and $_.value -eq '01020304' }).Count -eq 1 } -Window $dialogWindow
+        Wait-Ui { param($items)
+            @($items | Where-Object { $_.automationId -eq 'InspectorInterpretation' -and $_.value -eq '01020304' }).Count -eq 1 -and
+            @($items | Where-Object { $_.automationId -eq 'InterpreterHexView' -and $_.value -eq '01' }).Count -eq 1
+        } -Window $dialogWindow
         Set-Clipboard -Value 'Interpretation copy sentinel'
         Ui @('invoke', (Pick 'Button' 'Copy interpretation' -Window $dialogWindow).selector, '--action', 'invoke') -Window $dialogWindow | Out-Null
         Assert-Clipboard '01020304' 'inspector-range-copy' 'Interpretation copy sentinel'
@@ -2440,20 +2460,183 @@ try {
         Press 'Refresh'
     }
 
+    Test-Ui 'Hex editor supports keyboard editing and exposes the active byte to automation' {
+        Browser
+        $row = Select-Row 'Bytes, REG_BINARY'
+        Ui @('click', $row.selector, '--double') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'ValueHexPreview' }
+        $focused = Ui @('get-focused', '--json') | ConvertFrom-Json
+        if ($focused.element.automationId -ne 'ValueHexPreview') { throw 'Opening a binary value did not focus its editor.' }
+        $line = @(Read-Ui | Where-Object { $_.name -like '00000000 *' })[0]
+        if (-not $line) { throw 'The first hex row was missing from the automation tree.' }
+        $characterWidth = $line.width / $line.name.TrimEnd().Length
+        [UxTestWindow]::LeftClickAt([int]($line.x + 27 * $characterWidth), [int]($line.y + $line.height / 2))
+        Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'ValueHexPreview' -and $_.value -eq '05' }).Count -eq 1 }
+        function Read-SelectionColors([string] $column) {
+            $path = Join-Path $ArtifactDirectory "hex-selection-$column.png"
+            Ui @('screenshot', $line.selector, '--output', $path) | Out-Null
+            $bitmap = [Drawing.Bitmap]::new($path)
+            try {
+                $cell = $bitmap.Width / $line.name.TrimEnd().Length
+                # Compare the interiors and top edges at byte 06 with unselected ASCII byte 08.
+                foreach ($character in 29, 67, 69) {
+                    $bitmap.GetPixel([int](($character + 0.5) * $cell), 2).ToArgb()
+                }
+                foreach ($character in 29, 67) {
+                    $bitmap.GetPixel([int](($character + 0.5) * $cell), 0).ToArgb()
+                }
+            } finally { $bitmap.Dispose() }
+        }
+        Add-Type -AssemblyName System.Drawing
+        Ui @('send-keys', 'shift+right shift+right', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Hex, offset 7, byte 07, 3 bytes selected' }
+        $active, $mirror, $plain, $hexEdge, $asciiEdge = Read-SelectionColors 'hex'
+        function Read-HoverStroke([string] $name) {
+            $path = Join-Path $ArtifactDirectory "hex-hover-$name.png"
+            Ui @('screenshot', $line.selector, '--output', $path) | Out-Null
+            $bitmap = [Drawing.Bitmap]::new($path)
+            try {
+                $cell = $bitmap.Width / $line.name.TrimEnd().Length
+                foreach ($character in 29, 67) {
+                    # Sample inside the hover underline, above the mirrored selection's bottom border.
+                    $bitmap.GetPixel([int](($character + 0.5) * $cell), $bitmap.Height - 3).ToArgb()
+                }
+            } finally { $bitmap.Dispose() }
+        }
+        $before = Read-HoverStroke 'before'
+        $rowY = [int]($line.y + $line.height / 2)
+        foreach ($character in 29, 67) {
+            $point = '{0},{1}' -f [int]($line.x + ($character + 0.5) * $characterWidth), $rowY
+            Ui @('hover', '--at', $point) | Out-Null
+            $null = Read-ContextMenu 'Offset 0x00000006 (6)' -Types @('ToolTip','Text')
+            $over = Read-HoverStroke $character
+            if ($over[0] -eq $before[0] -or $over[1] -eq $before[1]) { throw 'Hovering either representation should mark both selected byte cells.' }
+        }
+        [UxTestWindow]::RightClickAt([int]($line.x + 70.5 * $characterWidth), $rowY)
+        $menu = Read-ContextMenu 'Copy offset'
+        $copyOffset = @($menu.Items | Where-Object name -eq 'Copy offset')[0]
+        Ui @('invoke', $copyOffset.selector, '--action', 'invoke') -Window $menu.Window | Out-Null
+        Assert-Clipboard '0x00000009' 'hex-pointer-offset'
+        Ui @('send-keys', 'ctrl+shift+c', '--via', 'send-input', '--target', 'ValueHexPreview') | Out-Null
+        Assert-Clipboard '0x00000007' 'hex-keyboard-offset'
+        Ui @('send-keys', 'ctrl+g', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'HexGoToOffset' }
+        $closeOffset = Pick 'Button' 'Close Go to offset'
+        [UxTestWindow]::LeftClickAt([int]($closeOffset.x + $closeOffset.width / 2), [int]($closeOffset.y + $closeOffset.height / 2))
+        Wait-Ui { param($items) $items.automationId -notcontains 'HexGoToOffset' -and $items.name -contains 'Hex, offset 7, byte 07, 3 bytes selected' }
+        Ui @('send-keys', 'f6', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'ASCII, offset 7, byte 07, 3 bytes selected' }
+        $hexFill, $asciiFill, $plainAfter, $hexEdgeAfter, $asciiEdgeAfter = Read-SelectionColors 'ascii'
+        if ($active -eq $plain -or $mirror -ne $plain -or $asciiEdge -eq $plain -or $plainAfter -ne $plain -or
+            $hexFill -ne $plain -or $asciiFill -ne $active -or $hexEdgeAfter -ne $asciiEdge -or $asciiEdgeAfter -ne $hexEdge) {
+            throw 'F6 should swap the filled input column and the outline around the matching bytes.'
+        }
+        Ui @('send-keys', 'f6 ctrl+home', '--via', 'send-input') | Out-Null
+        foreach ($keyName in 'a', '5', 'ctrl+end', 'f6', 'z', 'y') {
+            Ui @('send-keys', $keyName, '--via', 'send-input') | Out-Null
+        }
+        Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'hex-editor.png')) | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'ValueDataEditor' -and $items.name -contains 'Bytes: 18' -and
+            ($items.name -like '00000000   A5 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F *') -and ($items.name -like '00000010   7A 79 *') }
+        Ui @('send-keys', 'esc', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
+
+        if ((Read-Ui).automationId -contains 'ToolDetailsResize') {
+            Ui @('invoke', 'ToggleValueInspector', '--action', 'invoke') | Out-Null
+        }
+        $row = Select-Row 'Bytes, REG_BINARY'
+        Activate-Editor
+        Ui @('send-keys', 'ctrl+i', '--via', 'send-input', '--target', $row.selector) | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'OpenRawBytes' }
+        Ui @('invoke', 'OpenRawBytes', '--action', 'invoke') | Out-Null
+        $rawWindow = Wait-ByteToolWindow 'ExpandedValueHexView'
+        $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$rawWindow)
+        $view = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'ExpandedValueHexView'))
+        $byte = $view.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+        if (-not $byte.Current.IsReadOnly -or $byte.Current.Value -ne '00') { throw 'The inspector did not expose the original read-only byte.' }
+        Ui @('invoke', 'CloseButton', '--action', 'invoke') -Window $rawWindow | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and $items.automationId -contains 'OpenRawBytes' }
+        Primary
+        Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
+    }
+
+    Test-Ui 'Hex editor edits the active byte and confirms registry clipboard conversions' {
+        Browser
+        $row = Select-Row 'Bytes, REG_BINARY'
+        $root = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$mainWindow)
+        $rowCondition = [Windows.Automation.AndCondition]::new(
+            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::ListItem),
+            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $row.name))
+        Set-TestWindowForeground
+        $root.FindFirst([Windows.Automation.TreeScope]::Descendants, $rowCondition).SetFocus()
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'ValueHexPreview' }
+        $editor = $root.FindFirst([Windows.Automation.TreeScope]::Descendants,
+            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty, 'ValueHexPreview'))
+        function Editor-Keys([string] $Keys) {
+            Set-TestWindowForeground
+            $editor.SetFocus()
+            Ui @('send-keys', $Keys, '--via', 'send-input') | Out-Null
+        }
+        Editor-Keys 'ctrl+home shift+right shift+right'
+        Wait-Ui { param($items) $items.name -contains 'Hex, offset 2, byte 02, 3 bytes selected' }
+        if (-not [UxTestAccessibility]::SetByteAndObserveValue($editor, 'A5')) { throw 'The byte edit did not raise a ValuePattern change.' }
+        Wait-Ui { param($items) $items.name -like '00000000   00 01 A5 03 *' }
+        Editor-Keys 'ctrl+home shift+right shift+right b 6'
+        Wait-Ui { param($items) $items.name -like '00000000   00 01 B6 03 *' }
+        Editor-Keys 'ctrl+z'
+        Wait-Ui { param($items) $items.name -like '00000000   00 01 A5 03 *' }
+        Editor-Keys 'ctrl+y ctrl+a delete'
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 0' }
+        Editor-Keys 'ctrl+z'
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 16' -and $items.name -like '00000000   00 01 B6 03 *' }
+        Editor-Keys 'ctrl+g'
+        Wait-Ui { param($items) $items.automationId -contains 'HexGoToOffset' }
+        $line = @(Read-Ui | Where-Object name -like '00000000 *')[0]
+        $cell = $line.width / $line.name.TrimEnd().Length
+        [UxTestWindow]::LeftClickAt([int]($line.x + 20.5 * $cell), [int]($line.y + $line.height / 2))
+        Wait-Ui { param($items) $items.automationId -notcontains 'HexGoToOffset' -and $items.name -contains 'Hex, offset 3, byte 03, high digit' }
+        Ui @('send-keys', 'right f f', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -like '00000000   00 01 B6 03 FF *' }
+
+        Editor-Keys 'ctrl+home right'
+        Set-Clipboard -Value ('hex:de,\' + [Environment]::NewLine + '  ad')
+        Editor-Keys 'ctrl+v'
+        $offer = Read-ContextMenu 'Apply conversion' -Types @('Button')
+        Ui @('send-keys', 'esc', '--via', 'send-input') -Window $offer.Window | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 16' -and $items.name -like '00000000   00 01 B6 03 FF *' }
+        Editor-Keys 'ctrl+v'
+        $offer = Read-ContextMenu 'Apply conversion' -Types @('Button')
+        Ui @('invoke', 'ApplyHexPasteConversion', '--action', 'invoke') -Window $offer.Window | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 18' -and $items.name -like '00000000   00 DE AD 01 B6 03 FF *' }
+
+        Set-Clipboard -Value '01,A4,FF'
+        Editor-Keys 'ctrl+shift+v'
+        $offer = Read-ContextMenu 'Apply conversion' -Types @('Button')
+        Ui @('invoke', 'ApplyHexPasteConversion', '--action', 'invoke') -Window $offer.Window | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 18' -and $items.name -like '00000000   00 DE AD 01 A4 FF FF *' }
+        Set-Clipboard -Value 'hex(2):55,66'
+        Editor-Keys 'ctrl+v'
+        Wait-Ui { param($items) $items.name -contains 'Paste complete hexadecimal byte pairs.' -and $items.name -like '00000000   00 DE AD 01 A4 FF FF *' }
+        Press 'Cancel'
+        Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' }
+    }
+
     Test-Ui 'Bound New Copy and Paste commands retain value type across tabs' {
         Browser
         Press 'New'
         $menu = Read-ContextMenu
         $binary = Pick 'MenuItem' 'Binary value' -Window $menu.Window
         Ui @('invoke', $binary.selector, '--action', 'invoke') -Window $menu.Window | Out-Null
-        Wait-Ui { param($items) $items.name -contains 'Hexadecimal text' }
+        Wait-Ui { param($items) $items.automationId -contains 'ValueHexPreview' -and $items.automationId -notcontains 'ValueDataEditor' }
         $focused = Ui @('get-focused', '--json') | ConvertFrom-Json
         if (-not $focused.hasFocus -or $focused.element.type -ne 'Edit' -or $focused.element.name -ne 'Value name') { throw 'Creating a value did not focus its name.' }
-        Fill 'Value name' 'TypedBytes'
-        Fill 'Hexadecimal text' 'not hex'
-        Primary
-        Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' -and $items.name -contains 'Hexadecimal text' }
-        Fill 'Hexadecimal text' '00 ff 42'
+        Ui @('set-value', $focused.element.selector, 'TypedBytes') | Out-Null
+        Ui @('send-keys', 'g', '--target', 'ValueHexPreview', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 0' }
+        Ui @('send-keys', '0 0 f f 4 2', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'Bytes: 3' -and ($items.name -like '00000000   00 FF 42 *') }
         Primary
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'TypedBytes, REG_BINARY,*' }).Count -eq 1 }
         $row = Select-Row 'TypedBytes'
@@ -3099,10 +3282,12 @@ try {
                 Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
                 $data = 'after ' + $method
                 if ($method -eq 'Binary') {
-                    Ui @('invoke', 'EditBytesToggle', '--action', 'toggle-on') | Out-Null
-                    $data = [Convert]::ToHexString([Text.Encoding]::Unicode.GetBytes("$data`0"))
+                    Ui @('send-keys', 'ctrl+a delete', '--via', 'send-input', '--target', 'ValueHexPreview') | Out-Null
+                    $digits = [Convert]::ToHexString([Text.Encoding]::Unicode.GetBytes("$data`0")).ToLowerInvariant().ToCharArray() -join ' '
+                    Ui @('send-keys', $digits, '--via', 'send-input') | Out-Null
+                } else {
+                    Ui @('set-value', 'ValueDataEditor', $data) | Out-Null
                 }
-                Ui @('set-value', 'ValueDataEditor', $data) | Out-Null
                 Primary
                 Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' -and $items.name -contains "$name, REG_SZ, after $method" }
                 Assert-ResultViewport $viewport

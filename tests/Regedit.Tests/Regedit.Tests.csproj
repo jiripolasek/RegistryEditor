@@ -26,6 +26,10 @@
     <Compile Include="..\..\src\Regedit\Infrastructure\Input\MiddleClickGesture.cs" Link="Infrastructure\Input\MiddleClickGesture.cs" />
     <Compile Include="..\..\src\Regedit\Infrastructure\Input\PaneResize.cs" Link="Infrastructure\Input\PaneResize.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxLayout.cs" Link="Controls\Omnibox\OmniboxLayout.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\HexEditor\HexEditorBuffer.cs" Link="Controls\HexEditor\HexEditorBuffer.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\HexEditor\HexDocument.cs" Link="Controls\HexEditor\HexDocument.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\HexEditor\HexDocument.History.cs" Link="Controls\HexEditor\HexDocument.History.cs" />
+    <Compile Include="..\..\src\Regedit\Controls\HexEditor\HexEditorRow.cs" Link="Controls\HexEditor\HexEditorRow.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxItem.cs" Link="Controls\Omnibox\OmniboxItem.cs" />
     <Compile Include="..\..\src\Regedit\Controls\Omnibox\OmniboxScope.cs" Link="Controls\Omnibox\OmniboxScope.cs" />
     <Compile Include="..\..\src\Regedit\Infrastructure\Collections\IRangeList.cs" Link="Infrastructure\Collections\IRangeList.cs" />

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Regedit' or '$(MSBuildProjectName)' == 'Omnibox.Sample' or '$(MSBuildProjectName)' == 'ColumnList.Sample'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Regedit' or '$(MSBuildProjectName)' == 'Omnibox.Sample' or '$(MSBuildProjectName)' == 'ColumnList.Sample' or '$(MSBuildProjectName)' == 'HexEditor.Sample'">
     <OutputType>WinExe</OutputType>
     <TargetFramework>net11.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>

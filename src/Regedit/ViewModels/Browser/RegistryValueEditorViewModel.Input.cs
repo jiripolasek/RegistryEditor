@@ -2,6 +2,7 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using System.Globalization;
 using CommunityToolkit.Mvvm.Input;
 using JPSoftworks.Regedit.Core.Registry;
 
@@ -65,7 +66,7 @@ public sealed partial class RegistryValueEditorViewModel
         {
             this._dataInputError = this.DataError(ex);
             this.DataHelp = this._dataInputError;
-            if (this.GetDataCorrection() is { } correction)
+            if (this.GetDataCorrection(this.Data) is { } correction)
             {
                 this._dataCorrection = correction.Text;
                 this.DataHelp = correction.Help;
@@ -104,13 +105,98 @@ public sealed partial class RegistryValueEditorViewModel
             : "Complete the final byte: each byte needs two hexadecimal digits.";
     }
 
-    private (string Text, string Help)? GetDataCorrection()
+    internal static string ByteConversionHelp(int count) =>
+        $"Recognized byte data ({count:N0} bytes). Apply conversion to use hexadecimal pairs.";
+
+    internal int ReadRegistryHex(string input, Span<byte> destination)
     {
-        var text = this.Data.Trim();
+        var text = input.AsSpan().Trim();
+        var prefix = this._type == RegistryValueType.Binary ? "hex:" : $"hex({(uint)this._type:x}):";
+        var prefixed = text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        if (prefixed)
+        {
+            text = text[prefix.Length..];
+        }
+
+        if (!text.Contains(','))
+        {
+            if (!prefixed)
+            {
+                return -1;
+            }
+
+            var digits = 0;
+            var high = 0;
+            foreach (var ch in text)
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    continue;
+                }
+
+                if (!char.IsAsciiHexDigit(ch))
+                {
+                    return -1;
+                }
+
+                var digit = char.IsAsciiDigit(ch) ? ch - '0' : char.ToUpperInvariant(ch) - 'A' + 10;
+                if (digits % 2 == 0)
+                {
+                    high = digit;
+                }
+                else if (digits / 2 < destination.Length)
+                {
+                    destination[digits / 2] = (byte)((high << 4) | digit);
+                }
+
+                digits++;
+            }
+
+            return digits % 2 == 0 ? digits / 2 : -1;
+        }
+
+        if (!prefixed && !this.IsRaw)
+        {
+            return -1;
+        }
+
+        var count = 0;
+        foreach (var range in text.Split(','))
+        {
+            var token = text[range].Trim();
+            if (count > 0 && token.StartsWith('\\'))
+            {
+                var nextLine = token[1..].TrimStart(" \t");
+                if (nextLine.IsEmpty || nextLine[0] is not ('\r' or '\n'))
+                {
+                    return -1;
+                }
+
+                token = nextLine.TrimStart();
+            }
+
+            if (token.Length != 2 || !char.IsAsciiHexDigit(token[0]) || !char.IsAsciiHexDigit(token[1]))
+            {
+                return -1;
+            }
+
+            if (count < destination.Length)
+            {
+                destination[count] = byte.Parse(token, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    internal (string Text, string Help)? GetDataCorrection(string input)
+    {
+        var text = input.Trim();
         try
         {
             byte[] bytes;
-            var prefix = this._type == RegistryValueType.Binary ? "hex:" : $"hex({(uint)this._type:x}):";
             if (this.IsNumeric && text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
             {
                 bytes = RegistryValue.ParseData(this._type, text, hex: true);
@@ -123,27 +209,14 @@ public sealed partial class RegistryValueEditorViewModel
             }
             else
             {
-                if (text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    text = text[prefix.Length..];
-                }
-                else if (!this.IsRaw || !text.Contains(','))
+                var count = this.ReadRegistryHex(text, []);
+                if (count < 0 || (this.IsNumeric && count != (this._type == RegistryValueType.QWord ? 8 : 4)))
                 {
                     return null;
                 }
 
-                if (text.Contains(','))
-                {
-                    var parts = text.Split(',', StringSplitOptions.TrimEntries);
-                    if (parts.Any(part => part.Length != 2 || !part.All(char.IsAsciiHexDigit)))
-                    {
-                        return null;
-                    }
-
-                    text = string.Concat(parts);
-                }
-
-                bytes = RegistryValue.ParseData(this._type, text, binary: true);
+                bytes = new byte[count];
+                this.ReadRegistryHex(text, bytes);
             }
 
             var value = new RegistryValue(this.Name, this._type, bytes);
@@ -152,7 +225,7 @@ public sealed partial class RegistryValueEditorViewModel
             _ = RegistryValue.ParseData(this._type, correction, this.BaseIndex == 0, this.IsRaw);
             return (correction,
                 this.IsRaw
-                    ? $"Recognized byte data ({bytes.Length:N0} bytes). Apply conversion to use hexadecimal pairs."
+                    ? ByteConversionHelp(bytes.Length)
                     : $"Recognized numeric data. {this.NumberHelp(bytes)}. Apply conversion to use the selected base.");
         }
         catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException)

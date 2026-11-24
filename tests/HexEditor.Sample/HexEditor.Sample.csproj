@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JPSoftworks.HexEditor.Sample</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <Compile Include="..\..\src\Regedit\Controls\HexEditor\*.cs" Link="Controls\HexEditor\%(Filename)%(Extension)" />
+    <Page Include="..\..\src\Regedit\Controls\HexEditor\*.xaml" Link="Controls\HexEditor\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

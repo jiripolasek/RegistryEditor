@@ -91,10 +91,7 @@ public sealed partial class ValueInspector : UserControl
         var view = new ByteInterpreter(this.ViewModel);
         var layout = new DialogLayout(
             "Interpret bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading,
-            defaultButton: ContentDialogButton.None)
-        {
-            OnOpened = view.FocusOffset
-        };
+            defaultButton: ContentDialogButton.None) { OnOpened = view.FocusOffset };
         return this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 64, 704));
     }
 
@@ -135,12 +132,12 @@ public sealed partial class ValueInspector : UserControl
 
     private Task ShowRawBytesAsync()
     {
-        var view = new HexView { Bytes = this.ViewModel.Bytes, MinWidth = HexView.DialogWidth };
+        var view = new HexView { Bytes = this.ViewModel.Bytes };
         AutomationProperties.SetAutomationId(view, "ExpandedValueHexView");
         AutomationProperties.SetName(view, "Raw bytes");
         view.Loaded += (_, _) => HighlightBytes(this.ViewModel, view);
-        var layout = new DialogLayout("Raw bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading, fillBody: true);
-        layout.EnableHorizontalScrolling();
+        var layout = new DialogLayout(
+            "Raw bytes", view, close: "Close", subject: this.ViewModel.Name, subtitle: this.ViewModel.Heading, fillBody: true);
         return this._dialogs.ShowWindowAsync(layout, new((int)HexView.DialogWidth + 16, 588));
     }
 

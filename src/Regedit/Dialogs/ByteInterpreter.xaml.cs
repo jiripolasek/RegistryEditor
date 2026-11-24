@@ -3,7 +3,6 @@
 // ------------------------------------------------------------
 
 using System.ComponentModel;
-using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Infrastructure;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using Microsoft.UI.Dispatching;
@@ -20,7 +19,6 @@ public sealed partial class ByteInterpreter : UserControl
     {
         this.ViewModel = viewModel;
         this.InitializeComponent();
-        this.BytesView.MinWidth = HexView.DialogWidth;
         this.Loaded += (_, _) =>
         {
             this.ViewModel.PropertyChanged += this.RangeChanged;

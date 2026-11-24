@@ -535,6 +535,7 @@ if (args.Contains("--registry"))
 AddAsync("browser-edit", () => BrowserEditTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("duplicate-value", () => DuplicateValueTests.RunAsync(Check, args.Contains("--registry")));
 Add("value-editor-input", () => ValueEditorInputTests.Run(Check));
+Add("hex-editor", () => HexEditorTests.Run(Check));
 AddAsync("undo-redo", () => UndoRedoTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("history-broadcaster", () => RegistryHistoryBroadcasterTests.RunAsync(Check, args.Contains("--registry")));
 AddAsync("inline-rename", () => InlineRenameTests.RunAsync(Check, args.Contains("--registry")));

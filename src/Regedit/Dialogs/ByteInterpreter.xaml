@@ -63,21 +63,12 @@
                 Content="Interpret"
                 Style="{StaticResource AccentButtonStyle}" />
         </Grid>
-        <Border Style="{StaticResource HexViewFrameStyle}">
-            <ScrollViewer
-                AutomationProperties.Name="Scroll raw byte columns"
-                HorizontalScrollBarVisibility="Auto"
-                HorizontalScrollMode="Enabled"
-                VerticalScrollBarVisibility="Disabled"
-                VerticalScrollMode="Disabled">
-                <shared:HexView
-                    x:Name="BytesView"
-                    Height="180"
-                    AutomationProperties.AutomationId="InterpreterHexView"
-                    AutomationProperties.Name="Selected bytes"
-                    Bytes="{x:Bind ViewModel.Bytes}" />
-            </ScrollViewer>
-        </Border>
+        <shared:HexView
+            x:Name="BytesView"
+            Height="180"
+            AutomationProperties.AutomationId="InterpreterHexView"
+            AutomationProperties.Name="Selected bytes"
+            Bytes="{x:Bind ViewModel.Bytes}" />
         <Grid ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />

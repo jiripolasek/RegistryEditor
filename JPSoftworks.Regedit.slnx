@@ -44,6 +44,10 @@
     <Project Path="src/Regedit.Core/Regedit.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/HexEditor.Sample/HexEditor.Sample.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|ARM64" Project="ARM64" />
+    </Project>
     <Project Path="tests/ColumnList.Sample/ColumnList.Sample.csproj">
       <Platform Solution="*|x64" Project="x64" />
       <Platform Solution="*|ARM64" Project="ARM64" />
