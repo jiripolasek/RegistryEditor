@@ -1,55 +1,24 @@
-<UserControl
+﻿<UserControl
     x:Class="JPSoftworks.Regedit.Controls.Browser.RegistryEntryList"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:browser="using:JPSoftworks.Regedit.Controls.Browser"
     xmlns:lists="using:JPSoftworks.Regedit.Controls.Lists"
-    xmlns:models="using:JPSoftworks.Regedit.Models.Registry"
-    xmlns:resources="using:JPSoftworks.Regedit.Resources">
+    xmlns:models="using:JPSoftworks.Regedit.Models.Registry">
     <UserControl.Resources>
         <DataTemplate
             x:Key="IconCell"
             x:DataType="models:RegistryEntry"
             x:DefaultBindMode="OneWay">
-            <Grid
+            <browser:RegistryEntryIconCell
                 VerticalAlignment="Center"
                 lists:ColumnListView.IsDragHandle="{x:Bind IsStored}"
                 Background="Transparent"
-                DragStarting="Entry_DragStarting">
-                <FontIcon
-                    FontFamily="/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"
-                    FontSize="16"
-                    Glyph="{x:Bind Glyph}"
-                    Visibility="{x:Bind IsParent}" />
-                <FontIcon
-                    FontSize="16"
-                    Glyph="{x:Bind Glyph}"
-                    Style="{ThemeResource RegistryNavigationIconStyle}"
-                    Visibility="{x:Bind IsKey}" />
-                <FontIcon
-                    FontFamily="{x:Bind IconFontFamily}"
-                    FontSize="16"
-                    Glyph="{x:Bind Glyph}"
-                    Style="{ThemeResource RegistryStringIconStyle}"
-                    Visibility="{x:Bind HasStringIcon}" />
-                <FontIcon
-                    FontSize="16"
-                    Glyph="{x:Bind Glyph}"
-                    Style="{ThemeResource RegistryLinkIconStyle}"
-                    Visibility="{x:Bind HasLinkIcon}" />
-                <IconSourceElement
-                    x:Name="BinaryIcon"
-                    x:Load="{x:Bind HasBinaryIcon}"
-                    Width="16"
-                    Height="16"
-                    IconSource="{x:Bind resources:ToolRowResources.BinaryIcon, Mode=OneTime}"
-                    Style="{ThemeResource RegistryDataIconStyle}" />
-                <FontIcon
-                    FontFamily="{x:Bind IconFontFamily}"
-                    FontSize="16"
-                    Glyph="{x:Bind Glyph}"
-                    Style="{ThemeResource RegistryDataIconStyle}"
-                    Visibility="{x:Bind HasDataIcon}" />
-            </Grid>
+                DataStyle="{ThemeResource RegistryDataIconStyle}"
+                DragStarting="Entry_DragStarting"
+                LinkStyle="{ThemeResource RegistryLinkIconStyle}"
+                NavigationStyle="{ThemeResource RegistryNavigationIconStyle}"
+                TextStyle="{ThemeResource RegistryStringIconStyle}" />
         </DataTemplate>
         <DataTemplate x:Key="NameCell" x:DataType="models:RegistryEntry">
             <Grid ColumnSpacing="4">
@@ -67,12 +36,12 @@
                     ToolTipService.ToolTip="{x:Bind NamePreview, Mode=OneWay}" />
                 <Button
                     x:Name="NoteMarker"
-                    x:Load="{x:Bind HasNote, Mode=OneWay}"
                     Grid.Column="1"
                     MinWidth="24"
                     MinHeight="24"
                     Padding="3"
                     VerticalAlignment="Center"
+                    x:Load="{x:Bind HasNote, Mode=OneWay}"
                     AutomationProperties.AutomationId="{x:Bind NoteMarkerId, Mode=OneWay}"
                     AutomationProperties.HelpText="{x:Bind NotePeek, Mode=OneWay}"
                     AutomationProperties.Name="{x:Bind NoteMarkerLabel, Mode=OneWay}"
