@@ -373,7 +373,6 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
         var treeKey = model.TreeSelection && model.Selected is [var key] ? key : new FavoriteItemId(model.FolderId ?? string.Empty, true);
         if (this._nodes.TryGetValue(treeKey, out var node))
         {
-            // Do not change ancestor expansion from WinUI's own selection callback.
             if (model.TreeSelection && model.Selected.Count > 0 && this.FavoriteTree.SelectedNode != node)
             {
                 for (var parent = node.Parent; parent?.Content is FavoriteRow row; parent = parent.Parent)
@@ -564,17 +563,37 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private void FavoriteTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
     {
-        if (!this._loaded || this._syncing || sender.SelectedNode?.Content is not FavoriteRow row)
+        if (!this._loaded || this._syncing || args.AddedItems is not [TreeViewNode { Content: FavoriteRow row } node])
         {
             return;
         }
 
-        if (!this.ViewModel.Compact && row.Key.IsFolder && row.Key.Id == (this.ViewModel.FolderId ?? string.Empty))
-        {
-            return;
-        }
+        this.QueueTreeSelection(node, row);
+    }
 
-        this.ViewModel.SelectTree(row.Key);
+    private void QueueTreeSelection(TreeViewNode node, FavoriteRow row, bool activate = false)
+    {
+        // Let WinUI finish changing selection before refreshing the view.
+        this.DispatcherQueue.TryEnqueue(
+            () =>
+            {
+                if (this._loaded
+                    && this._nodes.GetValueOrDefault(row.Key) == node
+                    && (activate || Equals(this.FavoriteTree.SelectedItem, node))
+                    && (this.ViewModel.Compact || row.Key.Id != this.ViewModel.FolderId || (activate && this.ViewModel.Query.Length > 0)))
+                {
+                    this.ViewModel.SelectTree(row.Key);
+                }
+            });
+    }
+
+    private void FavoriteFolder_Tapped(object sender, TappedRoutedEventArgs args)
+    {
+        if (!this.ViewModel.Compact && sender is FrameworkElement
+            { DataContext: TreeViewNode { Content: FavoriteRow { Key.IsFolder: true } row } node })
+        {
+            this.QueueTreeSelection(node, row, activate: true);
+        }
     }
 
     private void FavoriteTree_Expanding(TreeView sender, TreeViewExpandingEventArgs args)
