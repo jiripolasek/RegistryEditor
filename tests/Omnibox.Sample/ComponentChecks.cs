@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using System.Text.Json;
+using JPSoftworks.DesktopToolkit.Controls;
 using JPSoftworks.Regedit;
 using JPSoftworks.Regedit.Controls.Omnibox;
 using Microsoft.UI.Xaml;
@@ -130,18 +131,27 @@ internal static class ComponentChecks
             var requests = 0;
             first.NavigationRequested += (_, _) => requests++;
             var root = Button(first, "RootButton");
-            var menu = (Flyout)root.Flyout;
-            menu.ShowAt(root);
-            await WaitAsync(() => Locations(menu).Items.OfType<OmniboxItem>().Any(item => item.Label == "Workspace"));
+            var childButton = Button(first, "BreadcrumbChildren0");
+            Check(root.Flyout is null && childButton.Flyout is null && Button(first, "BreadcrumbChildren2").Flyout is null,
+                "Building breadcrumbs leaves root, ancestor and leaf menus uncreated");
+            var menu = OpenChildrenMenu(root);
+            await WaitAsync(() => menu.ItemsSource?.Single().Text == "Workspace" && menu.FilteredItemCount == 1);
             Check(requests == 0, "Opening roots does not navigate");
             await CloseAsync(menu);
 
-            var childButton = Button(first, "BreadcrumbChildren0");
-            menu = (Flyout)childButton.Flyout;
-            menu.ShowAt(childButton);
-            await WaitAsync(() => Locations(menu).ContainerFromIndex(0) is ListViewItem);
+            Check(childButton.Flyout is null, "Opening the root menu leaves the child menu uncreated");
+            menu = OpenChildrenMenu(childButton);
+            await WaitAsync(() => menu.FilteredItemCount == 2);
             Check(requests == 0, "Opening children does not navigate");
-            Invoke((ListViewItem)Locations(menu).ContainerFromItem(App.Projects));
+            menu.FilterText = "missing";
+            await WaitAsync(() => menu.FilteredItemCount == 0);
+            Check(Status(menu).Text == "No matching locations", "Filtering children distinguishes no matches from an empty location");
+            menu.FilterText = "pRoJ";
+            await WaitAsync(() => menu.FilteredItemCount == 1 && Locations(menu).ContainerFromIndex(0) is ListViewItem row
+                && AutomationProperties.GetName(row) == "Projects");
+            var projectRow = (ListViewItem)Locations(menu).ContainerFromIndex(0);
+            Check(Equals(ToolTipService.GetToolTip(projectRow), App.Projects.Address), "Filtered rows show the full child address on hover");
+            Invoke(projectRow);
             await WaitAsync(() => first.Address == App.Projects.Address);
             Check(requests == 1 && second.Address == App.Notes.Address, "Selecting a child navigates only its own instance");
             Check(
@@ -154,8 +164,7 @@ internal static class ComponentChecks
             first.SetLocation(App.Notes.Address, (OmniboxItem[])[App.Workspace, App.Notes with { HasChildren = null }]);
             childButton = Button(first, "BreadcrumbChildren1");
             Check(childButton.Visibility == Visibility.Visible, "Unknown child availability preserves on-demand discovery");
-            menu = (Flyout)childButton.Flyout;
-            menu.ShowAt(childButton);
+            menu = OpenChildrenMenu(childButton);
             await WaitAsync(() => Status(menu).Text == "No child locations");
             Check(
                 Locations(menu).Items.Count == 0 && Locations(menu).Visibility == Visibility.Collapsed,
@@ -164,10 +173,9 @@ internal static class ComponentChecks
 
             first.ChildrenProvider = (_, _) => throw new IOException("Provider unavailable");
             childButton = Button(first, "BreadcrumbChildren0");
-            menu = (Flyout)childButton.Flyout;
-            menu.ShowAt(childButton);
-            await WaitAsync(() => Status(menu).Text == "Could not load locations");
-            Check(AutomationProperties.GetHelpText(Status(menu)) == "Provider unavailable", "Provider failures remain accessible");
+            menu = OpenChildrenMenu(childButton);
+            await WaitAsync(() => Status(menu).Text == "Could not load locations: Provider unavailable");
+            Check(menu.FilteredItemCount == 0, "Provider failures display the error without offering a navigation target");
             await CloseAsync(menu);
 
             var pending = new TaskCompletionSource<IReadOnlyList<OmniboxItem>>();
@@ -178,8 +186,7 @@ internal static class ComponentChecks
                 return pending.Task;
             };
             childButton = Button(first, "BreadcrumbChildren0");
-            menu = (Flyout)childButton.Flyout;
-            menu.ShowAt(childButton);
+            menu = OpenChildrenMenu(childButton);
             await WaitAsync(() => menu.IsOpen);
             Check(Status(menu).Text == "Loading locations…" && Locations(menu).Items.Count == 0, "Pending providers display loading");
             first.BeginEdit();
@@ -187,7 +194,7 @@ internal static class ComponentChecks
             Check(pendingToken.IsCancellationRequested, "Editing cancels an open child request");
             pending.SetResult((OmniboxItem[])[new OmniboxItem("Stale result", "stale:")]);
             await Task.Delay(50);
-            Check(!menu.IsOpen && Locations(menu).Items.Count == 0, "Late results cannot reopen or replace a closed menu");
+            Check(!menu.IsOpen && menu.ItemsSource is null, "Late results cannot reopen or replace a closed menu");
             first.SetLocation(App.Component.Address, App.Paths[App.Component.Address]);
 
             var older = new TaskCompletionSource<IReadOnlyList<OmniboxItem>>();
@@ -195,24 +202,27 @@ internal static class ComponentChecks
             first.ChildrenProvider = (_, _) =>
                 ++call == 1 ? older.Task : Task.FromResult<IReadOnlyList<OmniboxItem>>((OmniboxItem[])[App.Projects]);
             childButton = Button(first, "BreadcrumbChildren0");
-            menu = (Flyout)childButton.Flyout;
-            menu.ShowAt(childButton);
+            menu = OpenChildrenMenu(childButton);
             await WaitAsync(() => menu.IsOpen);
+            menu.FilterText = "older";
             await CloseAsync(menu);
-            menu.ShowAt(childButton);
+            Check(ReferenceEquals(menu, OpenChildrenMenu(childButton)), "Reopening the same button reuses its flyout");
             await WaitAsync(
-                () => Locations(menu).Items.OfType<OmniboxItem>().Any(item => item.Label == "Projects"),
+                () => menu.ItemsSource?.Single().Text == "Projects" && menu.FilterText.Length == 0,
                 () => $"Reopen requests: {call}; open: {menu.IsOpen}; items: {string.Join(", ", Locations(menu).Items)}");
             older.SetResult((OmniboxItem[])[new OmniboxItem("Older request", "old:")]);
             await Task.Delay(50);
-            Check(Locations(menu).Items.OfType<OmniboxItem>().Single().Label == "Projects", "Reopening a menu rejects an older completion");
+            Check(menu.ItemsSource?.Single().Text == "Projects", "Reopening a menu rejects an older completion");
             await CloseAsync(menu);
 
             var manyItems = await Task.Run(() => Enumerable.Range(0, 10_000)
                 .Select(index => new OmniboxItem($"Location {index:D5}", $"large:{index}")).ToArray());
-            first.ChildrenProvider = (_, _) => Task.FromResult<IReadOnlyList<OmniboxItem>>(manyItems);
+            first.ChildrenProvider = async (_, token) =>
+            {
+                await Task.Delay(30, token);
+                return manyItems;
+            };
             childButton = Button(first, "BreadcrumbChildren0");
-            menu = (Flyout)childButton.Flyout;
             var heartbeat = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
             var watch = Stopwatch.StartNew();
             var lastTick = 0d;
@@ -226,9 +236,9 @@ internal static class ComponentChecks
             heartbeat.Start();
             try
             {
-                menu.ShowAt(childButton);
+                menu = OpenChildrenMenu(childButton);
                 var list = Locations(menu);
-                await WaitAsync(() => list.ContainerFromIndex(0) is ListViewItem);
+                await WaitAsync(() => list.ActualHeight >= 160 && list.ContainerFromIndex(0) is ListViewItem);
                 var loadMilliseconds = watch.Elapsed.TotalMilliseconds;
                 var firstRealized = list.ItemsPanelRoot.Children.Count;
                 Check(
@@ -236,19 +246,16 @@ internal static class ComponentChecks
                     && firstRealized is > 0 and < 100
                     && list.ContainerFromIndex(manyItems.Length - 1) is null,
                     "Ten thousand children create only viewport containers without truncating results");
-                list.ScrollIntoView(manyItems[^1]);
+                list.ScrollIntoView(list.Items[^1]);
                 await WaitAsync(() => list.ContainerFromIndex(manyItems.Length - 1) is ListViewItem);
                 var lastRealized = list.ItemsPanelRoot.Children.Count;
                 Check(lastRealized < 100, "Scrolling a large popup keeps container creation bounded");
                 await WaitAsync(() =>
                     list.ContainerFromIndex(manyItems.Length - 1) is ListViewItem row
-                    && Equals(row.Content, manyItems[^1])
-                    && FrameworkElementAutomationPeer.CreatePeerForElement(row).GetName() == manyItems[^1].Label);
+                    && FrameworkElementAutomationPeer.CreatePeerForElement(row).GetName() == manyItems[^1].Label
+                    && AutomationProperties.GetHelpText(row) == manyItems[^1].Address);
                 var lastContainer = (ListViewItem)list.ContainerFromIndex(manyItems.Length - 1);
-                Check(
-                    Equals(lastContainer.Content, manyItems[^1])
-                    && FrameworkElementAutomationPeer.CreatePeerForElement(lastContainer).GetName() == manyItems[^1].Label,
-                    "Recycled rows expose the correct accessible label");
+                Check(Equals(ToolTipService.GetToolTip(lastContainer), manyItems[^1].Address), "Scrolling updates the tooltip to the current child address");
                 string? requestedAddress = null;
 
                 void CaptureRequest(object? sender, OmniboxNavigationRequestedEventArgs args)
@@ -261,7 +268,8 @@ internal static class ComponentChecks
                 await WaitAsync(() => requestedAddress is not null && !menu.IsOpen);
                 first.NavigationRequested -= CaptureRequest;
                 Check(requestedAddress == manyItems[^1].Address, "The last child remains reachable and navigates using its opaque address");
-                Check(list.ItemsSource is null, "Closing a child popup releases its loaded collection");
+                await WaitAsync(() => menu.ItemsSource is null && list.ItemsSource is null);
+                Check(menu.ItemsSource is null && list.ItemsSource is null, "Closing a child popup releases its loaded collection");
                 await Task.Delay(50);
                 largeList = new
                 {
@@ -290,13 +298,16 @@ internal static class ComponentChecks
                 && ((FrameworkElement)VisualTreeHelper.GetParent(Button(first, "Breadcrumb2"))).Visibility == Visibility.Visible,
                 "Narrow fields preserve the current breadcrumb beside its icon and expose ancestors");
             var overflow = Button(first, "OverflowButton");
-            var overflowMenu = (MenuFlyout)overflow.Flyout;
+            var overflowMenu = (SearchableMenuFlyout)overflow.Flyout;
             overflowMenu.ShowAt(overflow);
             await WaitAsync(() => overflowMenu.IsOpen);
             Check(
-                overflowMenu.Items.OfType<MenuFlyoutItem>().Select(item => item.Text).SequenceEqual(new[] { "Workspace", "Projects" }),
+                overflowMenu.Items.Where(item => item.GetType() == typeof(MenuFlyoutItem)).Cast<MenuFlyoutItem>()
+                    .Select(item => item.Text).SequenceEqual(new[] { "Workspace", "Projects" }),
                 "Overflow preserves ancestor order");
-            Invoke(overflowMenu.Items.OfType<MenuFlyoutItem>().First());
+            overflowMenu.FilterText = "work";
+            await WaitAsync(() => overflowMenu.FilteredItemCount == 1);
+            Invoke(overflowMenu.Items.OfType<MenuFlyoutItem>().Single(item => item.Text == "Workspace"));
             await WaitAsync(() => first.Address == App.Workspace.Address);
             Check(first.Address == App.Workspace.Address, "Overflow navigation uses the ancestor's opaque address");
 
@@ -581,8 +592,7 @@ internal static class ComponentChecks
                 return pending.Task;
             };
             childButton = Button(first, "BreadcrumbChildren0");
-            menu = (Flyout)childButton.Flyout;
-            menu.ShowAt(childButton);
+            menu = OpenChildrenMenu(childButton);
             await WaitAsync(() => menu.IsOpen);
             parent.Children.Remove(first);
             await WaitAsync(() => pendingToken.IsCancellationRequested);
@@ -601,9 +611,15 @@ internal static class ComponentChecks
         Environment.ExitCode = failure is null ? 0 : 1;
     }
 
+    private static SearchableItemsFlyout OpenChildrenMenu(Button button)
+    {
+        Invoke(button);
+        return (SearchableItemsFlyout)button.Flyout;
+    }
+
     private static ListView Locations(Flyout menu)
     {
-        return ((Grid)menu.Content).Children.OfType<ListView>().Single();
+        return (ListView)((FrameworkElement)menu.Content).FindName("ItemsList");
     }
 
     private static bool ContainsText(DependencyObject element, string text)
@@ -626,7 +642,7 @@ internal static class ComponentChecks
 
     private static TextBlock Status(Flyout menu)
     {
-        return ((Grid)menu.Content).Children.OfType<TextBlock>().Single();
+        return (TextBlock)((FrameworkElement)menu.Content).FindName("EmptyMessage");
     }
 
     private static Button Button(DependencyObject parent, string id)

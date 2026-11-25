@@ -4,6 +4,7 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using JPSoftworks.DesktopToolkit.Controls;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -46,7 +47,7 @@ public sealed partial class Omnibox : UserControl
     private readonly List<(OmniboxItem Item, StackPanel Panel, Button Label, Button Children)> _segments = [];
     private CancellationTokenSource? _suggestionsCancellation;
     private CancellationTokenSource? _childrenCancellation;
-    private Flyout? _childrenMenu;
+    private SearchableItemsFlyout? _childrenMenu;
     private Func<string?, CancellationToken, Task<IReadOnlyList<OmniboxItem>>>? _childrenProvider;
     private int _firstVisible;
     private bool _isEnteringEditMode;
@@ -125,7 +126,6 @@ public sealed partial class Omnibox : UserControl
         this.AddressEditorIcon.Margin = new Thickness(iconInset, 0, 0, 0);
         this._addressTextInset = iconInset + this.AddressEditorIcon.Width + (double)this.Resources["SuggestionColumnSpacing"];
         this.ClearInputButton.RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => this.UpdateInputPadding());
-        this.RootButton.Flyout = this.CreateChildrenMenu(null);
         this.Loaded += (_, _) => this.UpdateOverflow();
         this.RegisterPropertyChangedCallback(FontSizeProperty, (_, _) => this.UpdateOverflow());
         this.Unloaded += (_, _) =>
@@ -164,6 +164,18 @@ public sealed partial class Omnibox : UserControl
         this._suggestionsList = suggestionsList;
         this._suggestionsPanel = panel;
         suggestionsList.ItemsSource = this.Editor.ItemsSource;
+
+        void RestorePreviewSelection(object sender, TextChangedEventArgs args)
+        {
+            // AutoSuggestBox can clear the row selection while applying a queued preview to its textbox.
+            if (suggestionsList.SelectedIndex == -1 && this._previewItem is { } preview &&
+                input.Text == this.PreviewText && input.Text != this._queryText &&
+                this.IsSuggestionListOpen && suggestionsList.Items.Contains(preview))
+            {
+                suggestionsList.SelectedItem = preview;
+            }
+        }
+
         void UpdateEditorFrame()
         {
             var above = this.IsEditorPopupAbove;
@@ -201,6 +213,7 @@ public sealed partial class Omnibox : UserControl
 
         void PlacementChanged(object? sender, object args) => UpdateEditorFrame();
 
+        input.TextChanged += RestorePreviewSelection;
         var visibilityToken = this.Editor.RegisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, UpdateSuggestionVisibility);
         var panelToken = panel.RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => UpdateEditorFrame());
         this.EditorPopup.ActualPlacementChanged += PlacementChanged;
@@ -210,6 +223,7 @@ public sealed partial class Omnibox : UserControl
 
         void Unsubscribe()
         {
+            input.TextChanged -= RestorePreviewSelection;
             this.EditorPopup.ActualPlacementChanged -= PlacementChanged;
             this.Editor.UnregisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, visibilityToken);
             panel.UnregisterPropertyChangedCallback(VisibilityProperty, panelToken);
@@ -657,19 +671,7 @@ public sealed partial class Omnibox : UserControl
         }
 
         var text = sender.Text;
-        if (this._previewItem is { } preview && text == this.PreviewText)
-        {
-            // WinUI can clear the selection while processing queued preview changes.
-            if (text != this._queryText && this.IsSuggestionListOpen &&
-                this._suggestionsList is { SelectedIndex: -1 } list && list.Items.Contains(preview))
-            {
-                list.SelectedItem = preview;
-            }
-
-            return;
-        }
-
-        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput || text == this.PreviewText)
         {
             return;
         }
@@ -987,12 +989,13 @@ public sealed partial class Omnibox : UserControl
                 Width = 28,
                 Height = 32,
                 Padding = new Thickness(0),
-                Flyout = this.CreateChildrenMenu(item.Address),
+                Tag = item.Address,
                 Visibility = this.ChildrenProvider is null || item.HasChildren == false ? Visibility.Collapsed : Visibility.Visible
             };
             AutomationProperties.SetName(children, $"Children of {item.Label}");
             AutomationProperties.SetAutomationId(children, $"BreadcrumbChildren{this._segments.Count}");
             ToolTipService.SetToolTip(children, $"Children of {item.Label}");
+            children.Click += this.BreadcrumbMenuButton_Click;
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
             panel.Children.Add(label);
             panel.Children.Add(children);
@@ -1081,92 +1084,75 @@ public sealed partial class Omnibox : UserControl
         return menuItem;
     }
 
-    private Flyout CreateChildrenMenu(string? address)
+    private void BreadcrumbMenuButton_Click(object sender, RoutedEventArgs args)
     {
-        // A finite viewport keeps large child collections virtualized.
-        var list = new ListView
+        // WinUI opens Button.Flyout after the Click handlers return.
+        this.GetBreadcrumbMenu((Button)sender);
+    }
+
+    private FlyoutBase GetBreadcrumbMenu(Button button)
+    {
+        if (button.Flyout is { } existing)
         {
-            MaxHeight = 320,
-            SelectionMode = ListViewSelectionMode.None,
-            IsItemClickEnabled = true,
-            ItemTemplate = (DataTemplate)this.Resources["ChildLocationTemplate"],
-            ItemContainerStyle = (Style)this.Resources["ChildLocationContainerStyle"]
-        };
-        AutomationProperties.SetAutomationId(list, "ChildLocations");
-        AutomationProperties.SetName(list, address is null ? "Root locations" : $"Children of {address}");
-        var status = new TextBlock { Margin = new Thickness(8), TextWrapping = TextWrapping.Wrap };
-        AutomationProperties.SetAutomationId(status, "ChildLocationsStatus");
-        AutomationProperties.SetLiveSetting(status, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
-        var content = new Grid { MinWidth = 160, MaxWidth = 480 };
-        content.Children.Add(list);
-        content.Children.Add(status);
-        var menu = new Flyout
+            return existing;
+        }
+
+        var address = (string?)button.Tag;
+        var menu = new SearchableItemsFlyout
         {
-            Content = content,
-            Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft,
-            FlyoutPresenterStyle = (Style)this.Resources["ChildLocationsFlyoutStyle"]
+            FilterBoxAutomationName = address is null ? "Filter root locations" : $"Filter children of {address}",
+            FilterPlaceholderText = "Filter locations"
         };
-        list.ItemClick += (_, args) =>
+        AutomationProperties.SetName(menu, address is null ? "Root locations" : $"Children of {address}");
+        if (FindVisualChild<ListView>(menu.Content) is { } list)
         {
-            this.CloseChildrenMenu();
-            this.RequestNavigation((OmniboxItem)args.ClickedItem);
-        };
-        menu.Opening += async (_, _) => await this.LoadChildrenAsync(menu, list, status, address);
-        // Cancel before the closing animation so an older close cannot cancel a reopened menu.
+            list.ContainerContentChanging += static (_, args) => ToolTipService.SetToolTip(
+                args.ItemContainer, args.InRecycleQueue ? null : AutomationProperties.GetHelpText(args.ItemContainer));
+        }
+
+        menu.ItemInvoked += (_, args) => this.RequestNavigation((OmniboxItem)args.InvokedItem.Tag!);
+        menu.Opening += async (_, _) => await this.LoadChildrenAsync(menu, address);
         menu.Closing += (_, _) =>
         {
             if (ReferenceEquals(this._childrenMenu, menu))
             {
-                this.CloseChildrenMenu();
+                this._childrenMenu = null;
+                this._childrenCancellation?.Cancel();
+                this._childrenCancellation = null;
             }
-
-            list.ItemsSource = null;
         };
+        menu.Closed += (_, _) => menu.ItemsSource = null;
+        button.Flyout = menu;
         return menu;
     }
 
     private void CloseChildrenMenu()
     {
-        this._childrenCancellation?.Cancel();
-        this._childrenCancellation = null;
-        var menu = this._childrenMenu;
-        this._childrenMenu = null;
-        menu?.Hide();
+        this._childrenMenu?.Hide();
     }
 
-    private async Task LoadChildrenAsync(Flyout menu, ListView list, TextBlock status, string? address)
+    private async Task LoadChildrenAsync(SearchableItemsFlyout menu, string? address)
     {
         this.CloseChildrenMenu();
         this.OverflowMenu.Hide();
         this._childrenMenu = menu;
+        menu.NoResultsText = "Loading locations…";
+        // shortcut: Preview 2 sizes the popup only at open. Reserve the list and filter height until the toolkit resizes after source changes.
+        ((FrameworkElement)menu.Content).Height = menu.MaxListHeight + 48;
         using var cancellation = new CancellationTokenSource();
         this._childrenCancellation = cancellation;
         var token = cancellation.Token;
-        list.ItemsSource = null;
-        list.Visibility = Visibility.Collapsed;
-        status.Text = "Loading locations…";
-        status.Visibility = Visibility.Visible;
-        AutomationProperties.SetHelpText(status, string.Empty);
-        ToolTipService.SetToolTip(status, null);
         try
         {
             var items = this.ChildrenProvider is { } provider ? await provider(address, token) : [];
             token.ThrowIfCancellationRequested();
-            list.ItemsSource = items;
-            list.Visibility = items.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-            status.Text = "No child locations";
-            status.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            this.DispatcherQueue.TryEnqueue(() =>
+            menu.NoResultsText = items.Count == 0 ? "No child locations" : "No matching locations";
+            menu.ItemsSource = items.Select(item => new SearchableFlyoutItem
             {
-                if (!token.IsCancellationRequested && ReferenceEquals(this._childrenMenu, menu) && items.Count > 0)
-                {
-                    list.UpdateLayout();
-                    if (list.ContainerFromIndex(0) is ListViewItem first)
-                    {
-                        first.Focus(FocusState.Programmatic);
-                    }
-                }
-            });
+                Text = item.Label,
+                AutomationHelpText = item.Address,
+                Tag = item
+            }).ToArray();
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -1178,12 +1164,7 @@ public sealed partial class Omnibox : UserControl
                 return;
             }
 
-            list.ItemsSource = null;
-            list.Visibility = Visibility.Collapsed;
-            status.Text = "Could not load locations";
-            status.Visibility = Visibility.Visible;
-            ToolTipService.SetToolTip(status, ex.Message);
-            AutomationProperties.SetHelpText(status, ex.Message);
+            menu.NoResultsText = $"Could not load locations: {ex.Message}";
         }
         finally
         {
@@ -1218,17 +1199,12 @@ public sealed partial class Omnibox : UserControl
             buttons[Math.Clamp(index + offset, 0, buttons.Count - 1)].Focus(FocusState.Keyboard);
             args.Handled = true;
         }
-        else if (args.Key == VirtualKey.Down)
+        else if (args.Key == VirtualKey.Down && !ReferenceEquals(focused, this.EditAddressButton))
         {
-            var button = buttons[index];
-            if (button.Flyout is null)
+            var button = this._segments.FirstOrDefault(segment => ReferenceEquals(segment.Label, focused)).Children ?? buttons[index];
+            if (button.Visibility == Visibility.Visible)
             {
-                button = this._segments.FirstOrDefault(segment => ReferenceEquals(segment.Label, focused)).Children;
-            }
-
-            if (button?.Flyout is { } flyout && button.Visibility == Visibility.Visible)
-            {
-                flyout.ShowAt(button);
+                this.GetBreadcrumbMenu(button).ShowAt(button);
                 args.Handled = true;
             }
         }
