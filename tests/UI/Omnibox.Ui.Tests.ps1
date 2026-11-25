@@ -324,53 +324,65 @@ try {
             -not @($elements | Where-Object { $_.automationId -eq 'Breadcrumb0' -and $_.name -eq 'Computer' }).Count) {
             throw 'Expected Computer as the first breadcrumb without a duplicate root selector.'
         }
-        Invoke-Ui @('invoke', 'BreadcrumbChildren0', '--action', 'invoke') | Out-Null
-        Wait-State { param($elements) $elements.automationId -contains 'ChildLocations' }
-        $menu = Invoke-Ui @('inspect', 'ChildLocations', '-d', '4', '--json') | ConvertFrom-Json
-        $locationItem = Get-Elements $menu.windows[0].elements | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq 'HKEY_CURRENT_CONFIG' }
-        Invoke-Ui @('invoke', $locationItem.selector, '--action', 'invoke') | Out-Null
-        Expect-Location 'HKEY_CURRENT_CONFIG'
-    }
-    Test-Omnibox 'A segment chevron opens its children without navigating' {
-        Navigate 'HKCU' 'HKEY_CURRENT_USER'
-        Invoke-Ui @('invoke', 'BreadcrumbChildren1', '--action', 'invoke') | Out-Null
-        Wait-State { param($elements) $elements.automationId -contains 'ChildLocations' }
-        $watch = [Diagnostics.Stopwatch]::StartNew()
-        do {
-            $menu = Invoke-Ui @('inspect', 'ChildLocations', '-d', '4', '--json') | ConvertFrom-Json
-            $locationItem = Get-Elements $menu.windows[0].elements | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq 'Software' }
-            if ($locationItem) { break }
-            Start-Sleep -Milliseconds 100
-        } while ($watch.Elapsed.TotalSeconds -lt 10)
-        if (-not $locationItem) { throw 'The child menu did not show Software.' }
-        Expect-Location 'HKEY_CURRENT_USER'
-        Invoke-Ui @('scroll-into-view', $locationItem.selector) | Out-Null
-        Invoke-Ui @('screenshot', 'ChildLocations', '--output', (Join-Path $ArtifactDirectory 'children.png')) | Out-Null
-        Invoke-Ui @('invoke', $locationItem.selector, '--action', 'invoke') | Out-Null
-        Expect-Location 'HKEY_CURRENT_USER\Software'
-    }
-    Test-Omnibox 'Down opens a segment menu and Escape restores its focus' {
-        Wait-State { param($elements) $elements.automationId -notcontains 'ChildLocations' }
-        Invoke-Ui @('send-keys', 'Down', '--via', 'send-input', '--target', 'Breadcrumb1') | Out-Null
-        Wait-State { param($elements) $elements.automationId -contains 'ChildLocations' }
-        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
-        Expect-Location 'HKEY_CURRENT_USER\Software'
+        Invoke-Ui @('send-keys', 'Space', '--via', 'send-input', '--target', 'BreadcrumbChildren0') | Out-Null
+        Wait-State { param($elements) $elements.automationId -contains 'MenuFilterBox' }
+        Invoke-Ui @('send-keys', 'current_config', '--verbatim', '--via', 'send-input') | Out-Null
         Wait-State {
             param($elements)
-            $focus = Invoke-Ui @('get-property', 'Breadcrumb1', '-p', 'HasKeyboardFocus', '--json') | ConvertFrom-Json
-            $focus.properties.HasKeyboardFocus -eq 'True'
+            @($elements | Where-Object { $_.type -eq 'MenuItem' -and $_.name -eq 'HKEY_CURRENT_CONFIG' }).Count -eq 1
+        }
+        Invoke-Ui @('invoke', 'HKEY_CURRENT_CONFIG', '--type', 'MenuItem', '--action', 'invoke') | Out-Null
+        Expect-Location 'HKEY_CURRENT_CONFIG'
+    }
+    Test-Omnibox 'A segment chevron filters its children before navigating' {
+        Navigate 'HKCU' 'HKEY_CURRENT_USER'
+        Invoke-Ui @('click', 'BreadcrumbChildren1') | Out-Null
+        Wait-State { param($elements) $elements.automationId -contains 'MenuFilterBox' }
+        Expect-KeyboardFocus 'MenuFilterBox'
+        Invoke-Ui @('send-keys', 'software', '--verbatim', '--via', 'send-input') | Out-Null
+        Wait-State {
+            param($elements)
+            $list = $elements | Where-Object automationId -eq 'FilteredMenuItems'
+            $rows = @(Get-Elements $list.children | Where-Object type -eq 'MenuItem')
+            $rows.Count -gt 0 -and -not ($rows.name -notlike '*software*')
+        }
+        Expect-Location 'HKEY_CURRENT_USER'
+        $list = Read-Ui | Where-Object automationId -eq 'FilteredMenuItems'
+        $first = Get-Elements $list.children | Where-Object type -eq 'MenuItem' | Select-Object -First 1
+        Invoke-Ui @('screenshot', 'FilteredMenuItems', '--output', (Join-Path $ArtifactDirectory 'children.png')) | Out-Null
+        Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input') | Out-Null
+        Expect-Location "HKEY_CURRENT_USER\$($first.name)"
+    }
+    Test-Omnibox 'Down opens a segment menu and Escape restores its focus' {
+        Navigate 'HKCU\Software' 'HKEY_CURRENT_USER\Software'
+        foreach ($button in 'BreadcrumbChildren1', 'Breadcrumb1') {
+            Wait-State { param($elements) $elements.automationId -notcontains 'MenuFilterBox' }
+            Invoke-Ui @('send-keys', 'Down', '--via', 'send-input', '--target', $button) | Out-Null
+            Wait-State { param($elements) $elements.automationId -contains 'MenuFilterBox' }
+            Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+            Expect-Location 'HKEY_CURRENT_USER\Software'
+            Wait-State {
+                param($elements)
+                $focus = Invoke-Ui @('get-property', $button, '-p', 'HasKeyboardFocus', '--json') | ConvertFrom-Json
+                $focus.properties.HasKeyboardFocus -eq 'True'
+            }
         }
     }
     Test-Omnibox 'Large hive children support scrolling and keyboard navigation' {
         Navigate 'HKCR' 'HKEY_CLASSES_ROOT'
         Invoke-Ui @('send-keys', 'Down', '--via', 'send-input', '--target', 'Breadcrumb1') | Out-Null
-        Wait-State { param($elements) $elements.automationId -contains 'ChildLocations' }
-        Invoke-Ui @('send-keys', 'End', '--via', 'send-input', '--target', 'ChildLocations') | Out-Null
-        $menu = Invoke-Ui @('inspect', 'ChildLocations', '-d', '4', '--hide-offscreen', '--json') | ConvertFrom-Json
-        $visible = @(Get-Elements $menu.windows[0].elements | Where-Object { $_.type -eq 'ListItem' })
-        if ($visible.Count -eq 0 -or $visible.Count -gt 20) { throw 'Expected a bounded viewport of large-hive children.' }
-        Invoke-Ui @('screenshot', 'ChildLocations', '--output', (Join-Path $ArtifactDirectory 'large-hive.png')) | Out-Null
-        $destination = 'HKEY_CLASSES_ROOT\' + $visible[-1].name
+        Wait-State { param($elements) $elements.automationId -contains 'FilteredMenuItems' }
+        $popup = & winapp ui list-windows -a $AppPid --json --on $Target | ConvertFrom-Json | Where-Object label -eq 'popup' | Select-Object -First 1
+        Invoke-Ui @('send-keys', 'Down End', '--via', 'send-input') | Out-Null
+        Wait-State {
+            param($elements)
+            $menu = $elements | Where-Object automationId -eq 'FilteredMenuItems'
+            $visible = @(Get-Elements $menu.children | Where-Object type -eq 'MenuItem')
+            $focused = (Invoke-Ui @('get-focused', '--json') $popup.hwnd | ConvertFrom-Json).element
+            $visible.Count -in 1..20 -and $focused.type -eq 'MenuItem' -and $focused.name -eq $visible[-1].name
+        }
+        $destination = 'HKEY_CLASSES_ROOT\' + (Invoke-Ui @('get-focused', '--json') $popup.hwnd | ConvertFrom-Json).element.name
+        Invoke-Ui @('screenshot', 'FilteredMenuItems', '--output', (Join-Path $ArtifactDirectory 'large-hive.png')) | Out-Null
         Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input') | Out-Null
         Expect-Location $destination
     }

@@ -3,6 +3,7 @@
     <RootNamespace>JPSoftworks.Omnibox.Sample</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="JPSoftworks.DesktopToolkit.Controls.SearchableFlyouts" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <Page Include="..\..\src\Regedit\Controls\Omnibox\Omnibox.xaml" Link="Controls\Omnibox.xaml" />
