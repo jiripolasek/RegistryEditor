@@ -2372,6 +2372,32 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Window shell checks failed.' }
     }
 
+    Test-Ui 'Browser status bar accepts mouse clicks' {
+        function Click-StatusButton([string] $Id) {
+            $button = @(Read-Ui | Where-Object automationId -eq $Id)
+            if ($button.Count -ne 1 -or $button[0].width -le 0 -or $button[0].height -le 0) {
+                throw "Missing visible status button '$Id'."
+            }
+            $x = [int]($button[0].x + $button[0].width / 2)
+            $y = [int]($button[0].y + $button[0].height / 2)
+            Ui @('click', '--at', "$x,$y") | Out-Null
+        }
+
+        Browser
+        Set-TestWindowForeground
+        Click-StatusButton 'RegistryViewStatus'
+        $null = Read-ContextMenu '32-bit registry'
+        Ui @('send-keys', 'escape', '--via', 'send-input') | Out-Null
+
+        Click-StatusButton 'AccessStatus'
+        $null = Read-ContextMenu 'Open as administrator' -Types @('Button')
+        Ui @('send-keys', 'escape', '--via', 'send-input') | Out-Null
+
+        Click-StatusButton 'ConnectionStatus'
+        Wait-Ui { param($items) $items.name -contains 'Connect network registry' }
+        Press 'Cancel'
+    }
+
     Test-Ui 'List Alt arrow shortcuts navigate from a focused row' {
         function Expect-ListLocation([string] $Name) {
             Wait-Ui {
