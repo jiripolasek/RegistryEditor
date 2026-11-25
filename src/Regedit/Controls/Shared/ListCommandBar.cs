@@ -314,6 +314,12 @@ public sealed partial class ListCommandBar : CommandBar
             commands.HorizontalAlignment = HorizontalAlignment.Stretch;
         }
 
+        if (this.GetTemplateChild("SecondaryItemsControl") is FrameworkElement overflow)
+        {
+            // shortcut: WinUI hides chevrons at the template root; recheck this override when updating WinUI.
+            overflow.Resources["AppBarButtonHasFlyoutChevronVisibility"] = Visibility.Visible;
+        }
+
         if (this.GetTemplateChild("MoreButton") is Button more)
         {
             // Use our toolbar style so surrounding controls cannot supply a different ellipsis style.
