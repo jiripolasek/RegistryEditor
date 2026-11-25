@@ -28,6 +28,8 @@ The address bar, launch arguments, and favorite locations also accept PowerShell
 
 **Settings > Registry view > Always show address as text** replaces breadcrumbs with the full registry path in every registry tab. Click the address or press Ctrl+L to edit it. The preference is remembered; turn it off to restore breadcrumbs.
 
+Committing an address successfully moves keyboard focus to the registry list, ready for arrow-key navigation. Invalid or inaccessible addresses keep focus in the address editor so you can correct the draft.
+
 Spaces at the end of a key name are significant, including in unquoted paths. A whitespace-only key name is also valid. Navigation, copied paths, favorites, and restored tabs preserve these names exactly. Padding outside explicit quotes or a registry file header is ignored.
 
 **Copy path as…** is available in the tree and row context menus, the empty-list menu, and the list's **See more** menu. Choose **PowerShell drive path**, **PowerShell provider path**, or **Registry file header**. The drive format is available for local HKCU and HKLM keys; the provider and header formats support all local hives. Unsupported formats are disabled for Computer and remote locations. **Copy key path** and Ctrl+Shift+C still copy the standard address, including the server name for remote keys. Copied paths do not encode the registry view; choose the corresponding 32-bit or 64-bit view in the receiving tool. PowerShell paths are copied as literal path text, without command or string escaping.
