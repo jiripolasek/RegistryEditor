@@ -395,6 +395,7 @@ public sealed partial class NotificationHost : Control, IDisposable
             return;
         }
 
+        this._hostStack.IsHitTestVisible = this.ActiveCount > 0;
         this.InitializeScrollFade();
         this._stackDeck.PointerEntered += this.StackDeck_PointerEntered;
         this._stackDeck.PointerExited += this.StackDeck_PointerExited;
@@ -673,6 +674,8 @@ public sealed partial class NotificationHost : Control, IDisposable
             return;
         }
 
+        // The empty scroll viewport can still intercept input over controls beneath the host.
+        this._hostStack.IsHitTestVisible = active.Length > 0;
         this._stackToggle.IsChecked = this.IsExpanded;
         var many = active.Length > 2;
         var restoreFocus = !many && HasFocus(this._stackToggle);
