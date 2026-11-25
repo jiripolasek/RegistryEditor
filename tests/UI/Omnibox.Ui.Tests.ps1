@@ -3,6 +3,7 @@ param(
     [int] $AppPid,
     [ValidateSet('local', 'sandbox')]
     [string] $Target = 'local',
+    [string] $TestFilter,
     [string] $ArtifactDirectory = (Join-Path $PSScriptRoot "../../artifacts/omnibox-ui/$([guid]::NewGuid().ToString('N'))")
 )
 
@@ -70,6 +71,26 @@ function Navigate([string] $Address, [string] $Expected) {
     Invoke-Ui @('set-value', 'OmniboxInput', $Address) | Out-Null
     Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
     Expect-Location $Expected
+    Expect-ListKeyboardNavigation
+}
+
+function Expect-ListKeyboardNavigation {
+    Wait-State {
+        param($elements)
+        $list = $elements | Where-Object { $_.automationId -eq 'EntriesList' }
+        $rows = @(Get-Elements $list.children | Where-Object { $_.type -eq 'ListItem' })
+        $focused = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element
+        $focused.selector -eq 'EntriesList' -or $rows.selector -contains $focused.selector
+    }
+    Invoke-Ui @('send-keys', 'Home Down', '--via', 'send-input') | Out-Null
+    $focused = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element
+    $list = Invoke-Ui @('inspect', 'EntriesList', '-d', '4', '--hide-offscreen', '--json') | ConvertFrom-Json
+    $rows = @(Get-Elements $list.windows[0].elements | Where-Object { $_.type -eq 'ListItem' })
+    $expected = $rows | Select-Object -Index ([Math]::Min(1, $rows.Count - 1))
+    if (-not $expected -or $focused.selector -ne $expected.selector) {
+        throw 'Home and Down after committing an address did not focus the expected destination list row.'
+    }
+    if ($rows.Count -gt 1) { Expect-SuggestionSelection $expected.selector }
 }
 
 function Enter-Scope([string] $Prefix, [string] $Confirmation, [string] $Label, [string] $Placeholder) {
@@ -100,6 +121,7 @@ function Expect-SuggestionSelection([string] $Selector, [bool] $Selected = $true
 }
 
 function Test-Omnibox([string] $Name, [scriptblock] $Check) {
+    if ($TestFilter -and $Name -notmatch $TestFilter) { return }
     try {
         & $Check
         $results.Add(@{ name = $Name; status = 'PASS' })
@@ -118,7 +140,7 @@ try {
     if ($appWindows.Count -ne 1) { throw 'Expected one registry editor window in the selected target.' }
     $script:mainWindow = $appWindows[0].hwnd
 
-    Test-Omnibox 'Typed aliases become clickable breadcrumbs' {
+    Test-Omnibox 'Typed aliases become clickable breadcrumbs and focus the list' {
         Navigate 'HKCU\Software' 'HKEY_CURRENT_USER\Software'
     }
     Test-Omnibox 'Ancestor navigation updates the current location' {
@@ -161,7 +183,16 @@ try {
         }
     }
 
-    Test-Omnibox 'Invalid paths retain the draft and current key' {
+    Test-Omnibox 'Malformed paths retain the draft and keyboard focus' {
+        Edit-Address
+        Invoke-Ui @('set-value', 'OmniboxInput', 'InvalidHive\Software') | Out-Null
+        Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Wait-State { param($elements) @($elements | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0 }
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Expect-Location 'HKEY_CURRENT_USER'
+    }
+    Test-Omnibox 'Invalid paths retain the draft, keyboard focus and current key' {
         $missing = 'HKCU\Software\__Omnibox_Test_' + [guid]::NewGuid().ToString('N')
         Edit-Address
         Invoke-Ui @('set-value', 'OmniboxInput', $missing) | Out-Null
@@ -171,6 +202,8 @@ try {
             @($elements | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0 -and
                 @($elements | Where-Object { $_.type -eq 'Edit' -and $_.name -eq 'Address' -and $_.value -eq $missing }).Count -eq 1
         }
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'rejected-address.png')) | Out-Null
         Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
         Expect-Location 'HKEY_CURRENT_USER'
     }
@@ -195,6 +228,7 @@ try {
         }
         Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
         Expect-Location 'HKEY_CURRENT_USER\Software'
+        Expect-ListKeyboardNavigation
         if (@((Read-Ui) | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0) { throw 'Successful navigation did not clear the old error.' }
     }
     Test-Omnibox 'Escape prevents delayed suggestions from reopening the editor' {
@@ -523,6 +557,14 @@ try {
             @($elements | Where-Object { $_.type -eq 'TabItem' -and $_.name -eq "Find: $query" }).Count -eq 2
         }
     }
+    Test-Omnibox 'Committing Computer lets arrow keys navigate the hive list' {
+        Navigate 'Computer' 'Computer'
+        Invoke-Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'list-keyboard-focus.png')) | Out-Null
+    }
+    Test-Omnibox 'Committing the current address returns keyboard focus to the list' {
+        Navigate 'Computer' 'Computer'
+    }
+    if ($results.Count -eq 0) { throw "No UI test matched '$TestFilter'." }
     Invoke-Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'completed.png')) | Out-Null
 }
 catch {

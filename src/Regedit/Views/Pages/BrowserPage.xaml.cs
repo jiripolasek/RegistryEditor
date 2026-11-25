@@ -451,7 +451,18 @@ public sealed partial class BrowserPage : Page
     {
         await this.GuardAsync(
             "Couldn't open the registry key", "Navigation canceled",
-            () => this.ViewModel.NavigateAsync(RegistryLocation.Parse(args.Address, this.ViewModel.Location.View)));
+            async () =>
+            {
+                var target = RegistryLocation.Parse(args.Address, this.ViewModel.Location.View);
+                var navigation = this.ViewModel.NavigateAsync(target);
+                var version = this.ViewModel.NavigationVersion;
+                await navigation;
+                if (!this._closed && version == this.ViewModel.NavigationVersion &&
+                    !this.ViewModel.IsLoading && this.ViewModel.Error is null && this.ViewModel.Location.IsSameLocation(target))
+                {
+                    this.EntryList.FocusList(FocusState.Keyboard);
+                }
+            });
     }
 
 
