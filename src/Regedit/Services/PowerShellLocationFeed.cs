@@ -2,7 +2,6 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
-#if REGEDIT_EXPERIMENTAL_TERMINAL
 using System.IO.Pipes;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -186,4 +185,3 @@ internal sealed class PowerShellLocationFeed(RegistryView view)
         }
     }
 }
-#endif

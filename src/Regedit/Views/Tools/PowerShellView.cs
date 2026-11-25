@@ -2,7 +2,6 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
-#if REGEDIT_EXPERIMENTAL_TERMINAL
 using CommunityToolkit.Mvvm.Input;
 #if !REGEDIT_SYSTEM_CONPTY
 using EasyWindowsTerminalControl;
@@ -514,4 +513,3 @@ internal sealed partial class PowerShellView : UserControl, IDisposable, IPanelV
         protected override AutomationPeer OnCreateAutomationPeer() => new FrameworkElementAutomationPeer(this);
     }
 }
-#endif

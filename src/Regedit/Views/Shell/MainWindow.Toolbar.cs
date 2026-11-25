@@ -164,9 +164,7 @@ public sealed partial class MainWindow
                     inspections.Click += async (_, _) => await this.ShowRecentInspectionsAsync();
                     items.Add(inspections);
                 }
-#if REGEDIT_EXPERIMENTAL_TERMINAL
                 items.Add(this.CreatePowerShellMenuItem());
-#endif
                 items.Add(new MenuFlyoutSeparator());
             }
 

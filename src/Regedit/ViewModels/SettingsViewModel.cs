@@ -122,6 +122,13 @@ internal sealed partial class SettingsViewModel(AppSettings settings, Action<Act
         set => this.Update(this.OfferWindowsPowerShellFallback, value, s => s.OfferWindowsPowerShellFallback = value);
     }
 
+    public bool ExperimentalTerminalEnabled
+    {
+        get => settings.ExperimentalTerminalEnabled;
+        set => this.Update(
+            this.ExperimentalTerminalEnabled, value, s => s.ExperimentalTerminalEnabled = value);
+    }
+
     public string TerminalFontFamily
     {
         get => settings.TerminalFontFamily;

@@ -36,6 +36,7 @@ internal static class SettingsTests
                 && settings.ShowStatusBar, "Settings page retains existing appearance defaults");
             check(settings.TerminalFontFamily == "Consolas" && settings.TerminalFontSize == 14,
                 "Legacy settings retain the terminal renderer's default font");
+            check(!settings.ExperimentalTerminalEnabled, "Legacy settings keep the experimental terminal disabled");
             settings.Favorites.Add(new Favorite("Example", "HKCU\\Software"));
             settings.Tabs.Add(new SavedTab("HKCU"));
             settings.ToolPanePinned = true;
@@ -47,6 +48,7 @@ internal static class SettingsTests
                     value.FontSize = 18;
                     value.TerminalFontFamily = " Courier New ";
                     value.TerminalFontSize = 24;
+                    value.ExperimentalTerminalEnabled = true;
                     value.ShowStatusBar = false;
                     value.ShowKeysInList = value.ShowParentKeyInList = value.ShowValuePreview = true;
                     value.AutoSyncTree = false;
@@ -56,6 +58,7 @@ internal static class SettingsTests
             check(!loaded.AutoSyncTree, "Disabled automatic tree tracking survives saving and loading");
             check(loaded.TerminalFontFamily == "Courier New" && loaded.TerminalFontSize == 24,
                 "Terminal font preferences round-trip through the settings file");
+            check(loaded.ExperimentalTerminalEnabled, "Experimental terminal consent survives saving and loading");
             check(
                 loaded.ShowFavoritesBar && loaded.OpenFavoritesMenu, "Favorites access options survive saving and loading");
             check(
@@ -92,6 +95,7 @@ internal static class SettingsTests
                     && settings.FontSize == 18
                     && settings.TerminalFontFamily == "Courier New"
                     && settings.TerminalFontSize == 24
+                    && settings.ExperimentalTerminalEnabled
                     && saved.SequenceEqual(File.ReadAllBytes(file)), message);
             }
 

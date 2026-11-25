@@ -93,6 +93,8 @@ public sealed partial class AppSettings
 
     public bool OfferWindowsPowerShellFallback { get; set; } = true;
 
+    public bool ExperimentalTerminalEnabled { get; set; }
+
     internal const string DefaultTerminalFontFamily = "Consolas";
     internal const int DefaultTerminalFontSize = 14;
 
@@ -221,6 +223,7 @@ public sealed partial class AppSettings
             settings.RegistryFileLayout = Enum.IsDefined(saved.RegistryFileLayout) ? saved.RegistryFileLayout : RegistryFileLayout.Split;
             settings.PowerShellPath = saved.PowerShellPath?.Trim() ?? string.Empty;
             settings.OfferWindowsPowerShellFallback = saved.OfferWindowsPowerShellFallback;
+            settings.ExperimentalTerminalEnabled = saved.ExperimentalTerminalEnabled;
             settings.TerminalFontFamily = string.IsNullOrWhiteSpace(saved.TerminalFontFamily)
                 ? DefaultTerminalFontFamily
                 : saved.TerminalFontFamily.Trim();
@@ -300,7 +303,8 @@ public sealed partial class AppSettings
             this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton, this.ShowUpButton,
             this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl, this.RegistryFileLayout,
             this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
-            this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.TerminalFontFamily, this.TerminalFontSize);
+            this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.ExperimentalTerminalEnabled,
+            this.TerminalFontFamily, this.TerminalFontSize);
         try
         {
             change(this);
@@ -372,7 +376,8 @@ public sealed partial class AppSettings
                 this.ToolbarButtons, this.PanelTabsAtBottom, this.ColumnLayouts, this.ShowBackButton, this.ShowForwardButton,
                 this.ShowUpButton, this.ShowRefreshButton, this.AlwaysShowAddressAsText, this.Backdrop, this.WebSearchUrl,
                 this.RegistryFileLayout, this.EditorFont, this.ShowSearchBox, this.ShowFavoritesBar, this.OpenFavoritesMenu,
-                this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.TerminalFontFamily, this.TerminalFontSize) = previous;
+                this.PowerShellPath, this.OfferWindowsPowerShellFallback, this.ExperimentalTerminalEnabled,
+                this.TerminalFontFamily, this.TerminalFontSize) = previous;
             throw;
         }
     }
@@ -425,5 +430,6 @@ public sealed partial class AppSettings
         string? PowerShellPath = null,
         bool OfferWindowsPowerShellFallback = true,
         string? TerminalFontFamily = null,
-        int TerminalFontSize = DefaultTerminalFontSize);
+        int TerminalFontSize = DefaultTerminalFontSize,
+        bool ExperimentalTerminalEnabled = false);
 }
