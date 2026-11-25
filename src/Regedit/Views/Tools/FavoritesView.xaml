@@ -310,6 +310,7 @@
                                 DragStarting="FavoriteRow_DragStarting"
                                 Drop="FavoriteRow_Drop"
                                 DropCompleted="FavoriteRow_DropCompleted"
+                                Tapped="FavoriteFolder_Tapped"
                                 ToolTipService.ToolTip="{x:Bind ((vm:FavoriteRow)Content).Path, Mode=OneWay}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="20" />

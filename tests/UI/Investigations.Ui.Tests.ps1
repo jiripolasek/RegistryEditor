@@ -6846,6 +6846,12 @@ try {
         Press 'New folder'; Fill 'Name' 'Nested folder'; Primary
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'TreeItem' -and $_.name -eq 'Nested folder' }).Count -eq 1 }
         Show-RootFavorites
+        foreach ($name in 'Top folder', 'Nested folder', 'Top folder', 'Nested folder') {
+            Ui @('click', (Pick 'TreeItem' $name).selector) | Out-Null
+            Wait-Ui { param($items) @($items | Where-Object { $_.automationId -eq 'FavoritesFolderTitle' -and $_.name -eq $name }).Count -eq 1 }
+            Assert-TreeSelection $name
+        }
+        Show-RootFavorites
         Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Unfiled root favorite*' }).Count -eq 1 }
         $items = @(Read-Ui)
         if ($items.automationId -contains 'FavoritesRoot' -or @($items | Where-Object { $_.type -eq 'TreeItem' -and $_.name -eq 'Favorites' }).Count) {
