@@ -208,7 +208,6 @@
             </TabView.TabItemTemplate>
             <TabView.TabStripHeader>
                 <StackPanel
-                    x:Name="TabStripHeader"
                     MinHeight="40"
                     Margin="8,0,4,0"
                     Orientation="Horizontal"
@@ -244,19 +243,15 @@
                 </StackPanel>
             </TabView.TabStripHeader>
             <TabView.TabStripFooter>
-                <Grid MinHeight="40">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="48" />
-                        <ColumnDefinition x:Name="CaptionInset" Width="0" />
-                    </Grid.ColumnDefinitions>
-                    <Grid
-                        x:Name="TitleBarDragRegion"
-                        Background="Transparent"
-                        Loaded="TitleBarDragRegion_Loaded" />
-                </Grid>
+                <Border x:Name="TabStripEnd" HorizontalAlignment="Left" />
             </TabView.TabStripFooter>
 
         </TabView>
+        <Border
+            x:Name="TitleBarDragRegion"
+            Width="0"
+            HorizontalAlignment="Right"
+            Background="Transparent" />
         <SplitView
             x:Name="ToolsSplit"
             Grid.Row="2"

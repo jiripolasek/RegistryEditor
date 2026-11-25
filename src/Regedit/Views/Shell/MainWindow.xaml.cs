@@ -37,6 +37,7 @@ namespace JPSoftworks.Regedit.Views.Shell;
 
 public sealed partial class MainWindow : Window
 {
+    private const double TitleBarDragWidth = 48;
     private readonly Dictionary<WindowTab, FrameworkElement> _views = [];
     private readonly OperationNotification _exportNotification;
 
@@ -183,9 +184,9 @@ public sealed partial class MainWindow : Window
         this.AdministratorShield.Visibility = this.IsAdministrator ? Visibility.Visible : Visibility.Collapsed;
         this.ExtendsContentIntoTitleBar = true;
         var titleBarInput = InputNonClientPointerSource.GetForWindowId(this.AppWindow.Id);
-        this.WindowIconArea.LayoutUpdated += this.SetWindowIconRegion;
-        this.Activated += this.SetWindowIconRegion;
-        titleBarInput.WindowRectChanged += this.SetWindowIconRegion;
+        this.WindowIconArea.LayoutUpdated += this.UpdateTitleBarRegions;
+        this.Activated += this.UpdateTitleBarRegions;
+        titleBarInput.WindowRectChanged += this.UpdateTitleBarRegions;
         var placement = new WindowPlacementController(this.AppWindow, this.Handle, viewModel.Placement);
         viewModel.CapturePlacement = placement.Capture;
         this.AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -263,9 +264,9 @@ public sealed partial class MainWindow : Window
                 root.Changed -= this.TitleBarRoot_Changed;
             }
 
-            this.WindowIconArea.LayoutUpdated -= this.SetWindowIconRegion;
-            this.Activated -= this.SetWindowIconRegion;
-            titleBarInput.WindowRectChanged -= this.SetWindowIconRegion;
+            this.WindowIconArea.LayoutUpdated -= this.UpdateTitleBarRegions;
+            this.Activated -= this.UpdateTitleBarRegions;
+            titleBarInput.WindowRectChanged -= this.UpdateTitleBarRegions;
             this.ViewModel.CapturePlacement = null;
             this.JournalHistory.RevertCommand.Cancel();
             this.ViewModel.WindowClosed();
@@ -329,6 +330,7 @@ public sealed partial class MainWindow : Window
     private async void Shell_Loaded(object sender, RoutedEventArgs args)
     {
         this.EnableWindowIconGestures();
+        this.SetTitleBar(this.TitleBarDragRegion);
         this.Shell.XamlRoot.Changed += this.TitleBarRoot_Changed;
         this.UpdateCaptionInsets();
         _ = this.Preferences.LoadDefaultDataFontAsync(SystemFonts.GetDefaultMonospaceFontFamily);
@@ -346,13 +348,6 @@ public sealed partial class MainWindow : Window
         this.UpdateCaptionInsets();
     }
 
-    private void TitleBarDragRegion_Loaded(object sender, RoutedEventArgs args)
-    {
-        // The footer joins the XAML tree when the TabView template loads.
-        this.SetTitleBar(this.TitleBarDragRegion);
-        this.UpdateCaptionInsets();
-    }
-
     private void UpdateCaptionInsets()
     {
         if (this.Shell.XamlRoot is not { } root)
@@ -361,15 +356,30 @@ public sealed partial class MainWindow : Window
         }
 
         var scale = root.RasterizationScale;
-        this.CaptionInset.Width = new GridLength(CaptionLayout.InsetWidth(this.AppWindow.TitleBar.RightInset, scale));
-        this.TabStripHeader.Margin = new Thickness(CaptionLayout.InsetWidth(this.AppWindow.TitleBar.LeftInset, scale) + 8, 0, 4, 0);
+        var titleBar = this.AppWindow.TitleBar;
+        var rightInset = CaptionLayout.InsetWidth(titleBar.RightInset, scale);
+        // Reserve caption and drag space before TabView measures its tabs.
+        this.Tabs.Margin = new Thickness(
+            CaptionLayout.InsetWidth(titleBar.LeftInset, scale), 0, rightInset + TitleBarDragWidth, 0);
+        this.TitleBarDragRegion.Margin = new Thickness(0, 0, rightInset, 0);
     }
 
-    private void SetWindowIconRegion(object? sender, object args)
+    private void UpdateTitleBarRegions(object? sender, object args)
     {
         if (this.WindowIconArea.XamlRoot is not { } root || this.WindowIconArea.ActualWidth == 0)
         {
             return;
+        }
+
+        if (this.TabStripEnd.XamlRoot is not null)
+        {
+            var tabStripEnd = this.TabStripEnd.TransformToVisual(this.Shell).TransformPoint(default).X;
+            var dragRight = this.Shell.ActualWidth - this.TitleBarDragRegion.Margin.Right;
+            var dragWidth = Math.Max(TitleBarDragWidth, dragRight - tabStripEnd);
+            if (this.TitleBarDragRegion.Width != dragWidth)
+            {
+                this.TitleBarDragRegion.Width = dragWidth;
+            }
         }
 
         var origin = this.WindowIconArea.TransformToVisual(null).TransformPoint(default);

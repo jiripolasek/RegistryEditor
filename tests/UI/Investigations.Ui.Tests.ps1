@@ -2372,6 +2372,32 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Window shell checks failed.' }
     }
 
+    Test-Ui 'Overflowing tabs leave the caption buttons clear' {
+        Go-ToKey $address
+        $scale = [UxTestWindow]::GetDpiForWindow($mainWindow) / 96.0
+        if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, [int](760 * $scale), [int](650 * $scale), 0x16)) {
+            throw 'Could not narrow the test window.'
+        }
+        foreach ($tab in 1..7) {
+            Ui @('send-keys', 'ctrl+t', '--via', 'send-input', '--target', 'ToolsButton') | Out-Null
+        }
+        Restart-Editor
+        $saved = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json
+        if ($saved.WindowSessions[-1].Tabs.Count -lt 8) {
+            throw 'The restarted window did not have enough tabs to overflow.'
+        }
+        $items = @(Read-Ui)
+        $add = $items | Where-Object automationId -eq 'AddButton'
+        $minimize = $items | Where-Object automationId -eq 'Minimize'
+        if (-not $add -or -not $minimize -or $minimize.x - ($add.x + $add.width) -lt 48 * $scale - 2) {
+            throw 'Overflowing tabs intrude into the title-bar drag area or the caption buttons.'
+        }
+        foreach ($tab in 1..7) {
+            Ui @('send-keys', 'ctrl+w', '--via', 'send-input', '--target', 'ToolsButton') | Out-Null
+        }
+        [void][UxTestWindow]::SetWindowPos($mainWindow, 0, 0, 0, 1380, 900, 0x16)
+    }
+
     Test-Ui 'Browser status bar accepts mouse clicks' {
         function Click-StatusButton([string] $Id) {
             $button = @(Read-Ui | Where-Object automationId -eq $Id)
