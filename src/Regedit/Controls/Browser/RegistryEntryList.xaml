@@ -37,11 +37,12 @@
                     Style="{ThemeResource RegistryLinkIconStyle}"
                     Visibility="{x:Bind HasLinkIcon}" />
                 <IconSourceElement
+                    x:Name="BinaryIcon"
+                    x:Load="{x:Bind HasBinaryIcon}"
                     Width="16"
                     Height="16"
                     IconSource="{x:Bind resources:ToolRowResources.BinaryIcon, Mode=OneTime}"
-                    Style="{ThemeResource RegistryDataIconStyle}"
-                    Visibility="{x:Bind HasBinaryIcon}" />
+                    Style="{ThemeResource RegistryDataIconStyle}" />
                 <FontIcon
                     FontFamily="{x:Bind IconFontFamily}"
                     FontSize="16"
@@ -65,6 +66,8 @@
                     TextTrimming="CharacterEllipsis"
                     ToolTipService.ToolTip="{x:Bind NamePreview, Mode=OneWay}" />
                 <Button
+                    x:Name="NoteMarker"
+                    x:Load="{x:Bind HasNote, Mode=OneWay}"
                     Grid.Column="1"
                     MinWidth="24"
                     MinHeight="24"
@@ -76,8 +79,7 @@
                     Click="NoteMarker_Click"
                     Style="{StaticResource SubtleButtonStyle}"
                     Tag="{x:Bind}"
-                    ToolTipService.ToolTip="{x:Bind NotePeek, Mode=OneWay}"
-                    Visibility="{x:Bind HasNote, Mode=OneWay}">
+                    ToolTipService.ToolTip="{x:Bind NotePeek, Mode=OneWay}">
                     <FontIcon
                         FontFamily="/Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular"
                         FontSize="14"
@@ -151,7 +153,10 @@
             <ResourceDictionary>
                 <ResourceDictionary.ThemeDictionaries>
                     <ResourceDictionary x:Key="Light">
-                        <StaticResource x:Key="ListViewItemPlaceholderBackground" ResourceKey="SubtleFillColorSecondaryBrush" />
+                        <StaticResource x:Key="ListViewItemPlaceholderBackground" ResourceKey="SubtleFillColorTransparentBrush" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Dark">
+                        <StaticResource x:Key="ListViewItemPlaceholderBackground" ResourceKey="SubtleFillColorTransparentBrush" />
                     </ResourceDictionary>
                 </ResourceDictionary.ThemeDictionaries>
             </ResourceDictionary>
