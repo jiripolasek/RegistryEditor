@@ -2,7 +2,6 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
-#if REGEDIT_EXPERIMENTAL_TERMINAL
 using System.Text;
 using JPSoftworks.Regedit.Core.Export;
 using JPSoftworks.Regedit.Core.Registry;
@@ -39,24 +38,49 @@ public sealed partial class MainWindow
         {
             Text = "PowerShell", Icon = new FontIcon { Glyph = PowerShellGlyph }, KeyboardAcceleratorTextOverride = "Ctrl+;"
         };
-        shell.Click += (_, _) => this.OpenPowerShell();
+        shell.Click += async (_, _) => await this.OpenPowerShellAsync();
         return shell;
     }
 
-    internal void OpenPowerShell(RegistryLocation? location = null)
+    internal Task OpenPowerShellAsync(RegistryLocation? location = null)
     {
         location ??= this.ViewModel.VisibleBrowser?.Location;
-        this.OpenPowerShell(location is { IsComputer: false, Machine: null } ? location : DefaultPowerShellLocation, null);
+        return this.OpenPowerShellAsync(location is { IsComputer: false, Machine: null } ? location : DefaultPowerShellLocation, null);
     }
 
-    private void OpenPowerShell(RegistryLocation location, PowerShellRun? run)
+    private async Task OpenPowerShellAsync(RegistryLocation location, PowerShellRun? run)
     {
         if (this.ViewModel.IsClosing || this.Dialogs.IsOpen)
         {
             return;
         }
 
+        if (!this.Settings.ExperimentalTerminalEnabled)
+        {
+            if (!await this.ConfirmExperimentalTerminalAsync())
+            {
+                return;
+            }
+
+            this.Preferences.ExperimentalTerminalEnabled = true;
+            if (!this.Settings.ExperimentalTerminalEnabled)
+            {
+                return;
+            }
+        }
+
         this.ViewModel.SelectBottomTab(new PowerShellTab(location, run));
+    }
+
+    private async Task<bool> ConfirmExperimentalTerminalAsync()
+    {
+        var dialog = new AppDialog(
+            "Enable experimental terminal?",
+            "The integrated terminal is an experimental feature and may be unstable. Do you want to enable it?",
+            "Enable terminal",
+            "Cancel",
+            ContentDialogButton.Close);
+        return await this.Dialogs.ShowAsync(dialog) == ContentDialogResult.Primary;
     }
 
     private PowerShellView CreatePowerShellView(PowerShellTab tab)
@@ -243,7 +267,7 @@ public sealed partial class MainWindow
             if (await this.Dialogs.ShowAsync(dialog) == ContentDialogResult.Primary)
             {
                 var targets = changes.Select(change => change.Location).Distinct().ToArray();
-                this.OpenPowerShell(DefaultPowerShellLocation, new PowerShellRun(script, targets));
+                await this.OpenPowerShellAsync(DefaultPowerShellLocation, new PowerShellRun(script, targets));
             }
         }
         catch (Exception ex)
@@ -286,4 +310,3 @@ public sealed partial class MainWindow
         internal bool UseWindowsPowerShell { get; set; }
     }
 }
-#endif
