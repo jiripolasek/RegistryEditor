@@ -58,4 +58,7 @@
     </Project>
     <Project Path="tests/Regedit.Tests/Regedit.Tests.csproj" />
   </Folder>
+  <Folder Name="/third_party/">
+    <Project Path="third_party/Microsoft.Terminal.WinUI3/Microsoft.Terminal.WinUI3.csproj" />
+  </Folder>
 </Solution>
