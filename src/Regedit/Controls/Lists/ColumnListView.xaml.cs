@@ -286,6 +286,7 @@ public sealed partial class ColumnListView : UserControl
                 };
             }
 
+            this.InvalidateSelectionBounds();
             this.UpdateSelectAll();
             this.Items.TabFocusNavigation = this.Items.Items.Count == 0 ? KeyboardNavigationMode.Local : KeyboardNavigationMode.Once;
         };
@@ -697,6 +698,7 @@ public sealed partial class ColumnListView : UserControl
 
     private void ItemsViewChanged(object? sender, ScrollViewerViewChangedEventArgs args)
     {
+        this.InvalidateSelectionBounds();
         this.UpdateSelectionDrag();
         this.QueueVisibleChanged();
         this.DismissOffscreenEditor();

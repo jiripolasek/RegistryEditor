@@ -2,6 +2,7 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using System.Numerics;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -145,7 +146,8 @@ public sealed partial class ColumnListView
         var viewport = new Point(position.X - this.HorizontalScroll.HorizontalOffset, position.Y);
         var origin = new Point(position.X, position.Y + (scroll?.VerticalOffset ?? 0));
         var anchor = this._selectionAnchor >= 0 ? this._selectionAnchor : this.Items.SelectedIndex;
-        var start = handle is null ? this.RowsAt(position.Y) : (rowIndex, rowIndex + 1);
+        var bounds = handle is null ? new SelectionBounds() : null;
+        var start = bounds is not null ? this.RowsAt(position.Y, bounds) : (rowIndex, rowIndex + 1);
         if (start is not { } startRows)
         {
             return;
@@ -153,7 +155,12 @@ public sealed partial class ColumnListView
 
         this._selectionDrag = new SelectionDrag(
             args.Pointer, item, origin, viewport, startRows, args.KeyModifiers, anchor,
-            handle is null ? this.Items.SelectedRanges.ToArray() : [], handle);
+            handle is null ? this.Items.SelectedRanges.ToArray() : [], handle, bounds);
+        if (bounds is not null)
+        {
+            this.Items.LayoutUpdated += this.SelectionLayoutUpdated;
+            this.Items.ContainerContentChanging += this.SelectionContainerChanged;
+        }
     }
 
     private async void SelectionMoved(object sender, PointerRoutedEventArgs args)
@@ -296,6 +303,12 @@ public sealed partial class ColumnListView
     {
         var drag = this._selectionDrag;
         this._selectionDrag = null;
+        if (drag?.Bounds is not null)
+        {
+            this.Items.LayoutUpdated -= this.SelectionLayoutUpdated;
+            this.Items.ContainerContentChanging -= this.SelectionContainerChanged;
+        }
+
         if (drag is { Active: true })
         {
             this._selectionScrollTimer?.Stop();
@@ -334,7 +347,7 @@ public sealed partial class ColumnListView
 
     private void UpdateSelectionDrag()
     {
-        if (this._selectionDrag is not { Active: true } drag || this._itemsScroll is not { } scroll)
+        if (this._selectionDrag is not { Active: true, Bounds: { } bounds } drag || this._itemsScroll is not { } scroll)
         {
             return;
         }
@@ -349,14 +362,14 @@ public sealed partial class ColumnListView
         this.SelectionRectangle.Width = Math.Max(1, Math.Abs(x - originX));
         this.SelectionRectangle.Height = Math.Max(1, Math.Abs(y - originY));
 
-        if (this.RowsAt(y, drag) is not { } end)
+        if (this.RowsAt(y, bounds) is not { } end)
         {
             return;
         }
 
         var first = Math.Min(drag.StartRows.First, end.First);
         var after = Math.Max(drag.StartRows.After, end.After);
-        var ranges = drag.Intersections(first, after, Math.Min(drag.Origin.X, x), Math.Max(drag.Origin.X, x));
+        var ranges = bounds.Intersections(first, after, Math.Min(drag.Origin.X, x), Math.Max(drag.Origin.X, x));
         if (ranges.Count > 0 && drag.Modifiers.HasFlag(VirtualKeyModifiers.Shift) && drag.Anchor >= 0)
         {
             ranges[0] = (Math.Min(ranges[0].First, drag.Anchor), ranges[0].After);
@@ -371,55 +384,110 @@ public sealed partial class ColumnListView
         }
     }
 
-    // A point inside a row spans one index. A point in empty space is the gap before the next row.
-    private (int First, int After)? RowsAt(double y, SelectionDrag? drag = null)
+    private void SelectionLayoutUpdated(object? sender, object args)
     {
+        if (this._selectionDrag?.Bounds is { } bounds)
+        {
+            bounds.CheckLayout = true;
+        }
+    }
+
+    private void SelectionContainerChanged(ListViewBase sender, ContainerContentChangingEventArgs args) =>
+        this.InvalidateSelectionBounds();
+
+    private void InvalidateSelectionBounds()
+    {
+        if (this._selectionDrag?.Bounds is { } bounds)
+        {
+            bounds.Invalidated = true;
+        }
+    }
+
+    private void RefreshSelectionBounds(SelectionBounds bounds)
+    {
+        bounds.CheckLayout = false;
         if (this.Items.ItemsPanelRoot is not { } panel)
         {
-            return null;
+            bounds.Rows.Clear();
+            bounds.Panel = null;
+            return;
         }
 
-        if (drag is not null)
+        var children = panel.Children;
+        var panelOffset = panel.ActualOffset;
+        var panelSize = panel.RenderSize;
+        // Moving the rectangle also raises LayoutUpdated. Check layout values before measuring the rows again.
+        if (!bounds.Invalidated && ReferenceEquals(bounds.Panel, panel)
+            && bounds.ChildCount == children.Count && bounds.PanelOffset == panelOffset && bounds.PanelSize == panelSize
+            && bounds.Rows.TrueForAll(row => row.Offset == row.Element.ActualOffset && row.Size == row.Element.RenderSize))
         {
-            drag.PanelBounds = panel.TransformToVisual(this.Items).TransformBounds(new Rect(0, 0, panel.ActualWidth, panel.ActualHeight));
+            return;
         }
 
+        bounds.Invalidated = false;
+        bounds.Panel = panel;
+        bounds.ChildCount = children.Count;
+        bounds.PanelOffset = panelOffset;
+        bounds.PanelSize = panelSize;
+        bounds.PanelBounds = panel.TransformToVisual(this.Items).TransformBounds(new Rect(0, 0, panel.ActualWidth, panel.ActualHeight));
+        bounds.Rows.Clear();
         // Native AOT can expose the virtualizing panel as Panel. Its realized children still map to native item indices.
-        var previous = -1;
-        var next = int.MaxValue;
-        var hit = -1;
-        foreach (var item in panel.Children)
+        foreach (var item in children)
         {
             var index = this.Items.IndexFromContainer(item);
-            if (index < 0 || item.RenderSize.Height <= 0)
+            if (index < 0)
             {
                 continue;
             }
 
-            var bounds = item.TransformToVisual(this.Items).TransformBounds(new Rect(default, item.RenderSize));
-            if (drag is not null)
+            var size = item.RenderSize;
+            var rect = size.Height > 0 ? item.TransformToVisual(this.Items).TransformBounds(new Rect(default, size)) : Rect.Empty;
+            bounds.Rows.Add(new SelectionRow(item, index, item.ActualOffset, size, rect));
+            if (size.Height <= 0)
             {
-                if (bounds.Left == drag.PanelBounds.Left && bounds.Right == drag.PanelBounds.Right)
-                {
-                    drag.CustomBounds.Remove(index);
-                }
-                else
-                {
-                    drag.CustomBounds[index] = (bounds.Left, bounds.Right);
-                }
+                continue;
             }
 
-            if (y < bounds.Top)
+            if (rect.Left == bounds.PanelBounds.Left && rect.Right == bounds.PanelBounds.Right)
             {
-                next = Math.Min(next, index);
+                bounds.CustomBounds.Remove(index);
             }
-            else if (y >= bounds.Bottom)
+            else
             {
-                previous = Math.Max(previous, index);
+                bounds.CustomBounds[index] = (rect.Left, rect.Right);
+            }
+        }
+    }
+
+    // A point inside a row spans one index. A point in empty space is the gap before the next row.
+    private (int First, int After)? RowsAt(double y, SelectionBounds bounds)
+    {
+        if (bounds.Invalidated || bounds.CheckLayout)
+        {
+            this.RefreshSelectionBounds(bounds);
+        }
+
+        var previous = -1;
+        var next = int.MaxValue;
+        var hit = -1;
+        foreach (var row in bounds.Rows)
+        {
+            if (row.Size.Height <= 0)
+            {
+                continue;
+            }
+
+            if (y < row.Bounds.Top)
+            {
+                next = Math.Min(next, row.Index);
+            }
+            else if (y >= row.Bounds.Bottom)
+            {
+                previous = Math.Max(previous, row.Index);
             }
             else if (hit < 0)
             {
-                hit = index;
+                hit = row.Index;
             }
             else
             {
@@ -507,7 +575,8 @@ public sealed partial class ColumnListView
         VirtualKeyModifiers modifiers,
         int anchor,
         ItemIndexRange[] originalSelection,
-        FrameworkElement? handle)
+        FrameworkElement? handle,
+        SelectionBounds? bounds)
     {
         internal readonly Pointer Pointer = pointer;
         internal readonly ListViewItem? Item = item;
@@ -518,13 +587,27 @@ public sealed partial class ColumnListView
         internal readonly (int First, int After) StartRows = startRows;
         internal readonly int Anchor = anchor;
         internal readonly ItemIndexRange[] OriginalSelection = originalSelection;
-        internal readonly SortedDictionary<int, (double Left, double Right)> CustomBounds = [];
+        internal readonly SelectionBounds? Bounds = bounds;
         internal VirtualKeyModifiers Modifiers = modifiers;
         internal Point Position = pressPosition;
-        internal Rect PanelBounds = Rect.Empty;
         internal List<(int First, int After)>? LastRanges;
         internal VirtualKeyModifiers LastModifiers;
         internal bool Active;
+    }
+
+    private readonly record struct SelectionRow(UIElement Element, int Index, Vector3 Offset, Size Size, Rect Bounds);
+
+    private sealed class SelectionBounds
+    {
+        internal readonly List<SelectionRow> Rows = [];
+        internal readonly SortedDictionary<int, (double Left, double Right)> CustomBounds = [];
+        internal Panel? Panel;
+        internal Vector3 PanelOffset;
+        internal Size PanelSize;
+        internal Rect PanelBounds = Rect.Empty;
+        internal int ChildCount;
+        internal bool Invalidated = true;
+        internal bool CheckLayout;
 
         // Keep measured exceptions as rows scroll out. Stretched rows share the panel's horizontal bounds.
         internal List<(int First, int After)> Intersections(int first, int after, double left, double right)

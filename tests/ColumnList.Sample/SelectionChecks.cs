@@ -283,6 +283,15 @@ internal static partial class ComponentChecks
         var besideNarrow = (start.X, MouseInput.ToScreen(window, narrow, new Point(0, narrow.ActualHeight / 2)).Y);
         await StartDrag(start, besideNarrow);
         check(Selected(1, 2), "Ending beside a narrow row keeps intersected wider rows selected");
+        narrow.Width = list.ActualWidth;
+        list.UpdateLayout();
+        var wider = (besideNarrow.X + 12, besideNarrow.Y);
+        await MouseInput.GlideAsync(besideNarrow, wider, 5);
+        check(Selected(1, 2, 3), "A row that widens during a drag joins the rectangle");
+        narrow.Width = 76;
+        list.UpdateLayout();
+        await MouseInput.GlideAsync(wider, besideNarrow, 5);
+        check(Selected(1, 2), "A row that narrows during a drag leaves the rectangle");
         await MouseInput.GlideAsync(besideNarrow, (start.X, Row(4).Y), 5);
         await MouseInput.UpAsync();
         check(Selected(1, 2, 4), "A rectangle crossing two wide rows skips a narrow row outside its bounds");
