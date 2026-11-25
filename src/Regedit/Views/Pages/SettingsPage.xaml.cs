@@ -25,17 +25,16 @@ public sealed partial class SettingsPage : Page
 
     private string AppVersion => $"Version {typeof(SettingsPage).Assembly.GetName().Version?.ToString(3)}";
 
-#if REGEDIT_EXPERIMENTAL_TERMINAL
     private Visibility TerminalSettingsVisibility => Visibility.Visible;
 
-    internal void ShowTerminalSettings() => this.ShowShortcuts(false, this.PowerShellPathBox);
-#else
-    private Visibility TerminalSettingsVisibility => Visibility.Collapsed;
-#endif
+    private readonly Func<Task<bool>> _confirmExperimentalTerminal;
 
-    internal SettingsPage(SettingsViewModel viewModel)
+    internal void ShowTerminalSettings() => this.ShowShortcuts(false, this.PowerShellPathBox);
+
+    internal SettingsPage(SettingsViewModel viewModel, Func<Task<bool>> confirmExperimentalTerminal)
     {
         this.ViewModel = viewModel;
+        this._confirmExperimentalTerminal = confirmExperimentalTerminal;
         this.InitializeComponent();
         this.Unloaded += (_, _) => this.CancelDeferredFocus();
         this.AddShortcutGroup(
@@ -63,9 +62,7 @@ public sealed partial class SettingsPage : Page
         this.AddShortcutGroup(
             "Tools and favorites", ("Open / close the right sidebar", "F9"), ("Open / close the bottom panel", "Ctrl+J"),
             ("Show or hide the Favorites bar", "Ctrl+Shift+B"), ("Open Favorites in the sidebar", "Ctrl+Shift+O"),
-#if REGEDIT_EXPERIMENTAL_TERMINAL
             ("Open a PowerShell terminal", "Ctrl+;"),
-#endif
             ("Add or remove the selected key or current location in Favorites", "Ctrl+D"), ("Save the current note in Notes", "Ctrl+S"));
         this.AddShortcutGroup(
             "Registry file editor", ("Open the File menu", "Alt+F"), ("Open / save a registry file", "Ctrl+O / Ctrl+S"),
@@ -79,6 +76,34 @@ public sealed partial class SettingsPage : Page
     private async void FontExpander_Expanded(object? sender, EventArgs args)
     {
         await this.ViewModel.LoadFontFamiliesAsync(SystemFonts.GetFontFamilies);
+    }
+
+    private async void ExperimentalTerminal_Toggled(object sender, RoutedEventArgs args)
+    {
+        if (sender is not ToggleSwitch toggle || toggle.IsOn == this.ViewModel.ExperimentalTerminalEnabled)
+        {
+            return;
+        }
+
+        if (!toggle.IsOn)
+        {
+            this.ViewModel.ExperimentalTerminalEnabled = false;
+            return;
+        }
+
+        toggle.IsEnabled = false;
+        toggle.IsOn = false;
+        try
+        {
+            if (await this._confirmExperimentalTerminal())
+            {
+                this.ViewModel.ExperimentalTerminalEnabled = true;
+            }
+        }
+        finally
+        {
+            toggle.IsEnabled = true;
+        }
     }
 
     private void AddShortcutGroup(string heading, params (string Action, string Keys)[] shortcuts)

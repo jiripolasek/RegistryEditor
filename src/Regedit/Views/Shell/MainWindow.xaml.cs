@@ -193,7 +193,6 @@ public sealed partial class MainWindow : Window
         this.ApplyBackdrop();
         preferences.PreferenceSaved += property =>
         {
-#if REGEDIT_EXPERIMENTAL_TERMINAL
             if (property == nameof(SettingsViewModel.OfferWindowsPowerShellFallback))
             {
                 foreach (var terminal in this._views.Values.OfType<PowerShellView>())
@@ -201,7 +200,6 @@ public sealed partial class MainWindow : Window
                     terminal.RefreshRecoveryActions();
                 }
             }
-#endif
             if (property == nameof(SettingsViewModel.ThemeIndex))
             {
                 this.ApplyTheme(this.Settings.Theme);
@@ -247,9 +245,7 @@ public sealed partial class MainWindow : Window
         this.ViewModel.TabClosed += this.ReleaseView;
         this.ViewModel.SearchFocusRequested += () => (this.SelectedTabContent as BrowserPage)?.FocusSearch();
         this.ViewModel.CloseRequested += this.RequestClose;
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         this.InitializeTerminalMenu();
-#endif
         this.ApplyPanelTabPosition();
         this.ShellStateChanged(this.ViewModel, new PropertyChangedEventArgs(nameof(MainWindowViewModel.ActiveTab)));
         this.ShowBottomContent();
@@ -461,11 +457,9 @@ public sealed partial class MainWindow : Window
         view = tab switch
         {
             BrowserTab browser => new BrowserPage(this, browser.Browser, browser.InitialValue),
-            SettingsTab => new SettingsPage(this.Preferences),
+            SettingsTab => new SettingsPage(this.Preferences, this.ConfirmExperimentalTerminalAsync),
             ToolTab tool => (FrameworkElement)this.CreateTool(tool.Tool),
-#if REGEDIT_EXPERIMENTAL_TERMINAL
             PowerShellTab shell => this.CreatePowerShellView(shell),
-#endif
             RegistryUsageTab usage => new RegistryUsagePage(this, usage),
             InvestigationViewModel investigation => new InvestigationPage(
                 investigation, this.Dialogs, this.Notifications, this.Settings.ListRowPadding, this.ColumnLayouts),
@@ -514,11 +508,9 @@ public sealed partial class MainWindow : Window
             case InvestigationPage investigation:
                 investigation.DismissNotification();
                 break;
-#if REGEDIT_EXPERIMENTAL_TERMINAL
             case PowerShellView terminal:
                 terminal.Dispose();
                 break;
-#endif
         }
     }
 
@@ -553,12 +545,10 @@ public sealed partial class MainWindow : Window
         {
             this.ShowBottomContent();
         }
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         else if (args.PropertyName == nameof(MainWindowViewModel.IsDialogOpen))
         {
             this.UpdateTerminalVisibility();
         }
-#endif
     }
 
     private void UpdateTitle()
@@ -613,7 +603,7 @@ public sealed partial class MainWindow : Window
         args.Handled = true;
     }
 
-    private void Shortcuts_KeyDown(object sender, KeyRoutedEventArgs args)
+    private async void Shortcuts_KeyDown(object sender, KeyRoutedEventArgs args)
     {
         static bool Down(VirtualKey key)
         {
@@ -639,19 +629,16 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         var semicolon = VkKeyScan(';');
         // AltGr can synthesize left Ctrl. Require right Ctrl when typing a semicolon needs AltGr.
         if (Matches(semicolon) && ((semicolon & 0x600) != 0x600 || Down(VirtualKey.RightControl)))
         {
+            args.Handled = true;
             if (!args.KeyStatus.WasKeyDown)
             {
-                this.OpenPowerShell();
+                await this.OpenPowerShellAsync();
             }
-
-            args.Handled = true;
         }
-#endif
     }
 
     private void NewTab_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

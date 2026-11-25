@@ -86,12 +86,10 @@ public sealed partial class ToolView
                 Command = actions.CopyPowerShellCommand,
                 Icon = new FontIcon { Glyph = SymbolGlyphs.Get(Symbol.Copy) }
             });
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         ListContextMenu.Add(
             menu, "Review PowerShell script…",
             async () => await this._window.ReviewPowerShellScriptAsync(actions.SelectedChanges),
             actions.CopyPowerShellCommand.CanExecute(null));
-#endif
         menu.Items.Add(
             new MenuFlyoutItem
             {

@@ -400,12 +400,10 @@ public sealed partial class BrowserPage : Page
         UpdateHiveSwitchMenu(this.TreeSwitchHiveMenu, this._treeContextLocation);
         this.TreeWebSearchMenu.IsEnabled = this._treeContextLocation is { IsComputer: false };
         this.TreeUsageMenu.IsEnabled = this.TreeWebSearchMenu.IsEnabled;
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         this.TreePowerShellMenu.Visibility = Visibility.Visible;
         this.TreePowerShellMenu.IsEnabled = this._treeContextLocation is { IsComputer: false, Machine: null };
         this.TreeUseKeyInPowerShellMenu.Visibility = Visibility.Visible;
         this.TreeUseKeyInPowerShellMenu.IsEnabled = this._window.CanShowKeyInPowerShell(this._treeContextLocation);
-#endif
         this.TreeExportMenu.CommandParameter = this.TreePermissionsMenu.CommandParameter = this._treeContextLocation;
         this.TreeRenameMenu.CommandParameter = this.TreeDeleteMenu.CommandParameter = this._treeContextLocation;
         if (this._treeContextLocation is not { } location)
@@ -754,21 +752,17 @@ public sealed partial class BrowserPage : Page
         this.ViewModel.SearchWebCommand.Execute((this._treeContextLocation, null));
     }
 
-    private void TreeOpenPowerShell_Click(object sender, RoutedEventArgs args)
+    private async void TreeOpenPowerShell_Click(object sender, RoutedEventArgs args)
     {
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         if (this._treeContextLocation is { } location)
         {
-            this._window.OpenPowerShell(location);
+            await this._window.OpenPowerShellAsync(location);
         }
-#endif
     }
 
     private void TreeUseKeyInPowerShell_Click(object sender, RoutedEventArgs args)
     {
-#if REGEDIT_EXPERIMENTAL_TERMINAL
         _ = this._window.ShowKeyInPowerShellAsync(this._treeContextLocation);
-#endif
     }
 
     private void CurrentWebSearch_Click(object sender, RoutedEventArgs args)
