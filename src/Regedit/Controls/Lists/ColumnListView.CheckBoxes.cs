@@ -37,6 +37,27 @@ public sealed partial class ColumnListView
         }
     }
 
+    private void InitializeSelectAllReveal()
+    {
+        var box = this.SelectAllBox;
+        var pointerOverHeader = false;
+
+        void Refresh() => box.Opacity = pointerOverHeader || box.IsChecked != false || box.FocusState == FocusState.Keyboard ? 1 : 0;
+
+        void SetPointerOver(bool value)
+        {
+            pointerOverHeader = value;
+            Refresh();
+        }
+
+        this.Header.AddHandler(PointerEnteredEvent, new PointerEventHandler((_, _) => SetPointerOver(true)), true);
+        this.Header.AddHandler(PointerExitedEvent, new PointerEventHandler((_, _) => SetPointerOver(false)), true);
+        this.Header.Unloaded += (_, _) => SetPointerOver(false);
+        box.RegisterPropertyChangedCallback(ToggleButton.IsCheckedProperty, (_, _) => Refresh());
+        box.RegisterPropertyChangedCallback(FocusStateProperty, (_, _) => Refresh());
+        Refresh();
+    }
+
     private void UpdateCheckBoxPresentation()
     {
         var enabled = this.EffectiveCheckBoxes != SelectionCheckBoxMode.Default;

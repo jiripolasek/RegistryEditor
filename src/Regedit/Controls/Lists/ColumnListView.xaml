@@ -68,7 +68,37 @@
                     TabIndex="0"
                     ToolTipService.ToolTip="Select or clear all items"
                     Unchecked="SelectAllToggled"
-                    Visibility="Collapsed" />
+                    Visibility="Collapsed">
+                    <CheckBox.Resources>
+                        <ResourceDictionary>
+                            <ResourceDictionary.ThemeDictionaries>
+                                <ResourceDictionary x:Key="Light">
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundFillIndeterminate" ResourceKey="CheckBoxCheckBackgroundFillUnchecked" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" ResourceKey="CheckBoxCheckBackgroundFillUncheckedPointerOver" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" ResourceKey="CheckBoxCheckBackgroundFillUncheckedPressed" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeIndeterminate" ResourceKey="ControlStrokeColorDefaultBrush" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeIndeterminatePointerOver" ResourceKey="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeIndeterminatePressed" ResourceKey="CheckBoxCheckBackgroundStrokeUncheckedPressed" />
+                                    <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminate" ResourceKey="TextFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" ResourceKey="TextFillColorSecondaryBrush" />
+                                </ResourceDictionary>
+                                <ResourceDictionary x:Key="Dark">
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundFillIndeterminate" ResourceKey="CheckBoxCheckBackgroundFillUnchecked" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" ResourceKey="CheckBoxCheckBackgroundFillUncheckedPointerOver" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" ResourceKey="CheckBoxCheckBackgroundFillUncheckedPressed" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeIndeterminate" ResourceKey="ControlStrokeColorDefaultBrush" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeIndeterminatePointerOver" ResourceKey="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" />
+                                    <StaticResource x:Key="CheckBoxCheckBackgroundStrokeIndeterminatePressed" ResourceKey="CheckBoxCheckBackgroundStrokeUncheckedPressed" />
+                                    <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminate" ResourceKey="TextFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" ResourceKey="TextFillColorSecondaryBrush" />
+                                </ResourceDictionary>
+                                <ResourceDictionary x:Key="HighContrast" />
+                            </ResourceDictionary.ThemeDictionaries>
+                        </ResourceDictionary>
+                    </CheckBox.Resources>
+                </CheckBox>
             </local:ColumnHeaderRow>
             <ListView
                 x:Name="Items"
