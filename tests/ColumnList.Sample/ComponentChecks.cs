@@ -731,6 +731,7 @@ internal static partial class ComponentChecks
             File.Delete(page.LayoutFile);
             registry.ResetLayout();
             await CommandIconChecks.RunAsync(window, Check);
+            await CheckFocusDuringReloadAsync(window, Check);
         }
         catch (Exception ex)
         {
@@ -748,6 +749,57 @@ internal static partial class ComponentChecks
         File.WriteAllText(
             output, JsonSerializer.Serialize(new { passed, largeList, failure }, new JsonSerializerOptions { WriteIndented = true }));
         Environment.ExitCode = failure is null ? 0 : 1;
+    }
+
+    private static async Task CheckFocusDuringReloadAsync(Window window, Action<bool, string> check)
+    {
+        var content = window.Content;
+        var list = new ColumnListView { Height = 120, ItemsSource = new[] { "Source" }, KeepFocusOnItemsSourceChange = true };
+        var address = new TextBox();
+        var panel = new StackPanel { Children = { list, address } };
+        window.Content = panel;
+        try
+        {
+            await WaitAsync(() => list.ListView.ContainerFromIndex(0) is ListViewItem);
+            var row = (ListViewItem)list.ListView.ContainerFromIndex(0);
+            row.Focus(FocusState.Keyboard);
+
+            object? Focused() => FocusManager.GetFocusedElement(list.XamlRoot);
+            check(ReferenceEquals(Focused(), row), "Reload starts with focus on a row");
+
+            list.SelectFirstOnNextItemsSourceChange = true;
+            list.ItemsSource = new[] { "First", "Second" };
+            await WaitAsync(() => Focused() is ListViewItem { Content: "First" }, () => $"Focus after reload: {Focused()}");
+            check(list.ListView.SelectedItem is "First", "Navigation selects and focuses the first destination row");
+
+            list.SelectFirstOnNextItemsSourceChange = true;
+            list.ItemsSource = new[] { "First", "Restored" };
+            list.ListView.SelectedIndex = 1;
+            await WaitAsync(() => Focused() is ListViewItem { Content: "Restored" }, () => $"Focus after history navigation: {Focused()}");
+            check(list.ListView.SelectedItem is "Restored", "Navigation focuses a restored selection instead of the first row");
+
+            list.ItemsSource = Array.Empty<string>();
+            await WaitAsync(() => ReferenceEquals(Focused(), list.ListView), () => $"Focus after empty reload: {Focused()}");
+            check(ReferenceEquals(Focused(), list.ListView), "An empty reload keeps focus on the list");
+
+            list.ItemsSource = new[] { "Source" };
+            await WaitAsync(() => list.ListView.ContainerFromIndex(0) is ListViewItem);
+            ((ListViewItem)list.ListView.ContainerFromIndex(0)).Focus(FocusState.Keyboard);
+
+            var load = new TaskCompletionSource<string[]>();
+            async Task PublishRowsAsync() => list.ItemsSource = await load.Task;
+            var pending = PublishRowsAsync();
+
+            address.Focus(FocusState.Keyboard);
+            load.SetResult(["Destination"]);
+            await pending;
+            await WaitAsync(() => list.ListView.ContainerFromIndex(0) is ListViewItem { Content: "Destination" });
+            check(ReferenceEquals(Focused(), address), "Reload preserves focus moved away while loading");
+        }
+        finally
+        {
+            window.Content = content;
+        }
     }
 
     private static ColumnRow FirstRow(ColumnListView list)
