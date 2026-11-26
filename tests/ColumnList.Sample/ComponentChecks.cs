@@ -730,8 +730,8 @@ internal static partial class ComponentChecks
                 && registry.CurrentWidth("Type") == 140, "Stale saved layouts are normalized against the declared columns");
             File.Delete(page.LayoutFile);
             registry.ResetLayout();
-            await CheckFocusDuringReloadAsync(window, Check);
             await CommandIconChecks.RunAsync(window, Check);
+            await CheckFocusDuringReloadAsync(window, Check);
         }
         catch (Exception ex)
         {
