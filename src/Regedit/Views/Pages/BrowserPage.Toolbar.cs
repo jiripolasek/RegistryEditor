@@ -24,7 +24,8 @@ public sealed partial class BrowserPage
         this.PathRow.ContextFlyout = this.ToolbarShortcuts.ContextFlyout = this.ToolsButton.ContextFlyout = contextMenu;
         this.FavoritesBar.ContextFlyout = this._favoriteBarContextMenu;
         this._favoriteBarContextMenu.Opening += (_, _) => this.PopulateFavoriteBarContextMenu();
-        this.FavoriteBarOverflowButton.Flyout = this._window.CreateFavoritesMenu(rootItems: this.OverflowFavoriteItems);
+        this.AttachFavoriteBarMenu(this.FavoriteBarOverflowButton,
+            this._window.CreateFavoritesMenu(rootItems: this.OverflowFavoriteItems));
         this.UpdateToolbar();
     }
 
