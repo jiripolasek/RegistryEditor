@@ -2,17 +2,22 @@
 // Copyright (c) Jiri Polasek. All rights reserved.
 // ------------------------------------------------------------
 
+using System.ComponentModel;
 using JPSoftworks.Regedit.Controls.Lists;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Registry;
+using JPSoftworks.Regedit.ViewModels;
 using JPSoftworks.Regedit.ViewModels.Tools;
 using JPSoftworks.Regedit.Views.Shell;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
+using Windows.UI.Core;
 
 namespace JPSoftworks.Regedit.Views.Pages;
 
@@ -22,7 +27,13 @@ public sealed partial class RegistryUsagePage : Page
 
     internal RegistryUsageTab ViewModel { get; }
 
+    private SettingsViewModel Preferences => this._window.Preferences;
+
     internal Button MenuButton => this.PageHeader.MenuButton;
+
+    internal ListView ResultsList => this.Subkeys.ListView;
+
+    internal void FocusResults() => this.ResultsList.Focus(FocusState.Keyboard);
 
     internal RegistryUsagePage(MainWindow window, RegistryUsageTab viewModel)
     {
@@ -30,11 +41,27 @@ public sealed partial class RegistryUsagePage : Page
         this._window = window;
         this.InitializeComponent();
         this.UsageToolbar.HideUtilities();
+        this.Subkeys.KeepFocusOnItemsSourceChange = true;
+        this.Loaded += (_, _) =>
+        {
+            this.Preferences.PropertyChanged += this.Preferences_PropertyChanged;
+            this.ViewModel.ShowParentKeyInList = this.Preferences.ShowParentKeyInList;
+        };
+        this.Unloaded += (_, _) => this.Preferences.PropertyChanged -= this.Preferences_PropertyChanged;
+        viewModel.PropertyChanging += (_, args) =>
+        {
+            if (args.PropertyName == nameof(RegistryUsageTab.Rows))
+            {
+                this.Subkeys.SelectFirstOnNextItemsSourceChange = true;
+            }
+        };
 
         this.Subkeys.Columns.Add(new ListColumn
         {
             Id = "Subkey", Header = "Subkey", MinWidth = 120, FillWeight = 5, CanHide = false,
-            CellText = item => (item as RegistryUsageEntry)?.Location.Name
+            CellText = item => item is RegistryUsageEntry row
+                ? this.ViewModel.IsParentRow(row) ? ".." : row.Location.Name
+                : null
         });
         this.Subkeys.Columns.Add(NumberColumn("ValueData", "Value data (bytes)", 120, row => row.ValueDataBytes));
         this.Subkeys.Columns.Add(NumberColumn("Keys", "Keys", 72, row => row.KeyCount));
@@ -46,19 +73,66 @@ public sealed partial class RegistryUsagePage : Page
         });
         this.Subkeys.ItemAutomationName = item => item switch
         {
+            RegistryUsageEntry row when this.ViewModel.IsParentRow(row) => ".., Parent key",
             RegistryUsageEntry { KeyCount: 0 } row => $"{row.Location.Name}, unavailable. {RowStatusHelp(row.KeyCount, row.SkippedBranches)}",
             RegistryUsageEntry row => $"{row.Location.Name}, {RegistryUsageTab.FormatCount(row.ValueDataBytes, "byte")}"
                                       + $", {RegistryUsageTab.FormatCount(row.KeyCount, "key")}, {RegistryUsageTab.FormatCount(row.ValueCount, "value")}"
                                       + (row.SkippedBranches > 0 ? $", partial results. {RowStatusHelp(row.KeyCount, row.SkippedBranches)}" : string.Empty),
             _ => null
         };
-        var list = this.Subkeys.ListView;
+        var list = this.ResultsList;
         AutomationProperties.SetName(list, "Subkeys by value data size");
         AutomationProperties.SetAutomationId(list, "RegistryUsageSubkeys");
-        list.SelectionChanged += (_, _) => this.OpenSubkeyButton.CommandParameter = (list.SelectedItem as RegistryUsageEntry)?.Location;
+        list.Loaded += this.ResultsList_FirstLoaded;
+        list.SelectionChanged += (_, _) => this.ViewModel.SelectedSubkey = (list.SelectedItem as RegistryUsageEntry)?.Location;
+        viewModel.SelectionRequested += location =>
+            list.SelectedItem = viewModel.Rows.FirstOrDefault(row => location.IsSameLocation(row.Location));
         list.DoubleTapped += this.Subkey_DoubleTapped;
         list.PreviewKeyDown += this.Subkey_PreviewKeyDown;
         ListContextMenu.Attach(list, this.CreateSubkeyMenu);
+    }
+
+    private void SubkeyIcon_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        var children = ((Grid)sender).Children;
+        var subkeyIcon = (FontIcon)children[0];
+        var parentIcon = (PathIcon)children[1];
+        var isParentRow = args.NewValue is RegistryUsageEntry row && this.ViewModel.IsParentRow(row);
+        subkeyIcon.Visibility = isParentRow ? Visibility.Collapsed : Visibility.Visible;
+        parentIcon.Visibility = isParentRow ? Visibility.Visible : Visibility.Collapsed;
+        if (isParentRow && parentIcon.Data is null)
+        {
+            parentIcon.Data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry),
+                Application.Current.Resources["RegistryParentIconData"]);
+        }
+    }
+
+    private void ResultsList_FirstLoaded(object sender, RoutedEventArgs args)
+    {
+        this.ResultsList.Loaded -= this.ResultsList_FirstLoaded;
+        if (this.ResultsList.XamlRoot is not { } root)
+        {
+            return;
+        }
+
+        var focused = FocusManager.GetFocusedElement(root);
+        this.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (this.ResultsList.IsLoaded && this.ResultsList.XamlRoot == root
+                && ReferenceEquals(this._window.ViewModel.ActiveTab, this.ViewModel) && !this._window.Dialogs.IsOpen
+                && ReferenceEquals(FocusManager.GetFocusedElement(root), focused))
+            {
+                this.FocusResults();
+            }
+        });
+    }
+
+    private void Preferences_PropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(SettingsViewModel.ShowParentKeyInList))
+        {
+            this.ViewModel.ShowParentKeyInList = this.Preferences.ShowParentKeyInList;
+        }
     }
 
     private MenuFlyout? CreateSubkeyMenu()
@@ -69,9 +143,11 @@ public sealed partial class RegistryUsagePage : Page
         }
 
         var menu = new MenuFlyout();
+        var open = this.ViewModel.IsParentRow(row) ? "Open parent key" : "Open subkey";
+        var target = new RegistryUsageTab.ScanTarget(row.Location);
         ListContextMenu.Add(
-            menu, "Open subkey", () => this._window.RunAfterMenuCloses(menu, () => this.TryOpenSubkey(row)),
-            this.ViewModel.ScanCommand.CanExecute(row.Location), icon: Symbol.OpenFile, shortcut: "Enter");
+            menu, open, () => this._window.RunAfterMenuCloses(menu, () => this.TryScan(target)),
+            this.ViewModel.ScanCommand.CanExecute(target), icon: Symbol.OpenFile, shortcut: "Enter");
         ListContextMenu.Add(
             menu, "Open in browser", () => this._window.RunAfterMenuCloses(menu, () => this._window.ViewModel.OpenBrowser(row.Location)),
             iconSource: (IconSource)Application.Current.Resources["OpenInNewTabIcon"]);
@@ -102,6 +178,32 @@ public sealed partial class RegistryUsagePage : Page
     private static string ScanProgressText(bool isCancellationRequested) =>
         isCancellationRequested ? "Canceling scan…" : "Scanning registry branch…";
 
+    private void Page_PreviewKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key is not (VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Back or VirtualKey.F5)
+            || this._window.Dialogs.IsOpen)
+        {
+            return;
+        }
+
+        static bool Down(VirtualKey key) => (InputKeyboardSource.GetKeyStateForCurrentThread(key) & CoreVirtualKeyStates.Down) != 0;
+        var needsAlt = args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up;
+        if (Down(VirtualKey.Menu) != needsAlt || Down(VirtualKey.Control) || Down(VirtualKey.Shift)
+            || Down(VirtualKey.LeftWindows) || Down(VirtualKey.RightWindows))
+        {
+            return;
+        }
+
+        this.TryScan(args.Key switch
+        {
+            VirtualKey.Left or VirtualKey.Back => this.ViewModel.BackTarget,
+            VirtualKey.Right => this.ViewModel.ForwardTarget,
+            VirtualKey.Up => this.ViewModel.UpTarget,
+            _ => this.ViewModel.CurrentTarget
+        });
+        args.Handled = true;
+    }
+
     private void Subkey_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args)
     {
         for (var source = args.OriginalSource as DependencyObject;
@@ -110,7 +212,7 @@ public sealed partial class RegistryUsagePage : Page
         {
             if (source is ListViewItem { Content: RegistryUsageEntry row })
             {
-                args.Handled = this.TryOpenSubkey(row);
+                args.Handled = this.TryScan(new(row.Location));
                 return;
             }
         }
@@ -118,20 +220,27 @@ public sealed partial class RegistryUsagePage : Page
 
     private void Subkey_PreviewKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key == VirtualKey.Enter && sender is ListView { SelectedItem: RegistryUsageEntry row })
+        if (args.Key != VirtualKey.Enter || sender is not ListView list)
         {
-            args.Handled = this.TryOpenSubkey(row);
+            return;
+        }
+
+        var focused = (FocusManager.GetFocusedElement(list.XamlRoot) as ListViewItem)?.Content as RegistryUsageEntry;
+        if ((focused ?? list.SelectedItem as RegistryUsageEntry) is { } row)
+        {
+            list.SelectedItem = row;
+            args.Handled = this.TryScan(new(row.Location));
         }
     }
 
-    private bool TryOpenSubkey(RegistryUsageEntry row)
+    private bool TryScan(RegistryUsageTab.ScanTarget? target)
     {
-        if (!this.ViewModel.ScanCommand.CanExecute(row.Location))
+        if (!this.ViewModel.ScanCommand.CanExecute(target))
         {
             return false;
         }
 
-        this.ViewModel.ScanCommand.Execute(row.Location);
+        this.ViewModel.ScanCommand.Execute(target);
         return true;
     }
 
