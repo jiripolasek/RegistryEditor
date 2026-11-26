@@ -48,7 +48,7 @@ public sealed partial class ColumnListView : UserControl
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
         nameof(ItemsSource), typeof(object), typeof(ColumnListView),
-        new PropertyMetadata(null, (owner, args) => ((ColumnListView)owner).Items.ItemsSource = args.NewValue));
+        new PropertyMetadata(null, (owner, args) => ((ColumnListView)owner).SetItemsSource(args.NewValue)));
 
     public static readonly DependencyProperty SelectionModeProperty = DependencyProperty.Register(
         nameof(SelectionMode), typeof(ListViewSelectionMode), typeof(ColumnListView),
@@ -127,6 +127,10 @@ public sealed partial class ColumnListView : UserControl
         get => this.GetValue(ItemsSourceProperty);
         set => this.SetValue(ItemsSourceProperty, value);
     }
+
+    internal bool KeepFocusOnItemsSourceChange { get; set; }
+
+    internal bool SelectFirstOnNextItemsSourceChange { get; set; }
 
     public ListViewSelectionMode SelectionMode
     {
@@ -846,6 +850,78 @@ public sealed partial class ColumnListView : UserControl
         return true;
     }
 
+    private void SetItemsSource(object? source)
+    {
+        var selectFirst = this.SelectFirstOnNextItemsSourceChange;
+        this.SelectFirstOnNextItemsSourceChange = false;
+        var root = this.KeepFocusOnItemsSourceChange ? this.Items.XamlRoot : null;
+        var previous = root is not null ? FocusManager.GetFocusedElement(root) as DependencyObject : null;
+        var hadListFocus = previous == this.Items || this.IsFocusInRow(previous);
+        this.Items.ItemsSource = source;
+
+        if (!hadListFocus || root is null || FocusManager.GetFocusedElement(root) is not UIElement fallback)
+        {
+            return;
+        }
+
+        var focusStayedInList = fallback == this.Items || this.IsFocusInRow(fallback);
+        if (focusStayedInList && !selectFirst)
+        {
+            return;
+        }
+
+        // Navigation can restore a selection after replacing the rows, so wait before choosing the focus target.
+        var focusMoved = false;
+        void LosingFallbackFocus(UIElement sender, LosingFocusEventArgs args) => focusMoved = true;
+
+        fallback.LosingFocus += LosingFallbackFocus;
+        if (!this.DispatcherQueue.TryEnqueue(() =>
+            {
+                fallback.LosingFocus -= LosingFallbackFocus;
+                if (!focusMoved && this.Items.IsLoaded && this.Items.XamlRoot == root
+                    && ReferenceEquals(FocusManager.GetFocusedElement(root), fallback))
+                {
+                    if (selectFirst && this.Items.SelectedIndex < 0 && this.Items.Items.Count > 0)
+                    {
+                        this.Items.SelectedIndex = 0;
+                    }
+
+                    if (!focusStayedInList)
+                    {
+                        this.Items.Focus(FocusState.Keyboard);
+                    }
+                    else if (this.Items.SelectedItem is { } item && this.RealizeFocusRow(item) is { } row
+                             && ReferenceEquals(FocusManager.GetFocusedElement(root), fallback))
+                    {
+                        row.Focus(FocusState.Keyboard);
+                    }
+                }
+            }))
+        {
+            fallback.LosingFocus -= LosingFallbackFocus;
+        }
+    }
+
+    private bool IsFocusInRow(DependencyObject? element)
+    {
+        for (; element is not null && element != this.Items; element = VisualTreeHelper.GetParent(element))
+        {
+            if (element is ListViewItem item && this.Items.IndexFromContainer(item) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private ListViewItem? RealizeFocusRow(object item)
+    {
+        this.Items.ScrollIntoView(item);
+        this.Items.UpdateLayout();
+        return this.Items.ContainerFromItem(item) as ListViewItem;
+    }
+
     private void ItemsGettingFocus(UIElement sender, GettingFocusEventArgs args)
     {
         if (args.FocusState == FocusState.Keyboard && args.NewFocusedElement is ListViewItem focused && !ModifierDown())
@@ -860,9 +936,7 @@ public sealed partial class ColumnListView : UserControl
 
         // Redirect before focus is drawn, retaining the list itself as the empty-list tab stop.
         var item = this.Items.SelectedItem ?? this.Items.Items[0];
-        this.Items.ScrollIntoView(item);
-        this.Items.UpdateLayout();
-        if (this.Items.ContainerFromItem(item) is ListViewItem container)
+        if (this.RealizeFocusRow(item) is { } container)
         {
             args.TrySetNewFocusedElement(container);
         }

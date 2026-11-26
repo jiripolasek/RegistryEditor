@@ -29,6 +29,7 @@ internal static class NavigationHistoryTests
             && back.Select(entry => entry.Index).SequenceEqual(new[] { 3, 2, 1, 0 }),
             "Back history is nearest-first and distinguishes repeated visits");
         history.MoveTo(1);
+        history.CurrentSelection = (a, "first visit");
         check(
             history.Current == a && history.BackTarget == root && history.ForwardTarget == b,
             "History jump moves the cursor without adding a visit");
@@ -36,6 +37,8 @@ internal static class NavigationHistoryTests
             history.GetEntries(true).Select(entry => entry.Location).SequenceEqual(new[] { b, a, c }),
             "Forward history retains all skipped visits in order");
         history.MoveTo(3);
+        check(history.CurrentSelection is null, "Repeated addresses have independent history selections");
+        history.CurrentSelection = (a, "second visit");
         check(
             history.Current == a && history.BackTarget == b && history.ForwardTarget == c,
             "Selecting a repeated address reaches the requested visit");
@@ -45,6 +48,7 @@ internal static class NavigationHistoryTests
             history.Current == a && history.BackTarget == b && history.GetTarget(-1) is null && history.GetTarget(5) is null,
             "Rejected jumps leave the history cursor intact");
         history.MoveTo(1);
+        check(history.CurrentSelection == (a, "first visit"), "History jumps recover the selection for the requested visit");
         var replacement = root.Child("Replacement");
         history.Navigate(replacement);
         check(
@@ -63,16 +67,25 @@ internal static class NavigationHistoryTests
         view.ForwardCommand.CanExecuteChanged += (_, _) => forwardChanges++;
         check(!view.BackCommand.CanExecute(null) && !view.ForwardCommand.CanExecute(null), "Both history commands start disabled");
         await view.NavigateAsync(remote);
+        var remoteKey = remote.GetHives()[^1];
+        view.SelectedEntry = view.Entries.Single(row => row.Key == remoteKey);
         check(
             backChanges > 0 && view.BackCommand.CanExecute(null) && !view.ForwardCommand.CanExecute(null),
             "A committed navigation enables the bound Back command");
         await view.NavigateAsync(other);
+        var otherKey = other.GetHives()[^1];
+        view.SelectedEntry = view.Entries.Single(row => row.Key == otherKey);
         var target = view.GetHistory(false)[0];
         check(target.Location == remote, "History menu entries retain computer and registry-view identity");
         forwardChanges = 0;
         await view.NavigateHistoryAsync(target.Index, target.Location);
         check(forwardChanges > 0 && view.ForwardCommand.CanExecute(null), "A history jump enables the bound Forward command");
         check(view.Location == remote && view.CanGoBack && view.CanGoForward, "Menu jumps update navigation state");
+        check(view.SelectedEntry?.Key == remoteKey, "A history jump restores the selected key");
+        await view.ForwardCommand.ExecuteAsync(null);
+        check(view.Location == other && view.SelectedEntry?.Key == otherKey, "Forward restores the selected key for that visit");
+        await view.BackCommand.ExecuteAsync(null);
+        check(view.Location == remote && view.SelectedEntry?.Key == remoteKey, "Back restores the selected key for that visit");
         var stale = view.GetHistory(true)[0];
         await view.NavigateAsync(computer);
         await view.NavigateHistoryAsync(stale.Index, stale.Location);
@@ -119,6 +132,24 @@ internal static class NavigationHistoryTests
                 && view.Error is null
                 && view.GetHistory(true).Select(entry => entry.Location.Name).SequenceEqual(new[] { "B", "C" }),
                 "A restored history target can be revisited without losing intermediate visits");
+
+            using (var key = Registry.CurrentUser.OpenSubKey(target.Location.SubKey, writable: true)!)
+            {
+                key.SetValue("Remembered", "old data");
+                await view.NavigateAsync(target.Location, addToHistory: false);
+                view.SelectedEntry = view.Entries.Single(row => row.Value?.Name == "Remembered");
+                await view.ForwardCommand.ExecuteAsync(null);
+                key.SetValue("Remembered", "new data");
+                await view.BackCommand.ExecuteAsync(null);
+                check(view.SelectedEntry?.Value is { Name: "Remembered" } value && value.DisplayData == "new data",
+                    "History restores a selected value by name after its data changes");
+
+                await view.ForwardCommand.ExecuteAsync(null);
+                key.DeleteValue("Remembered");
+                await view.BackCommand.ExecuteAsync(null);
+                check(view.SelectedEntry is null, "A missing history row leaves selection available for the list's fallback");
+            }
+
             target = view.GetHistory(true).Last();
             var pending = view.NavigateHistoryAsync(target.Index, target.Location);
             await view.NavigateAsync(computer);

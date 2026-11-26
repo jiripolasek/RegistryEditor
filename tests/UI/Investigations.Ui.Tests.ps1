@@ -2449,6 +2449,72 @@ try {
         Press 'Back'; Expect-ListLocation $fixtureName
     }
 
+    Test-Ui 'Browser list keeps keyboard focus across row replacements' {
+        Browser
+        Go-ToKey $address
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$subKey\Child", $true)
+        try { $key.SetValue('FocusFixture', 'disposable') } finally { $key.Dispose() }
+        $inspectorWasOpen = (Read-Ui).automationId -contains 'CloseValueInspector'
+        try {
+            foreach ($inspectorOpen in $true, $false) {
+                if (((Read-Ui).automationId -contains 'CloseValueInspector') -ne $inspectorOpen) {
+                    Ui @('invoke', 'ToggleValueInspector') | Out-Null
+                }
+
+                $row = Select-Row 'Child,'
+                if ($inspectorOpen) {
+                    Ui @('send-keys', 'enter', '--via', 'send-input', '--target', $row.selector) | Out-Null
+                } else {
+                    Ui @('click', $row.selector, '--double') | Out-Null
+                }
+                Wait-Ui { param($items) @($items | Where-Object type -eq 'ListItem').name -like 'FocusFixture,*' }
+                Assert-FocusedPane 'Registry keys and values'
+                $rows = @(Elements (Pick 'List' 'Registry keys and values').children | Where-Object type -eq 'ListItem' | Sort-Object y)
+                $selected = Ui @('get-property', $rows[0].selector, '--property', 'IsSelected', '--json') | ConvertFrom-Json
+                if ($selected.properties.IsSelected -ne 'True') { throw 'Navigation did not select the first row in Child.' }
+                Ui @('send-keys', 'down', '--via', 'send-input') | Out-Null
+                $focused = (Ui @('get-focused', '--json') | ConvertFrom-Json).element
+                if ($rows.Count -lt 2 -or $focused.name -ne $rows[1].name) { throw "Down reached '$($focused.name)' after entering Child." }
+
+                foreach ($shortcut in 'alt+left', 'alt+right', 'alt+up') {
+                    Ui @('send-keys', $shortcut, '--via', 'send-input') | Out-Null
+                    $destination = if ($shortcut -eq 'alt+right') { 'Child' } else { $fixtureName }
+                    Wait-Ui { param($items) @($items | Where-Object automationId -match '^Breadcrumb\d+$')[-1].name -eq $destination }
+                    Assert-FocusedPane 'Registry keys and values'
+                    if ($shortcut -ne 'alt+up') {
+                        $expectedName = if ($shortcut -eq 'alt+left') { $row.name } else { $rows[1].name }
+                        $restored = (Ui @('get-focused', '--json') | ConvertFrom-Json).element
+                        $selected = Ui @('get-property', $restored.selector, '--property', 'IsSelected', '--json') | ConvertFrom-Json
+                        if ($restored.name -ne $expectedName -or $selected.properties.IsSelected -ne 'True') {
+                            throw "$shortcut did not restore selection and focus to '$expectedName'."
+                        }
+                    }
+                }
+            }
+
+            Go-ToKey "$address\Child"
+            Press 'Filter'; Fill 'Filter this key' 'FocusFixture'
+            Wait-Ui {
+                param($items)
+                $rows = @($items | Where-Object type -eq 'ListItem')
+                $rows.Count -eq 1 -and $rows[0].name -like 'FocusFixture,*'
+            }
+            $row = Select-Row 'FocusFixture'
+            $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$subKey\Child", $true)
+            try { $key.DeleteValue('FocusFixture') } finally { $key.Dispose() }
+            Ui @('send-keys', 'f5', '--via', 'send-input', '--target', $row.selector) | Out-Null
+            Wait-Ui { param($items) $items.name -contains 'No matching items' }
+            Assert-FocusedPane 'Registry keys and values'
+            $focused = (Ui @('get-focused', '--json') | ConvertFrom-Json).element
+            if ($focused.automationId -ne 'EntriesList') { throw "The empty registry list left focus on '$($focused.name)'." }
+        } finally {
+            if (((Read-Ui).automationId -contains 'CloseValueInspector') -ne $inspectorWasOpen) {
+                Ui @('invoke', 'ToggleValueInspector') | Out-Null
+            }
+            Go-ToKey $address
+        }
+    }
+
     Test-Ui 'Numeric editor binds the displayed base and validated bytes' {
         Browser
         $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($subKey, $true)

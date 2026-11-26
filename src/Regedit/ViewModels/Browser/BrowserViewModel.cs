@@ -25,6 +25,8 @@ public sealed partial class BrowserViewModel : ObservableObject
 
     internal event Action<string>? ValueSelectionRequested;
 
+    internal event Action? NavigationRowsReplacing;
+
     internal event Func<ValueInspectorViewModel, Task>? InspectorRequested;
 
     internal event Action<RegistryLocation, string?>? WatchRequested;
@@ -467,7 +469,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
 
         this._navigationVersion++;
-        return this.LoadAsync(target, () => this._history.MoveTo(index));
+        return this.LoadAsync(target, () => this._history.MoveTo(index), restoreHistorySelection: true);
     }
 
     public void CancelPending()
@@ -519,12 +521,12 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
     }
 
-    private Task LoadAsync(RegistryLocation target, Action? commitHistory)
+    private Task LoadAsync(RegistryLocation target, Action? commitHistory, bool restoreHistorySelection = false)
     {
-        return this._pendingNavigation = this.LoadLocationAsync(target, commitHistory);
+        return this._pendingNavigation = this.LoadLocationAsync(target, commitHistory, restoreHistorySelection);
     }
 
-    private async Task LoadLocationAsync(RegistryLocation target, Action? commitHistory)
+    private async Task LoadLocationAsync(RegistryLocation target, Action? commitHistory, bool restoreHistorySelection)
     {
         var request = ++this._request;
         this._metadata.Cancel();
@@ -555,12 +557,25 @@ public sealed partial class BrowserViewModel : ObservableObject
                 return;
             }
 
-            commitHistory?.Invoke();
-            var clearFilter = this.Location != target && this.Filter != string.Empty;
+            if (commitHistory is not null)
+            {
+                this._history.CurrentSelection = this.SelectedEntry is { } row
+                    ? (row.Key ?? row.ParentLocation ?? this.Location, row.IsKey || row.IsParent ? null : row.Value?.Name ?? string.Empty)
+                    : null;
+                commitHistory();
+            }
+
+            var locationChanged = this.Location != target;
+            var clearFilter = locationChanged && this.Filter != string.Empty;
             this._allEntries = entries;
             this.HasSnapshot = true;
             this.Location = target;
             this.ApplyNotes();
+            if (locationChanged || restoreHistorySelection)
+            {
+                this.NavigationRowsReplacing?.Invoke();
+            }
+
             if (clearFilter)
             {
                 this.Filter = string.Empty;
@@ -568,6 +583,13 @@ public sealed partial class BrowserViewModel : ObservableObject
             else
             {
                 this.ApplyFilter();
+            }
+
+            if (restoreHistorySelection && this._history.CurrentSelection is { } selection)
+            {
+                this.SelectedEntry = this.Entries.FirstOrDefault(row => selection.ValueName is { } name
+                    ? !row.IsKey && !row.IsParent && string.Equals(row.Value?.Name ?? string.Empty, name, StringComparison.OrdinalIgnoreCase)
+                    : selection.Location.IsSameLocation(row.Key ?? row.ParentLocation));
             }
 
             if (commitHistory is not null)
@@ -613,13 +635,17 @@ public sealed partial class BrowserViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanGoBack))]
     private Task BackAsync()
     {
-        return this._history.CanGoBack ? this.LoadAsync(this._history.BackTarget, () => this._history.Back()) : Task.CompletedTask;
+        return this._history.CanGoBack
+            ? this.LoadAsync(this._history.BackTarget, () => this._history.Back(), restoreHistorySelection: true)
+            : Task.CompletedTask;
     }
 
     [RelayCommand(CanExecute = nameof(CanGoForward))]
     private Task ForwardAsync()
     {
-        return this._history.CanGoForward ? this.LoadAsync(this._history.ForwardTarget, () => this._history.Forward()) : Task.CompletedTask;
+        return this._history.CanGoForward
+            ? this.LoadAsync(this._history.ForwardTarget, () => this._history.Forward(), restoreHistorySelection: true)
+            : Task.CompletedTask;
     }
 
     [RelayCommand(CanExecute = nameof(CanNavigateEntry), AllowConcurrentExecutions = true)]

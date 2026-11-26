@@ -47,6 +47,7 @@ public sealed partial class RegistryEntryList : UserControl
     public RegistryEntryList()
     {
         this.InitializeComponent();
+        this.Entries.KeepFocusOnItemsSourceChange = true;
         var list = this.EntriesList;
         AutomationProperties.SetName(list, "Registry keys and values");
         AutomationProperties.SetAutomationId(list, "EntriesList");
@@ -79,6 +80,7 @@ public sealed partial class RegistryEntryList : UserControl
     internal void Initialize(BrowserViewModel viewModel, SettingsViewModel preferences, MenuFlyout entries, MenuFlyout background)
     {
         this.ViewModel = viewModel;
+        viewModel.NavigationRowsReplacing += () => this.Entries.SelectFirstOnNextItemsSourceChange = true;
         this._preferences = preferences;
         this.EntriesList.ItemContainerStyle = new Style(typeof(ListViewItem))
         {
