@@ -14,6 +14,8 @@ using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Rectangle = Microsoft.UI.Xaml.Shapes.Rectangle;
 
 namespace JPSoftworks.ColumnList.Sample;
 
@@ -39,8 +41,42 @@ internal static partial class ComponentChecks
 
         try
         {
+            var idleHeader = new ColumnListView
+            {
+                ItemsSource = new[] { "Item" },
+                SelectionCheckBoxes = SelectionCheckBoxMode.Inline
+            }.SelectAllBox;
+            Check(
+                idleHeader.Visibility == Visibility.Visible && idleHeader.IsEnabled && idleHeader.IsChecked == false && idleHeader.Opacity > 0,
+                "An unchecked Select All box is visible before pointer or keyboard input");
+
             await WaitAsync(() => registry.RealizedRows.Count > 5 && tools.RealizedRows.Count > 5);
             await Task.Delay(150);
+
+            var selectAllBox = registry.SelectAllBox;
+            var originalTheme = selectAllBox.RequestedTheme;
+            var selectAllTemplate = (Grid)VisualTreeHelper.GetChild(selectAllBox, 0);
+            var selectAllOutline = selectAllTemplate.Children.OfType<Grid>().Single().Children.OfType<Rectangle>().Single();
+            foreach (var (theme, expectedOpacity) in new[] { (ElementTheme.Light, 0.95), (ElementTheme.Dark, 0.72) })
+            {
+                selectAllBox.RequestedTheme = theme;
+                await WaitAsync(() => selectAllBox.ActualTheme == theme);
+                SolidColorBrush? uncheckedStroke = null;
+                foreach (var state in new[] { "UncheckedNormal", "UncheckedPointerOver", "IndeterminateNormal", "IndeterminatePointerOver" })
+                {
+                    var stateApplied = VisualStateManager.GoToState(selectAllBox, state, false);
+                    await Task.Delay(100);
+                    var stroke = selectAllOutline.Stroke as SolidColorBrush;
+                    uncheckedStroke ??= stroke;
+                    Check(
+                        stateApplied && stroke is not null && uncheckedStroke?.Color.Equals(stroke.Color) == true
+                        && Math.Abs(stroke.Opacity - expectedOpacity) < 0.01,
+                        $"Select All outline matches the unchecked outline in {theme} {state}");
+                }
+            }
+
+            VisualStateManager.GoToState(selectAllBox, "UncheckedNormal", false);
+            selectAllBox.RequestedTheme = originalTheme;
 
             var liveEntry = page.Entries[0];
             var liveRow = registry.RealizedRows.Single(row => ReferenceEquals(row.DataContext, liveEntry));
