@@ -295,7 +295,6 @@ public sealed partial class ColumnListView : UserControl
         this.Loaded += (_, _) => this.InvalidateChrome();
         this.InitializeEditing();
         this.InitializeDragSelection();
-        this.InitializeSelectAllReveal();
         this.Items.RegisterPropertyChangedCallback(ListView.SelectionModeProperty, (_, _) => this.UpdatePresentation());
         this.RebuildColumns();
     }
