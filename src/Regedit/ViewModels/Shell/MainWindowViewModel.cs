@@ -490,7 +490,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
         var tab = new RegistryUsageTab(this._registry, location);
         this.SelectTab(tab);
-        tab.ScanCommand.Execute(location);
+        tab.ScanCommand.Execute(tab.CurrentTarget);
     }
 
     internal void OpenToolTab(ToolKind tool, bool fromPanel = false)
