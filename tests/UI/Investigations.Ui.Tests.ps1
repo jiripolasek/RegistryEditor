@@ -4119,27 +4119,29 @@ try {
     }
 
     Test-Ui 'Favorites nested folder creation and selection do not reenter expansion' {
-        Browser; Set-TestWindowForeground; Tool-Option 'Favorites'
+        Browser
+        Ui @('send-keys', 'ctrl+shift+o', '--via', 'send-input', '--target', 'ToolsButton') | Out-Null
+        Wait-Ui { param($items) $items.automationId -contains 'FavoriteTree' }
         Press 'Pin tool panel'
         foreach ($name in 'Crash parent folder', 'Crash child folder') {
             Press 'New folder'; Fill 'Name' $name; Primary
             Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' -and $items.name -contains $name }
             Select-Folder $name
         }
-        foreach ($name in 'Crash parent folder', 'Crash child folder', 'Crash parent folder', 'Crash child folder') {
+        foreach ($name in 'Crash parent folder', 'Crash child folder', 'Crash parent folder') {
             Set-TestWindowForeground
             $folder = Pick 'TreeItem' $name
             Ui @('click', $folder.selector) | Out-Null
-            Wait-Ui {
-                param($items)
-                $folder = @($items | Where-Object { $_.type -eq 'TreeItem' -and $_.name -eq $name })[0]
-                $folder -and (Ui @('get-property', $folder.selector, '--property', 'IsSelected', '--json') | ConvertFrom-Json).properties.IsSelected -eq 'True'
-            }
+            Assert-TreeSelection $name
         }
+        Press 'New folder'; Fill 'Name' 'Selection sibling folder'; Primary
+        Wait-Ui { param($items) $items.automationId -notcontains 'PrimaryButton' -and $items.name -contains 'Selection sibling folder' }
         $saved = Get-Content $settingsFile -Raw | ConvertFrom-Json
         $parent = @($saved.FavoriteFolders | Where-Object Name -eq 'Crash parent folder')[0]
         $child = @($saved.FavoriteFolders | Where-Object Name -eq 'Crash child folder')[0]
+        $sibling = @($saved.FavoriteFolders | Where-Object Name -eq 'Selection sibling folder')[0]
         if (-not $parent -or $child.ParentId -ne $parent.Id) { throw 'Nested folders were not preserved.' }
+        if ($sibling.ParentId -ne $parent.Id) { throw 'The sidebar still used the previously selected folder.' }
         Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'favorites-nested-folder-selection.png')) | Out-Null
         Press 'Unpin tool panel'
         Press 'Close tool panel'
