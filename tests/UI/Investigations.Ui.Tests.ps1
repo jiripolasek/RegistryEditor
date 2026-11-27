@@ -7477,6 +7477,37 @@ try {
         }
     }
 
+    Test-Ui 'Favorites bar switches between open folder menus on hover' {
+        $appProcess.CloseMainWindow() | Out-Null
+        if (-not $appProcess.WaitForExit(15000)) { throw 'The editor did not close for Favorites setup.' }
+        $settings = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json -AsHashtable
+        $settings.ShowFavoritesBar = $true
+        $settings.FavoriteFolders = @(
+            @{ Id = 'hover-first'; Name = 'First folder' }
+            @{ Id = 'hover-second'; Name = 'Second folder' }
+        ) + @(1..16 | ForEach-Object { @{ Id = "hover-extra-$_"; Name = "Additional favorites folder $_" } })
+        $settings.Favorites = @(
+            @{ Id = 'hover-first-key'; Name = 'First folder key'; FolderId = 'hover-first'; Address = $address }
+            @{ Id = 'hover-second-key'; Name = 'Second folder key'; FolderId = 'hover-second'; Address = "$address\Child" }
+        )
+        [IO.File]::WriteAllText($settingsFile, ($settings | ConvertTo-Json -Depth 64))
+        Restart-Editor
+        Browser
+        Set-TestWindowForeground
+        Ui @('click', 'FavoriteBarFolder_hover-first') | Out-Null
+        [void](Read-ContextMenu 'First folder key')
+        Ui @('hover', 'FavoriteBarFolder_hover-second') | Out-Null
+        [void](Read-ContextMenu 'Second folder key')
+        Ui @('hover', 'FavoriteBarOverflowButton') | Out-Null
+        [void](Read-ContextMenu 'Open Favorites sidebar')
+        Ui @('hover', 'FavoriteBarFolder_hover-first') | Out-Null
+        $menu = Read-ContextMenu 'First folder key'
+        Ui @('send-keys', 'esc', '--via', 'send-input') -Window $menu.Window | Out-Null
+        Ui @('hover', 'FavoriteBarFolder_hover-second') | Out-Null
+        Ui @('click', 'FavoriteBarFolder_hover-second') | Out-Null
+        [void](Read-ContextMenu 'Second folder key')
+    }
+
     if ($results.Count -eq 0) { throw "No UI test matched '$TestFilter'." }
 }
 catch {

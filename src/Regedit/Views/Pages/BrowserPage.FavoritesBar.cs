@@ -8,6 +8,7 @@ using JPSoftworks.Regedit.Infrastructure.Input;
 using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.ViewModels.Tools;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -21,6 +22,7 @@ public sealed partial class BrowserPage
 {
     private readonly FavoriteDrag _favoritesBarDrag = new();
     private readonly MenuFlyout _favoriteBarContextMenu = new();
+    private MenuFlyout? _openFavoriteBarMenu;
     private bool _favoritesBarDirty = true;
     private int _visibleFavoriteBarItems;
 
@@ -38,7 +40,7 @@ public sealed partial class BrowserPage
         }
 
         this._favoritesBarDirty = false;
-        this.FavoriteBarOverflowButton.Flyout?.Hide();
+        this._openFavoriteBarMenu?.Hide();
         var items = this.FavoriteBarItems.Children;
         items.Clear();
         if (!this.Settings.ShowFavoritesBar)
@@ -52,7 +54,7 @@ public sealed partial class BrowserPage
         {
             var button = this.CreateFavoriteBarButton(
                 folder.Name, SymbolGlyphs.Get(Symbol.Folder), new FavoriteItemId(folder.Id, true));
-            button.Flyout = this._window.CreateFavoritesMenu(folder.Id);
+            this.AttachFavoriteBarMenu(button, this._window.CreateFavoritesMenu(folder.Id));
             items.Add(button);
         }
 
@@ -76,6 +78,29 @@ public sealed partial class BrowserPage
         }
 
         this.UpdateFavoritesBarOverflow();
+    }
+
+    private void AttachFavoriteBarMenu(Button button, MenuFlyout menu)
+    {
+        menu.OverlayInputPassThroughElement = this.FavoriteBarHost;
+        menu.Opening += (_, _) => this._openFavoriteBarMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(this._openFavoriteBarMenu, menu))
+            {
+                this._openFavoriteBarMenu = null;
+            }
+        };
+        button.Flyout = menu;
+        button.PointerEntered += (_, args) =>
+        {
+            if (args.Pointer.PointerDeviceType == PointerDeviceType.Mouse && !args.Pointer.IsInContact &&
+                this._openFavoriteBarMenu is { } openMenu && !ReferenceEquals(openMenu, menu))
+            {
+                // WinUI closes the previous flyout before opening its sibling.
+                menu.ShowAt(button);
+            }
+        };
     }
 
     private void FavoriteBarHost_SizeChanged(object sender, SizeChangedEventArgs args)
