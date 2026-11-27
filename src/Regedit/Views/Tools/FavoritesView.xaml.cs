@@ -589,7 +589,7 @@ public sealed partial class FavoritesView : UserControl, IToolSurface
 
     private void FavoriteFolder_Tapped(object sender, TappedRoutedEventArgs args)
     {
-        if (!this.ViewModel.Compact && sender is FrameworkElement
+        if (sender is FrameworkElement
             { DataContext: TreeViewNode { Content: FavoriteRow { Key.IsFolder: true } row } node })
         {
             this.QueueTreeSelection(node, row, activate: true);
