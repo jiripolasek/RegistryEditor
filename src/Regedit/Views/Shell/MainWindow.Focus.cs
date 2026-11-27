@@ -31,6 +31,10 @@ public sealed partial class MainWindow
         {
             panes.AddRange(browser.GetFocusPanes());
         }
+        else if (this.SelectedTabContent is RegistryUsagePage usage)
+        {
+            panes.Add((usage.ResultsList, usage.FocusResults));
+        }
         else if (this.SelectedTabContent is FrameworkElement content)
         {
             panes.Add((content, () => FocusContent(content, content)));

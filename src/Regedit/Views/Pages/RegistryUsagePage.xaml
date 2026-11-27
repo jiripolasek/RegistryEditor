@@ -6,14 +6,24 @@
     xmlns:lists="using:JPSoftworks.Regedit.Controls.Lists"
     xmlns:local="using:JPSoftworks.Regedit.Views.Pages"
     xmlns:shared="using:JPSoftworks.Regedit.Controls.Shared"
-    xmlns:tools="using:JPSoftworks.Regedit.Views.Tools">
+    xmlns:tools="using:JPSoftworks.Regedit.Views.Tools"
+    PreviewKeyDown="Page_PreviewKeyDown">
     <Page.Resources>
         <DataTemplate x:Key="SubkeyIconCell">
-            <FontIcon
-                AutomationProperties.AccessibilityView="Raw"
-                FontSize="16"
-                Glyph="&#xE8B7;"
-                Style="{ThemeResource RegistryNavigationIconStyle}" />
+            <Grid DataContextChanged="SubkeyIcon_DataContextChanged">
+                <FontIcon
+                    AutomationProperties.AccessibilityView="Raw"
+                    FontSize="16"
+                    Glyph="&#xE8B7;"
+                    Style="{ThemeResource RegistryNavigationIconStyle}" />
+                <PathIcon
+                    Width="16"
+                    Height="16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Visibility="Collapsed" />
+            </Grid>
         </DataTemplate>
         <DataTemplate x:Key="UsageStatusCell" x:DataType="core:RegistryUsageEntry">
             <Grid>
@@ -45,8 +55,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" MinHeight="100" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <shared:ToolPageHeader
             x:Name="PageHeader"
@@ -64,32 +73,44 @@
                     DefaultLabelPosition="Right"
                     IsDynamicOverflowEnabled="True">
                     <AppBarButton
+                        AutomationProperties.AutomationId="RegistryUsageBack"
+                        Command="{x:Bind ViewModel.ScanCommand}"
+                        CommandParameter="{x:Bind ViewModel.BackTarget, Mode=OneWay}"
+                        KeyboardAcceleratorTextOverride="Alt+Left"
+                        Label="Back">
+                        <AppBarButton.Icon>
+                            <shared:CommandIcon Symbol="Back" />
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton
+                        AutomationProperties.AutomationId="RegistryUsageForward"
+                        Command="{x:Bind ViewModel.ScanCommand}"
+                        CommandParameter="{x:Bind ViewModel.ForwardTarget, Mode=OneWay}"
+                        KeyboardAcceleratorTextOverride="Alt+Right"
+                        Label="Forward">
+                        <AppBarButton.Icon>
+                            <shared:CommandIcon Symbol="Forward" />
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                    <AppBarButton
                         AutomationProperties.AutomationId="RegistryUsageUp"
                         Command="{x:Bind ViewModel.ScanCommand}"
-                        CommandParameter="{x:Bind ViewModel.Parent, Mode=OneWay}"
+                        CommandParameter="{x:Bind ViewModel.UpTarget, Mode=OneWay}"
+                        KeyboardAcceleratorTextOverride="Alt+Up"
                         Label="Up">
                         <AppBarButton.Icon>
                             <shared:CommandIcon Symbol="Up" />
                         </AppBarButton.Icon>
                     </AppBarButton>
+                    <AppBarSeparator />
                     <AppBarButton
                         AutomationProperties.AutomationId="RegistryUsageRefresh"
                         Command="{x:Bind ViewModel.ScanCommand}"
-                        CommandParameter="{x:Bind ViewModel.Location, Mode=OneWay}"
+                        CommandParameter="{x:Bind ViewModel.CurrentTarget, Mode=OneWay}"
+                        KeyboardAcceleratorTextOverride="F5"
                         Label="Rescan">
                         <AppBarButton.Icon>
                             <shared:CommandIcon Symbol="Refresh" />
-                        </AppBarButton.Icon>
-                    </AppBarButton>
-                    <AppBarButton
-                        x:Name="OpenSubkeyButton"
-                        AutomationProperties.AutomationId="RegistryUsageOpenSubkey"
-                        Command="{x:Bind ViewModel.ScanCommand}"
-                        KeyboardAcceleratorTextOverride="Enter"
-                        Label="Open subkey"
-                        ToolTipService.ToolTip="Measure the selected subkey (Enter)">
-                        <AppBarButton.Icon>
-                            <shared:CommandIcon Symbol="OpenFile" />
                         </AppBarButton.Icon>
                     </AppBarButton>
                     <AppBarButton
@@ -100,106 +121,121 @@
                             <shared:CommandIcon IconSource="{StaticResource OpenInNewTabIcon}" />
                         </AppBarButton.Icon>
                     </AppBarButton>
+                    <AppBarSeparator />
+                    <shared:ListCommandBar.SecondaryCommands>
+                        <AppBarToggleButton
+                            AutomationProperties.AutomationId="RegistryUsageShowParent"
+                            IsChecked="{x:Bind Preferences.ShowParentKeyInList, Mode=TwoWay}"
+                            Label="Show parent key in list" />
+                    </shared:ListCommandBar.SecondaryCommands>
                 </shared:ListCommandBar>
             </shared:ToolToolbar.CommandsContent>
         </shared:ToolToolbar>
-        <Grid
-            Grid.Row="2"
-            MinHeight="24"
-            Margin="0,0,0,4"
-            ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock
-                VerticalAlignment="Center"
-                AutomationProperties.AutomationId="RegistryUsageSummary"
-                AutomationProperties.LiveSetting="Polite"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Text="{x:Bind ViewModel.Summary, Mode=OneWay}"
-                TextTrimming="CharacterEllipsis"
-                ToolTipService.ToolTip="{x:Bind ViewModel.Summary, Mode=OneWay}" />
-            <StackPanel
-                Grid.Column="1"
-                VerticalAlignment="Center"
-                AutomationProperties.AutomationId="RegistryUsageCoverage"
-                AutomationProperties.HelpText="{x:Bind ViewModel.CoverageWarning, Mode=OneWay}"
-                AutomationProperties.LiveSetting="Polite"
-                Background="Transparent"
-                Orientation="Horizontal"
-                Spacing="6"
-                ToolTipService.ToolTip="{x:Bind ViewModel.CoverageWarning, Mode=OneWay}"
-                Visibility="{x:Bind tools:ToolView.TextVisibility(ViewModel.CoverageWarning), Mode=OneWay}">
-                <TextBlock
+        <Grid Grid.Row="2" Style="{StaticResource ToolListSurfaceStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" MinHeight="100" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid AutomationProperties.AutomationId="RegistryUsageListSurface">
+                <lists:ColumnListView
+                    x:Name="Subkeys"
+                    ColumnSpacing="12"
+                    ItemsSource="{x:Bind ViewModel.Rows, Mode=OneWay}"
+                    SelectionMode="Single"
+                    ShowColumns="True">
+                    <lists:ColumnListView.LeadingColumn>
+                        <lists:ListColumn
+                            CellTemplate="{StaticResource SubkeyIconCell}"
+                            DefaultWidth="20"
+                            Id="Icon" />
+                    </lists:ColumnListView.LeadingColumn>
+                </lists:ColumnListView>
+                <StackPanel
+                    MaxWidth="360"
+                    Margin="16"
+                    HorizontalAlignment="Center"
                     VerticalAlignment="Center"
+                    Spacing="8"
+                    Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}">
+                    <ProgressRing
+                        Width="28"
+                        Height="28"
+                        AutomationProperties.AutomationId="RegistryUsageProgress"
+                        AutomationProperties.Name="Scan progress"
+                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                    <TextBlock
+                        AutomationProperties.LiveSetting="Polite"
+                        FontWeight="SemiBold"
+                        Text="{x:Bind local:RegistryUsagePage.ScanProgressText(ViewModel.ScanCommand.IsCancellationRequested), Mode=OneWay}"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <Button
+                        HorizontalAlignment="Center"
+                        AutomationProperties.AutomationId="RegistryUsageCancel"
+                        Command="{x:Bind ViewModel.ScanCancelCommand}"
+                        Content="Cancel scan"
+                        ToolTipService.ToolTip="Cancel scan (Esc)" />
+                </StackPanel>
+                <TextBlock
+                    MaxWidth="360"
+                    Margin="16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="RegistryUsageStatus"
+                    AutomationProperties.LiveSetting="Polite"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    IsHitTestVisible="False"
+                    Text="{x:Bind ViewModel.EmptyMessage, Mode=OneWay}"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    Visibility="{x:Bind tools:ToolView.TextVisibility(ViewModel.EmptyMessage), Mode=OneWay}" />
+            </Grid>
+            <Grid
+                Grid.Row="1"
+                MinHeight="32"
+                Padding="8,2"
+                AutomationProperties.AutomationId="RegistryUsageStatusBar"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0"
+                ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Margin="8,0"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="RegistryUsageSummary"
+                    AutomationProperties.LiveSetting="Polite"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Style="{StaticResource CaptionTextBlockStyle}"
-                    Text="Partial totals" />
-                <FontIcon
-                    AutomationProperties.AccessibilityView="Raw"
-                    FontSize="14"
-                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                    Glyph="&#xE946;" />
-            </StackPanel>
-        </Grid>
-        <Grid
-            Grid.Row="3"
-            AutomationProperties.AutomationId="RegistryUsageListSurface"
-            Style="{StaticResource ToolListSurfaceStyle}">
-            <lists:ColumnListView
-                x:Name="Subkeys"
-                ColumnSpacing="12"
-                ItemsSource="{x:Bind ViewModel.Rows, Mode=OneWay}"
-                SelectionMode="Single"
-                ShowColumns="True">
-                <lists:ColumnListView.LeadingColumn>
-                    <lists:ListColumn
-                        CellTemplate="{StaticResource SubkeyIconCell}"
-                        DefaultWidth="20"
-                        Id="Icon" />
-                </lists:ColumnListView.LeadingColumn>
-            </lists:ColumnListView>
-            <StackPanel
-                MaxWidth="360"
-                Margin="16"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Spacing="8"
-                Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}">
-                <ProgressRing
-                    Width="28"
-                    Height="28"
-                    AutomationProperties.AutomationId="RegistryUsageProgress"
-                    AutomationProperties.Name="Scan progress"
-                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
-                <TextBlock
+                    Text="{x:Bind ViewModel.Summary, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.Summary, Mode=OneWay}" />
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="8,0"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="RegistryUsageCoverage"
+                    AutomationProperties.HelpText="{x:Bind ViewModel.CoverageWarning, Mode=OneWay}"
                     AutomationProperties.LiveSetting="Polite"
-                    FontWeight="SemiBold"
-                    Text="{x:Bind local:RegistryUsagePage.ScanProgressText(ViewModel.ScanCommand.IsCancellationRequested), Mode=OneWay}"
-                    TextAlignment="Center"
-                    TextWrapping="Wrap" />
-                <Button
-                    HorizontalAlignment="Center"
-                    AutomationProperties.AutomationId="RegistryUsageCancel"
-                    Command="{x:Bind ViewModel.ScanCancelCommand}"
-                    Content="Cancel scan"
-                    ToolTipService.ToolTip="Cancel scan (Esc)" />
-            </StackPanel>
-            <TextBlock
-                MaxWidth="360"
-                Margin="16"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                AutomationProperties.AutomationId="RegistryUsageStatus"
-                AutomationProperties.LiveSetting="Polite"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                IsHitTestVisible="False"
-                Text="{x:Bind ViewModel.EmptyMessage, Mode=OneWay}"
-                TextAlignment="Center"
-                TextWrapping="Wrap"
-                Visibility="{x:Bind tools:ToolView.TextVisibility(ViewModel.EmptyMessage), Mode=OneWay}" />
+                    Background="Transparent"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.CoverageWarning, Mode=OneWay}"
+                    Visibility="{x:Bind tools:ToolView.TextVisibility(ViewModel.CoverageWarning), Mode=OneWay}">
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="Partial totals" />
+                    <FontIcon
+                        AutomationProperties.AccessibilityView="Raw"
+                        FontSize="14"
+                        Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                        Glyph="&#xE946;" />
+                </StackPanel>
+            </Grid>
         </Grid>
     </Grid>
 </Page>

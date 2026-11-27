@@ -2998,6 +2998,70 @@ try {
         Go-ToKey $address
     }
 
+    Test-Ui 'Registry Usage drill-down keeps keyboard focus in its results' {
+        Browser
+        function Assert-UsageRowFocus([string] $Pattern) {
+            Assert-FocusedPane 'Subkeys by value data size'
+            $focused = (Ui @('get-focused', '--json') | ConvertFrom-Json).element
+            if ($focused.name -notlike $Pattern) { throw "Expected '$Pattern' to have focus, got '$($focused.name)'." }
+        }
+
+        $scope = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("$subKey\UsageFocus\Drill")
+        try {
+            $first = $scope.CreateSubKey('First')
+            try { $first.SetValue('Bytes', [byte[]](0..7)) } finally { $first.Dispose() }
+            $scope.CreateSubKey('EmptyLeaf').Dispose()
+        } finally { $scope.Dispose() }
+
+        Go-ToKey "$address\UsageFocus"
+        Open-Menu 'Registry Usage' 'Tools'
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Drill,*' }).Count -eq 1 }
+        Assert-UsageRowFocus 'Drill,*'
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'First,*' }).Count -eq 1 }
+        Assert-UsageRowFocus 'First,*'
+
+        Ui @('send-keys', 'down', '--via', 'send-input') | Out-Null
+        Assert-UsageRowFocus 'EmptyLeaf,*'
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'This key has no subkeys.' }
+        Assert-FocusedPane 'Subkeys by value data size'
+        $focused = (Ui @('get-focused', '--json') | ConvertFrom-Json).element
+        if ($focused.automationId -ne 'RegistryUsageSubkeys') { throw "The empty list left focus on '$($focused.name)'." }
+
+        Ui @('send-keys', 'alt+left', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'EmptyLeaf,*' }).Count -eq 1 }
+        Assert-UsageRowFocus 'EmptyLeaf,*'
+        Ui @('send-keys', 'alt+right', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'This key has no subkeys.' }
+        Ui @('send-keys', 'alt+up', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'EmptyLeaf,*' }).Count -eq 1 }
+        Assert-UsageRowFocus 'EmptyLeaf,*'
+        $first = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$subKey\UsageFocus\Drill\First", $true)
+        try { $first.SetValue('Bytes', [byte[]](0..8)) } finally { $first.Dispose() }
+        Ui @('send-keys', 'f5', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'First, 9 bytes, 1 key, 1 value' }
+        Assert-UsageRowFocus 'EmptyLeaf,*'
+        Ui @('send-keys', 'backspace', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) $items.name -contains 'This key has no subkeys.' }
+
+        Open-Menu 'Close tab'
+        Wait-Ui { param($items) $items.name -contains 'Registry keys and values' }
+        View-Option 'Show parent key in list'
+        Open-Menu 'Registry Usage' 'Tools'
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Drill,*' }).Count -eq 1 }
+        Ui @('send-keys', 'f6 enter', '--via', 'send-input', '--target', 'RegistryUsageRefresh') | Out-Null
+        Wait-Ui { param($items) $items.name -contains '.., Parent key' }
+        Assert-UsageRowFocus '.., Parent key'
+        Ui @('send-keys', 'enter', '--via', 'send-input') | Out-Null
+        Wait-Ui { param($items) @($items | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Drill,*' }).Count -eq 1 }
+        Assert-UsageRowFocus 'Drill,*'
+        Open-Menu 'Close tab'
+        Wait-Ui { param($items) $items.name -contains 'Registry keys and values' }
+        View-Option 'Show parent key in list'
+        Go-ToKey $address
+    }
+
     Test-Ui 'Baseline sibling edits preserve tree anchor viewport' {
         function Save-Name([string] $Field, [string] $Name) {
             Wait-Ui { param($items) $items.automationId -contains 'PrimaryButton' }
