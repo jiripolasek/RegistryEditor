@@ -5,7 +5,9 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using JPSoftworks.DesktopToolkit.Controls;
+using Microsoft.UI.Content;
 using Microsoft.UI.Input;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -48,19 +50,24 @@ public sealed partial class Omnibox : UserControl
     private CancellationTokenSource? _suggestionsCancellation;
     private CancellationTokenSource? _childrenCancellation;
     private SearchableItemsFlyout? _childrenMenu;
+    private MenuFlyout? _suggestionMenu;
+    private VirtualKey? _actionsKeyDown;
     private Func<string?, CancellationToken, Task<IReadOnlyList<OmniboxItem>>>? _childrenProvider;
     private int _firstVisible;
     private bool _isEnteringEditMode;
+    private (string Draft, bool Backwards)? _pendingTab;
     private Border? _suggestionsPanel;
     private Action? _detachSuggestionLayout;
     private OmniboxScope? _scope;
     private string _queryText = string.Empty;
+    // Opening the editor requests an empty query while the textbox still displays the current address.
+    private string _providerQuery = string.Empty;
     private OmniboxItem? _previewItem;
     private readonly double _addressTextInset;
     private ListView? _suggestionsList;
     private IReadOnlyList<OmniboxItem> _suggestions = [];
     private readonly ObservableCollection<OmniboxItem> _suggestionRows = [];
-    private readonly ObservableCollection<OmniboxSuggestionGroup> _suggestionGroups = [];
+    private OmniboxSuggestionGroup[] _suggestionGroups = [];
     private ICollectionView? _groupedSuggestionsView;
     private readonly HashSet<string> _expandedSuggestionGroups = new(StringComparer.Ordinal);
 
@@ -105,6 +112,10 @@ public sealed partial class Omnibox : UserControl
     }
 
     public Func<string, CancellationToken, Task<IReadOnlyList<OmniboxItem>>>? SuggestionProvider { get; set; }
+
+    public Func<string, IReadOnlyList<OmniboxAction>>? SuggestionActionProvider { get; set; }
+
+    public bool ShowSuggestionsOnOpen { get; set; }
 
     public IReadOnlyList<OmniboxScope> Scopes { get; set; } = Array.Empty<OmniboxScope>();
 
@@ -165,6 +176,14 @@ public sealed partial class Omnibox : UserControl
         this._suggestionsPanel = panel;
         suggestionsList.ItemsSource = this.Editor.ItemsSource;
 
+        void CancelTabOnEdit(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
+        {
+            if (this._pendingTab is { } tab && args.NewText != tab.Draft)
+            {
+                this._pendingTab = null;
+            }
+        }
+
         void RestorePreviewSelection(object sender, TextChangedEventArgs args)
         {
             // AutoSuggestBox can clear the row selection while applying a queued preview to its textbox.
@@ -200,7 +219,7 @@ public sealed partial class Omnibox : UserControl
         void UpdateSuggestionVisibility(DependencyObject sender, DependencyProperty property)
         {
             if (!this.Editor.IsSuggestionListOpen && panel.Visibility == Visibility.Visible &&
-                (this._isEnteringEditMode || (this.XamlRoot is { } root &&
+                (this._isEnteringEditMode || this._suggestionMenu is not null || (this.XamlRoot is { } root &&
                     Contains(suggestionsList, FocusManager.GetFocusedElement(root) as DependencyObject))))
             {
                 return;
@@ -213,7 +232,17 @@ public sealed partial class Omnibox : UserControl
 
         void PlacementChanged(object? sender, object args) => UpdateEditorFrame();
 
+        void SuppressTextMenuForRowAction(object sender, ContextMenuEventArgs args)
+        {
+            if (this._actionsKeyDown is not null)
+            {
+                args.Handled = true;
+            }
+        }
+
+        input.BeforeTextChanging += CancelTabOnEdit;
         input.TextChanged += RestorePreviewSelection;
+        input.ContextMenuOpening += SuppressTextMenuForRowAction;
         var visibilityToken = this.Editor.RegisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, UpdateSuggestionVisibility);
         var panelToken = panel.RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => UpdateEditorFrame());
         this.EditorPopup.ActualPlacementChanged += PlacementChanged;
@@ -223,7 +252,9 @@ public sealed partial class Omnibox : UserControl
 
         void Unsubscribe()
         {
+            input.BeforeTextChanging -= CancelTabOnEdit;
             input.TextChanged -= RestorePreviewSelection;
+            input.ContextMenuOpening -= SuppressTextMenuForRowAction;
             this.EditorPopup.ActualPlacementChanged -= PlacementChanged;
             this.Editor.UnregisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, visibilityToken);
             panel.UnregisterPropertyChangedCallback(VisibilityProperty, panelToken);
@@ -250,6 +281,8 @@ public sealed partial class Omnibox : UserControl
     public void BeginEdit(OmniboxScope? scope)
     {
         this._isEnteringEditMode = true;
+        void FocusOnOpen() => this.FocusEditor(showInitialSuggestions: true);
+
         var contextMenu = ((FrameworkElement)this.Content).ContextFlyout;
         var menu = this._childrenMenu ?? (this.OverflowMenu.IsOpen ? this.OverflowMenu : contextMenu);
         if (menu is { IsOpen: true })
@@ -258,14 +291,14 @@ public sealed partial class Omnibox : UserControl
             void OnClosed(object? sender, object args)
             {
                 menu.Closed -= OnClosed;
-                this.DispatcherQueue.TryEnqueue(this.FocusEditor);
+                this.DispatcherQueue.TryEnqueue(FocusOnOpen);
             }
 
             menu.Closed += OnClosed;
         }
         else
         {
-            this.DispatcherQueue.TryEnqueue(this.FocusEditor);
+            this.DispatcherQueue.TryEnqueue(FocusOnOpen);
         }
 
         this.CloseChildrenMenu();
@@ -276,6 +309,11 @@ public sealed partial class Omnibox : UserControl
         this._previewItem = null;
         this._queryText = scope is null ? this.Address : string.Empty;
         this.Editor.Text = this._queryText;
+        this.OpenEditorPopup();
+    }
+
+    private void OpenEditorPopup()
+    {
         if (!this.EditorPopup.IsOpen)
         {
             this.EditPlaceholder.MinWidth = this.DisplayPath.DesiredSize.Width;
@@ -305,6 +343,25 @@ public sealed partial class Omnibox : UserControl
         this.EditorSurface.Width = this.ActualWidth;
         this.Editor.MinHeight = Math.Max(this.ActualHeight, this.AddressHost.MinHeight);
         this.EditorAccessories.Height = this.Editor.MinHeight;
+        if (this.XamlRoot is { } root)
+        {
+            const double heightLimit = 560;
+            var bounds = this.AddressHost.TransformToVisual(null)
+                .TransformBounds(new Rect(0, 0, this.ActualWidth, this.Editor.MinHeight));
+            var converter = ContentCoordinateConverter.CreateForWindowId(root.ContentIslandEnvironment.AppWindowId);
+            var anchor = converter.ConvertLocalToScreen(bounds);
+            var display = DisplayArea.GetFromRect(anchor, DisplayAreaFallback.Nearest);
+            var work = display.WorkArea;
+            // WorkArea is relative to the display, while the anchor is in screen coordinates.
+            var workTop = display.OuterBounds.Y + work.Y;
+            var above = (anchor.Y - workTop) / root.RasterizationScale;
+            var below = (workTop + work.Height - anchor.Y - anchor.Height) / root.RasterizationScale;
+            var openAbove = below < heightLimit && above > below;
+            this.EditorPopup.DesiredPlacement = openAbove
+                ? PopupPlacementMode.TopEdgeAlignedLeft : PopupPlacementMode.BottomEdgeAlignedLeft;
+            this.Editor.MaxSuggestionListHeight = Math.Clamp(openAbove ? above : below, 0, heightLimit);
+        }
+
         this.UpdateEditorPopupOffset();
     }
 
@@ -314,7 +371,7 @@ public sealed partial class Omnibox : UserControl
         this.EditorPopup.VerticalOffset = this.IsEditorPopupAbove ? this.Editor.MinHeight : -this.Editor.MinHeight;
     }
 
-    private void FocusEditor()
+    private void FocusEditor(bool showInitialSuggestions)
     {
         if (this.Editor.Visibility != Visibility.Visible)
         {
@@ -340,6 +397,10 @@ public sealed partial class Omnibox : UserControl
             else
             {
                 textBox.SelectAll();
+                if (showInitialSuggestions && this.ShowSuggestionsOnOpen)
+                {
+                    _ = this.RequestSuggestionsAsync(string.Empty);
+                }
             }
 
             this._isEnteringEditMode = false;
@@ -354,14 +415,19 @@ public sealed partial class Omnibox : UserControl
         this.CancelSuggestions();
         this.SetScope(null);
         this.Editor.Text = this.Address;
-        this.Editor.Visibility = Visibility.Collapsed;
-        this.DisplayPath.Visibility = Visibility.Visible;
-        this.EditPlaceholder.Visibility = Visibility.Collapsed;
-        this.EditorPopup.IsOpen = false;
+        this.CloseEditorPopup();
         if (restoreFocus)
         {
             this.EditAddressButton.Focus(FocusState.Programmatic);
         }
+    }
+
+    private void CloseEditorPopup()
+    {
+        this.Editor.Visibility = Visibility.Collapsed;
+        this.DisplayPath.Visibility = Visibility.Visible;
+        this.EditPlaceholder.Visibility = Visibility.Collapsed;
+        this.EditorPopup.IsOpen = false;
     }
 
     private void SetScope(OmniboxScope? scope)
@@ -382,6 +448,7 @@ public sealed partial class Omnibox : UserControl
     private void ChangeScope(OmniboxScope? scope, string query)
     {
         this._isEnteringEditMode = true;
+        this._pendingTab = null;
         if (scope is null)
         {
             this.CancelSuggestions();
@@ -396,7 +463,7 @@ public sealed partial class Omnibox : UserControl
         this._previewItem = null;
         this._queryText = query;
         this.Editor.Text = query;
-        this.DispatcherQueue.TryEnqueue(this.FocusEditor);
+        this.DispatcherQueue.TryEnqueue(() => this.FocusEditor(showInitialSuggestions: query.Length == 0));
     }
 
     private void UpdateInputPadding()
@@ -465,7 +532,26 @@ public sealed partial class Omnibox : UserControl
             ? "Tab Complete   ·   Esc Close"
             : "↑↓ / Tab Select   ·   Enter Choose   ·   Esc Close");
         this.UpdateSuggestionItems();
+        this.SetSuggestionRowsSelectable(true);
         this.SetSuggestionListOpen(suggestions.Count > 0);
+        if (this._pendingTab is { } tab && tab.Draft == this._queryText)
+        {
+            this._pendingTab = null;
+            if (this.XamlRoot is { } root && FocusManager.GetFocusedElement(root) is TextBox input &&
+                input.Text == tab.Draft && Contains(this.Editor, input))
+            {
+                this.NavigateByTab(tab.Backwards);
+            }
+        }
+    }
+
+    private void SetSuggestionRowsSelectable(bool selectable)
+    {
+        if (this._suggestionsList is { } list)
+        {
+            list.SelectionMode = selectable ? ListViewSelectionMode.Single : ListViewSelectionMode.None;
+            list.IsItemClickEnabled = selectable;
+        }
     }
 
     private void UpdateSuggestionItems()
@@ -474,7 +560,13 @@ public sealed partial class Omnibox : UserControl
         {
             var groups = this._suggestions.GroupBy(item => item.Group ?? string.Empty)
                 .Select(this.UpdateSuggestionGroup).ToArray();
-            UpdateRows(this._suggestionGroups, groups);
+            if (!this._suggestionGroups.SequenceEqual(groups))
+            {
+                // WinUI can reject removing a populated group from a live grouped view.
+                this._suggestionGroups = groups;
+                this._groupedSuggestionsView = null;
+            }
+
             var view = this._groupedSuggestionsView ??= new CollectionViewSource
             {
                 IsSourceGrouped = true,
@@ -620,6 +712,169 @@ public sealed partial class Omnibox : UserControl
         }
     }
 
+    private void SuggestionActions_Loaded(object sender, RoutedEventArgs args)
+    {
+        var button = (Button)sender;
+        if (this._suggestionsList?.ContainerFromItem(button.DataContext) is not ListViewItem row)
+        {
+            return;
+        }
+
+        var pointerOver = false;
+        void Reveal(bool hovered)
+        {
+            pointerOver = hovered;
+            button.Visibility = hovered || row.IsSelected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        void Entered(object sender, PointerRoutedEventArgs args) => Reveal(true);
+        void Exited(object sender, PointerRoutedEventArgs args) => Reveal(false);
+        void ContextRequested(UIElement sender, ContextRequestedEventArgs args)
+        {
+            if (row.Content is OmniboxItem item && args.TryGetPosition(row, out _))
+            {
+                this.ShowSuggestionActions(row, item);
+                args.Handled = true;
+            }
+        }
+
+        var selectionToken = row.RegisterPropertyChangedCallback(SelectorItem.IsSelectedProperty, (_, _) => Reveal(pointerOver));
+        row.PointerEntered += Entered;
+        row.PointerExited += Exited;
+        row.ContextRequested += ContextRequested;
+        button.Unloaded += Detach;
+        Reveal(false);
+
+        void Detach(object sender, RoutedEventArgs args)
+        {
+            button.Unloaded -= Detach;
+            row.PointerEntered -= Entered;
+            row.PointerExited -= Exited;
+            row.ContextRequested -= ContextRequested;
+            row.UnregisterPropertyChangedCallback(SelectorItem.IsSelectedProperty, selectionToken);
+        }
+    }
+
+    private void SuggestionActions_Click(object sender, RoutedEventArgs args)
+    {
+        if (sender is Button { Tag: OmniboxItem item } && this._suggestionsList?.ContainerFromItem(item) is ListViewItem row)
+        {
+            this.ShowSuggestionActions(row, item);
+        }
+    }
+
+    private void SuggestionActions_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (this.SuggestionActionProvider is not null && this._suggestionsList?.SelectedItem is OmniboxItem { HasActions: true } &&
+            this.HasCurrentSuggestionRows(this.InputText))
+        {
+            // WinUI requests the textbox menu on key-down. Open the row menu once that gesture has finished.
+            this._actionsKeyDown = sender.Key;
+            args.Handled = true;
+        }
+    }
+
+    private void Editor_PreviewKeyUp(object sender, KeyRoutedEventArgs args)
+    {
+        if (this._actionsKeyDown != args.Key)
+        {
+            return;
+        }
+
+        args.Handled = true;
+        this._actionsKeyDown = null;
+        if (this._suggestionsList is { SelectedItem: OmniboxItem item } list && list.ContainerFromItem(item) is FrameworkElement row)
+        {
+            this.ShowSuggestionActions(row, item);
+        }
+    }
+
+    private void ShowSuggestionActions(FrameworkElement anchor, OmniboxItem item)
+    {
+        if (this._suggestionMenu is not null || !this.HasCurrentSuggestionRows(this.InputText) ||
+            item.ActionsKey is not { } key || this.SuggestionActionProvider?.Invoke(key) is not { Count: > 0 } actions)
+        {
+            return;
+        }
+
+        var menu = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
+        OmniboxAction? chosen = null;
+        foreach (var action in actions)
+        {
+            var entry = new MenuFlyoutItem { Text = action.Label };
+            entry.Click += (_, _) => chosen = action;
+            menu.Items.Add(entry);
+        }
+
+        this._suggestionMenu = menu;
+        menu.Closed += async (_, _) =>
+        {
+            if (!ReferenceEquals(this._suggestionMenu, menu))
+            {
+                return;
+            }
+
+            if (chosen?.CloseEditor == true)
+            {
+                this.EndEdit(false);
+            }
+            else if (chosen is not null)
+            {
+                // The windowed editor popup would cover a dialog shown by the action.
+                this.SetSuggestionListOpen(false);
+                this.CloseEditorPopup();
+            }
+
+            try
+            {
+                if (chosen is not null)
+                {
+                    await chosen.ExecuteAsync();
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(this._suggestionMenu, menu))
+                {
+                    if (chosen is not null)
+                    {
+                        this.OpenEditorPopup();
+                        this.Editor.UpdateLayout();
+                    }
+
+                    this._suggestionMenu = null;
+                    FindVisualChild<TextBox>(this.Editor)?.Focus(FocusState.Programmatic);
+                    if (chosen is null)
+                    {
+                        this.SetSuggestionListOpen(true);
+                    }
+                    else
+                    {
+                        await this.RefreshSuggestionsAfterActionAsync();
+                    }
+                }
+            }
+        };
+        menu.ShowAt(anchor);
+    }
+
+    private async Task RefreshSuggestionsAfterActionAsync()
+    {
+        if (this._previewItem is not null && this._suggestionsList is { } list)
+        {
+            this.RestoreTypedQuery(list);
+        }
+
+        if (this._scope is { } scope)
+        {
+            this.ShowScopedSuggestions(scope, this._queryText);
+        }
+        else
+        {
+            await this.RequestSuggestionsAsync(this._providerQuery);
+        }
+    }
+
     private void ShowScopedSuggestions(OmniboxScope scope, string text)
     {
         var suggestions = scope.Suggest(text);
@@ -646,8 +901,13 @@ public sealed partial class Omnibox : UserControl
 
     private void CancelSuggestions()
     {
+        this._actionsKeyDown = null;
+        var menu = this._suggestionMenu;
+        this._suggestionMenu = null;
+        menu?.Hide();
         this._suggestionsCancellation?.Cancel();
         this._suggestionsCancellation = null;
+        this._pendingTab = null;
         this._suggestions = [];
         this._expandedSuggestionGroups.Clear();
         this.Editor.ItemsSource = null;
@@ -658,10 +918,16 @@ public sealed partial class Omnibox : UserControl
 
         this.SetSuggestionListOpen(false);
         this._suggestionRows.Clear();
-        this._suggestionGroups.Clear();
+        this._suggestionGroups = [];
+        this._groupedSuggestionsView = null;
     }
 
     private string? PreviewText => this._previewItem?.Scope?.Keyword ?? this._previewItem?.Address;
+
+    private string InputText => FindVisualChild<TextBox>(this.Editor)?.Text ?? this.Editor.Text;
+
+    private bool HasCurrentSuggestionRows(string text) => this._suggestionsList is { SelectionMode: ListViewSelectionMode.Single } &&
+        (text == this._queryText || text == this.PreviewText);
 
     private async void Editor_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
@@ -671,7 +937,7 @@ public sealed partial class Omnibox : UserControl
         }
 
         var text = sender.Text;
-        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput || text == this.PreviewText)
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput || text == this.PreviewText || text != this.InputText)
         {
             return;
         }
@@ -715,32 +981,39 @@ public sealed partial class Omnibox : UserControl
             return;
         }
 
-        if (sender.Items.Count > 0 && sender.Items[0] is OmniboxItem { Scope: not null })
-        {
-            this.CancelSuggestions();
-        }
+        await this.RequestSuggestionsAsync(text);
+    }
 
+    private async Task RequestSuggestionsAsync(string query)
+    {
         if (this.SuggestionProvider is not { } provider)
         {
             this.CancelSuggestions();
             return;
         }
 
-        // Keep the current list visible while the replacement request is pending.
+        var initial = this.ShowSuggestionsOnOpen && query.Length == 0;
+        var editorText = this.Editor.Text;
         this._suggestionsCancellation?.Cancel();
+        this.SetSuggestionRowsSelectable(false);
         var cancellation = new CancellationTokenSource();
         this._suggestionsCancellation = cancellation;
         var token = cancellation.Token;
         try
         {
-            await Task.Delay(120, token);
-            var suggestions = await provider(text, token);
+            if (!initial)
+            {
+                await Task.Delay(120, token);
+            }
+
+            var suggestions = await provider(query, token);
             token.ThrowIfCancellationRequested();
-            if (this.Editor.Visibility != Visibility.Visible || sender.Text != text)
+            if (this.Editor.Visibility != Visibility.Visible || this.InputText != editorText)
             {
                 return;
             }
 
+            this._providerQuery = query;
             this.SetSuggestions(suggestions);
         }
         catch (OperationCanceledException)
@@ -766,7 +1039,7 @@ public sealed partial class Omnibox : UserControl
 
     private void Editor_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
     {
-        if (this._scope is null && args.SelectedItem is OmniboxItem item)
+        if (this._scope is null && args.SelectedItem is OmniboxItem item && this.HasCurrentSuggestionRows(this.InputText))
         {
             this._previewItem = item;
             sender.Text = item.Scope?.Keyword ?? item.Address;
@@ -780,6 +1053,13 @@ public sealed partial class Omnibox : UserControl
 
     private void SubmitQuery(string query, OmniboxItem? suggestion)
     {
+        var text = this.InputText;
+        if (this._scope is null && !this.HasCurrentSuggestionRows(text))
+        {
+            suggestion = null;
+            query = text;
+        }
+
         if (suggestion is { FirstHiddenResult: not null })
         {
             // AutoSuggestBox dismisses its popup after QuerySubmitted returns.
@@ -834,7 +1114,20 @@ public sealed partial class Omnibox : UserControl
         var list = this._suggestionsList;
         var source = args.OriginalSource as DependencyObject;
         var fromSuggestions = list is not null && Contains(list, source);
-        if (args.Key == VirtualKey.Enter && fromSuggestions && source is ListViewItem { Content: OmniboxItem item })
+        if (args.Key is VirtualKey.Up or VirtualKey.Down && this.IsSuggestionListOpen &&
+            !IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Menu))
+        {
+            if (!this.HasCurrentSuggestionRows(this.InputText))
+            {
+                args.Handled = true;
+            }
+            else if (!IsKeyDown(VirtualKey.Shift) && ReferenceEquals(sender, this.Editor) && list is not null)
+            {
+                var focusedItem = fromSuggestions ? (source as FrameworkElement)?.DataContext as OmniboxItem : null;
+                args.Handled = this.MoveSuggestionSelection(list, args.Key == VirtualKey.Up, wrap: true, focusedItem: focusedItem);
+            }
+        }
+        else if (args.Key == VirtualKey.Enter && fromSuggestions && source is ListViewItem { Content: OmniboxItem item })
         {
             this.SubmitQuery(this.Editor.Text, item);
             args.Handled = true;
@@ -850,59 +1143,118 @@ public sealed partial class Omnibox : UserControl
             this.ChangeScope(null, string.Empty);
             args.Handled = true;
         }
+        else if (args.Key == VirtualKey.Z && ReferenceEquals(sender, this.Editor) && !fromSuggestions &&
+                 IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Shift) && !IsKeyDown(VirtualKey.Menu) &&
+                 list is not null && this.IsSuggestionListOpen && this.PreviewText is { } preview && this.Editor.Text == preview)
+        {
+            this.RestoreTypedQuery(list);
+            args.Handled = true;
+        }
         else if (args.Key == VirtualKey.Tab && !fromSuggestions && ReferenceEquals(sender, this.Editor) &&
                  !IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Menu))
         {
             var backwards = IsKeyDown(VirtualKey.Shift);
-            var text = this.Editor.Text;
+            // A fast Tab can reach the textbox before AutoSuggestBox reports the latest text change.
+            var text = this.InputText;
             var query = text == this.PreviewText ? this._queryText : text;
             if (!backwards && this._scope is null && this.FindTabScope(query) is { } scope)
             {
                 this.ChangeScope(scope, string.Empty);
                 args.Handled = true;
             }
-            else if (list is not null && this.IsSuggestionListOpen)
+            else if (this._scope is null && this.SuggestionProvider is not null &&
+                     (query != this._queryText || this._suggestionsCancellation is { IsCancellationRequested: false }))
             {
-                args.Handled = this.MoveSuggestionSelection(list, backwards);
+                this._pendingTab = (query, backwards);
+                args.Handled = true;
             }
-            else if (this.XamlRoot?.Content is { } root)
+            else
             {
-                // Resume tab navigation from the Edit address button.
-                this.EndEdit(true);
-                var direction = backwards ? FocusNavigationDirection.Previous : FocusNavigationDirection.Next;
-                args.Handled = FocusManager.TryMoveFocus(direction, new FindNextElementOptions { SearchRoot = root });
+                args.Handled = this.NavigateByTab(backwards);
             }
         }
     }
 
-    private bool MoveSuggestionSelection(ListView list, bool backwards)
+    private bool NavigateByTab(bool backwards)
     {
-        var step = backwards ? -1 : 1;
-        var current = list.SelectedIndex;
-        var index = backwards && current < 0 ? list.Items.Count - 1 : current + step;
-        while (index >= 0 && index < list.Items.Count && IsStatusSuggestion(list.Items[index]))
+        if (this._suggestionsList is { } list && this.IsSuggestionListOpen)
         {
-            index += step;
+            return this.MoveSuggestionSelection(list, backwards);
         }
 
-        if (index < 0 || index >= list.Items.Count)
-        {
-            index = -1;
-        }
-
-        if (index == current)
+        if (this.XamlRoot?.Content is not { } root)
         {
             return false;
         }
 
-        if (index < 0 && this._scope is null)
+        // Resume tab navigation from the Edit address button.
+        this.EndEdit(true);
+        var direction = backwards ? FocusNavigationDirection.Previous : FocusNavigationDirection.Next;
+        return FocusManager.TryMoveFocus(direction, new FindNextElementOptions { SearchRoot = root });
+    }
+
+    private bool MoveSuggestionSelection(ListView list, bool backwards, bool wrap = false, OmniboxItem? focusedItem = null)
+    {
+        var step = backwards ? -1 : 1;
+        var count = list.Items.Count;
+        var edge = backwards ? count - 1 : 0;
+        var current = focusedItem is null ? list.SelectedIndex : list.Items.IndexOf(focusedItem);
+        var index = current < 0 ? edge : current + step;
+        for (var visited = 0; visited < count; visited++, index += step)
         {
-            this._previewItem = null;
-            this.Editor.Text = this._queryText;
+            if (index < 0 || index >= count)
+            {
+                if (!wrap)
+                {
+                    break;
+                }
+
+                index = edge;
+            }
+
+            var item = list.Items[index];
+            if (IsStatusSuggestion(item))
+            {
+                continue;
+            }
+
+            list.SelectedIndex = index;
+            list.ScrollIntoView(item);
+            if (focusedItem is not null)
+            {
+                list.UpdateLayout();
+                (list.ContainerFromItem(item) as Control)?.Focus(FocusState.Keyboard);
+            }
+
+            return true;
         }
 
-        list.SelectedIndex = index;
+        if (current < 0)
+        {
+            return wrap;
+        }
+
+        if (this._scope is null)
+        {
+            this.RestoreTypedQuery(list);
+        }
+        else
+        {
+            list.SelectedIndex = -1;
+        }
+
         return true;
+    }
+
+    private void RestoreTypedQuery(ListView list)
+    {
+        this._previewItem = null;
+        this.Editor.Text = this._queryText;
+        list.SelectedIndex = -1;
+        if (FindVisualChild<TextBox>(this.Editor) is { } input)
+        {
+            input.Select(input.Text.Length, 0);
+        }
     }
 
     private bool IsSuggestionListOpen => this._suggestionsPanel?.Visibility == Visibility.Visible;
@@ -929,7 +1281,8 @@ public sealed partial class Omnibox : UserControl
     {
         this.DispatcherQueue.TryEnqueue(() =>
         {
-            if (this._isEnteringEditMode || this.Editor.Visibility != Visibility.Visible || this.XamlRoot is not { } root)
+            if (this._isEnteringEditMode || this._suggestionMenu is not null ||
+                this.Editor.Visibility != Visibility.Visible || this.XamlRoot is not { } root)
             {
                 return;
             }
@@ -1229,6 +1582,8 @@ public sealed partial class Omnibox : UserControl
     }
 
     internal static string ShowMoreName(string label) => $"Show more from {label}";
+
+    internal static string SuggestionActionsName(string label) => $"More actions for {label}";
 
     private void UpdateLocationIcon()
     {

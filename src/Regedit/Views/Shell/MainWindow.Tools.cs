@@ -229,7 +229,7 @@ public sealed partial class MainWindow
         this.SaveToolPreferences();
     }
 
-    internal void OpenToolTab(ToolKind tool, IToolSurface? source = null)
+    internal IToolSurface OpenToolTab(ToolKind tool, IToolSurface? source = null)
     {
         this.ViewModel.OpenToolTab(tool, source is not null);
         var target = (IToolSurface)this.GetView(this.ViewModel.ActiveTab!);
@@ -240,6 +240,7 @@ public sealed partial class MainWindow
         }
 
         target.RequestFocus(true);
+        return target;
     }
 
     internal void ShowToolInPanel(IToolSurface source)

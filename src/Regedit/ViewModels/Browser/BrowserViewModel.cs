@@ -239,7 +239,6 @@ public sealed partial class BrowserViewModel : ObservableObject
         NotesStore? notes = null)
     {
         this.Registry = registry;
-        this.Addresses = new RegistryAddressSuggestions(registry.SubKeys);
         this._metadata = new RegistryListMetadata(registry);
         this._notes = notes;
         this._preferences = preferences;
@@ -261,6 +260,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
 
         this._history = new NavigationHistory(initial);
+        this.Addresses = new RegistryAddressSuggestions(registry.SubKeys, favorites?.Favorites ?? [], this._history);
         this._clipboard = clipboard;
         this._favorites = favorites;
         this.Location = initial;

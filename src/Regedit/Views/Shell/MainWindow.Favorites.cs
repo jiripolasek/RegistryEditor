@@ -146,6 +146,14 @@ public sealed partial class MainWindow
             "Open favorite", () => this.ViewModel.NavigateFromToolsAsync(favorite.GetLocation(), newTab));
     }
 
+    internal void ShowFavoriteInOrganizer(string id)
+    {
+        var favorite = this.Favorites.Bookmark(id);
+        var organizer = (FavoritesView)this.OpenToolTab(ToolKind.Favorites);
+        organizer.ViewModel.OpenFolder(favorite.FolderId ?? string.Empty);
+        organizer.ViewModel.SelectRows((FavoriteItemId[])[new(id, false)]);
+    }
+
     internal async Task RunFavoriteActionAsync(string operation, Func<Task> action)
     {
         try

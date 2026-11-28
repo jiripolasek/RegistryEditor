@@ -7,8 +7,11 @@ using CommunityToolkit.Mvvm.Input;
 using JPSoftworks.Regedit.Controls.Omnibox;
 using JPSoftworks.Regedit.Controls.Shared;
 using JPSoftworks.Regedit.Core.Registry;
+using JPSoftworks.Regedit.Dialogs;
+using JPSoftworks.Regedit.Models.Tools;
 using JPSoftworks.Regedit.ViewModels.Browser;
 using JPSoftworks.Regedit.ViewModels.Shell;
+using JPSoftworks.Regedit.ViewModels.Tools;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Win32;
 using Windows.System;
@@ -18,7 +21,7 @@ namespace JPSoftworks.Regedit.Views.Pages;
 public sealed partial class BrowserPage
 {
     private const string SearchScopeKeyword = "@search";
-    private const string TabsGlyph = "\uE7E8";
+    private const string TabsGlyph = "\uE7C4";
 
     private void InitializeOmniboxScopes()
     {
@@ -69,6 +72,17 @@ public sealed partial class BrowserPage
             GroupPreviewCounts = new Dictionary<string, int> { ["Tools"] = 3 }
         };
         this.AddressBar.AddressPlaceholder = "Enter an address or type @";
+        this.AddressBar.SuggestionActionProvider = id => (OmniboxAction[])
+        [
+            new("Show in Favorites organizer", () => this._window.RunFavoriteActionAsync("Show in Favorites organizer", () =>
+            {
+                this._window.ShowFavoriteInOrganizer(id);
+                return Task.CompletedTask;
+            }), CloseEditor: true),
+            new("Remove favorite…", () => this._window.RunFavoriteActionAsync("Remove favorite", () =>
+                FavoritesViewModel.RemoveItemsAsync(this._window.Favorites, new FavoriteDialogs(this._window.Dialogs),
+                    (FavoriteItemId[])[new(id, false)])))
+        ];
         this.AddressBar.Scopes = (OmniboxScope[])
         [
             new("@favorites", "Favorites", "Find favorites", query => this.SuggestFavorites(query.Trim(), openFavorite), "*")
@@ -104,6 +118,7 @@ public sealed partial class BrowserPage
             {
                 IconGlyph = SymbolGlyphs.Get(Symbol.Favorite),
                 RightText = favorite.Is32Bit ? "32-bit" : "64-bit",
+                ActionsKey = favorite.Id,
                 Command = openFavorite,
                 CommandParameter = favorite.Id
             }).ToArray();

@@ -22,6 +22,7 @@
             BasedOn="{StaticResource DefaultListViewItemStyle}"
             TargetType="ListViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="MinHeight" Value="{StaticResource SuggestionRowMinHeight}" />
             <Setter Property="Padding" Value="0" />
         </Style>
@@ -61,15 +62,35 @@
                     <Run Text="{x:Bind Label}" />
                     <Run Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind local:Omnibox.InlineDetail(Detail)}" />
                 </TextBlock>
-                <TextBlock
-                    Grid.Column="2"
-                    MaxWidth="108"
-                    VerticalAlignment="Center"
-                    FontSize="12"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="{x:Bind RightText}"
-                    TextTrimming="CharacterEllipsis"
-                    Visibility="{x:Bind local:Omnibox.DescriptionVisibility(RightText)}" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SuggestionColumnSpacing}">
+                    <Button
+                        x:Name="SuggestionActionsButton"
+                        x:Load="{x:Bind HasActions}"
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        VerticalAlignment="Center"
+                        AllowFocusOnInteraction="False"
+                        AutomationProperties.AcceleratorKey="Shift+F10"
+                        AutomationProperties.Name="{x:Bind local:Omnibox.SuggestionActionsName(Label)}"
+                        Click="SuggestionActions_Click"
+                        IsTabStop="False"
+                        Loaded="SuggestionActions_Loaded"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        Tag="{x:Bind}"
+                        ToolTipService.ToolTip="More actions (Shift+F10)"
+                        Visibility="Collapsed">
+                        <FontIcon FontSize="16" Glyph="&#xE712;" />
+                    </Button>
+                    <TextBlock
+                        MaxWidth="108"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind RightText}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{x:Bind local:Omnibox.DescriptionVisibility(RightText)}" />
+                </StackPanel>
             </Grid>
         </DataTemplate>
         <DataTemplate x:Key="SuggestionPreviewHeaderTemplate" x:DataType="local:OmniboxItem">
@@ -178,7 +199,7 @@
                                     <GroupStyle.HeaderTemplate>
                                         <DataTemplate x:DataType="local:OmniboxSuggestionGroup">
                                             <Grid
-                                                MinHeight="{StaticResource SuggestionRowMinHeight}"
+                                                MinHeight="24"
                                                 Padding="{StaticResource SuggestionRowPadding}"
                                                 Visibility="{x:Bind local:Omnibox.DescriptionVisibility(Label), Mode=OneWay}">
                                                 <TextBlock
@@ -240,7 +261,6 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <ContentPresenter
@@ -314,26 +334,23 @@
                 TextTrimming="CharacterEllipsis"
                 ToolTipService.ToolTip="{x:Bind Address, Mode=OneWay}"
                 Visibility="Collapsed" />
+            <!-- The address surface provides the edit action behind the breadcrumb buttons. -->
             <Button
                 x:Name="EditAddressButton"
-                Grid.Column="3"
-                Width="32"
-                Height="32"
-                Padding="7"
-                VerticalAlignment="Center"
+                Grid.ColumnSpan="3"
+                MinWidth="0"
+                Padding="0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
                 AccessKey="E"
                 AutomationProperties.Name="Edit address"
+                Canvas.ZIndex="-1"
                 Click="EditAddress_Click"
                 Style="{StaticResource SubtleButtonStyle}"
-                ToolTipService.ToolTip="Edit address (Ctrl+L)">
-                <FontIcon
-                    FontSize="14"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Glyph="&#xE70F;" />
-            </Button>
+                ToolTipService.ToolTip="Edit address (Ctrl+L)" />
             <ContentPresenter
                 x:Name="TrailingPresenter"
-                Grid.Column="4"
+                Grid.Column="3"
                 VerticalContentAlignment="Center" />
         </Grid>
         <Border x:Name="EditPlaceholder" Visibility="Collapsed" />
@@ -353,15 +370,20 @@
                     ItemContainerStyle="{StaticResource SuggestionItemStyle}"
                     ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}"
                     LostFocus="Editor_LostFocus"
-                    MaxSuggestionListHeight="280"
                     PreviewKeyDown="Editor_PreviewKeyDown"
+                    PreviewKeyUp="Editor_PreviewKeyUp"
                     QueryIcon="Forward"
                     QuerySubmitted="Editor_QuerySubmitted"
                     SuggestionChosen="Editor_SuggestionChosen"
                     Template="{StaticResource SuggestionEditorTemplate}"
                     TextChanged="Editor_TextChanged"
                     UpdateTextOnSelect="False"
-                    Visibility="Collapsed" />
+                    Visibility="Collapsed">
+                    <AutoSuggestBox.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F10" Modifiers="Shift" Invoked="SuggestionActions_Invoked" ScopeOwner="{x:Bind Editor}" />
+                        <KeyboardAccelerator Key="Application" Invoked="SuggestionActions_Invoked" ScopeOwner="{x:Bind Editor}" />
+                    </AutoSuggestBox.KeyboardAccelerators>
+                </AutoSuggestBox>
                 <Grid x:Name="EditorAccessories" VerticalAlignment="Top">
                     <FontIcon
                         x:Name="AddressEditorIcon"

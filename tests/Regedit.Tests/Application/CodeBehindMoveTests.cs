@@ -30,6 +30,7 @@ internal static class CodeBehindMoveTests
         Rows(check);
         RemoteProbe(check);
         await SuggestionsAsync(check);
+        await DestinationSuggestionsAsync(check);
         await ApplicationMenuAsync(check);
     }
 
@@ -204,13 +205,22 @@ internal static class CodeBehindMoveTests
 
     private static async Task SuggestionsAsync(Action<bool, string> check)
     {
+        var currentHive = RegistryLocation.Parse("HKCU");
+        var current = currentHive.Child("Software");
         var reads = new List<RegistryLocation>();
+        var autoRunKeys = Enumerable.Range(0, 31).Select(index => $"AutoRun{index:00}");
         var suggestions = new RegistryAddressSuggestions(location =>
         {
             reads.Add(location);
-            return Enumerable.Range(0, 40).Select(index => $"Key{index:00}").Append("Other").ToArray();
-        });
-        var roots = await suggestions.SuggestAsync("hkc", RegistryView.Registry64, CancellationToken.None);
+            return [..autoRunKeys.Reverse(), "RunOnce", "runAll", "xRun", "Absent", "Run"];
+        }, [], new NavigationHistory(currentHive));
+        var fresh = await suggestions.SuggestAsync(string.Empty, currentHive, CancellationToken.None);
+        check(fresh.Select(item => item.Address).SequenceEqual(currentHive.GetHives().Where(root => root != currentHive).Select(root => root.Address))
+              && reads.Count == 0, "A fresh starting list shows the other hives without reading the registry");
+        check(fresh.Select(item => item.RightText).SequenceEqual(["HKCR", "HKLM", "HKU", "HKCC"])
+              && fresh.All(item => item is { Group: "Hives", IconGlyph: "\uE8B7" }),
+            "A fresh profile groups hive aliases under Hives without promoting an arbitrary row");
+        var roots = await suggestions.SuggestAsync("hkc", current, CancellationToken.None);
         var expected = RegistryLocation.Roots.Where(root =>
             root.Alias.StartsWith("hkc", StringComparison.OrdinalIgnoreCase)
             || root.Name.StartsWith("hkc", StringComparison.OrdinalIgnoreCase)).Select(root => root.Name);
@@ -219,23 +229,126 @@ internal static class CodeBehindMoveTests
             && roots.Any(item => item.Label == "HKEY_CURRENT_USER")
             && reads.Count == 0, "Root suggestions match aliases without reading the registry");
 
-        var keys = await suggestions.SuggestAsync(@"Computer\HKCU\Software\key", RegistryView.Registry64, CancellationToken.None);
+        var keys = await suggestions.SuggestAsync(@"Computer\HKCU\Software\rUn", current, CancellationToken.None);
+        var expectedKeys = new[] { "Run", "runAll", "RunOnce" }.Concat(autoRunKeys).Take(30);
         check(
-            keys.Count == RegistryAddressSuggestions.SuggestionLimit
-            && keys[0].Label == "Key00"
-            && reads is [{ SubKey: "Software" }]
-            && keys[0].Address == RegistryLocation.Parse(@"HKCU\Software").Child("Key00").Address,
-            "Subkey suggestions strip the Computer prefix, filter by prefix and stop at the limit");
+            keys.Select(item => item.Label).SequenceEqual(expectedKeys) && keys.All(item => item.Group is null),
+            "A late exact match survives the 30-result cap, followed by prefix and substring matches sorted by name");
+        check(
+            reads.SequenceEqual([current]) && keys[0].Address == current.Child("Run").Address,
+            "Subkey suggestions strip the Computer prefix and read only the requested parent");
 
         reads.Clear();
-        var remote = await suggestions.SuggestAsync(@"\\SERVER\HKLM\Soft", RegistryView.Registry64, CancellationToken.None);
+        var remote = await suggestions.SuggestAsync(@"\\SERVER\HKLM\Soft", current, CancellationToken.None);
         check(remote.Count == 0 && reads.Count == 0, "Remote paths never query the network while typing");
 
-        var current = RegistryLocation.Parse(@"HKCU\Software");
         var hives = await suggestions.ChildrenAsync(null, current, CancellationToken.None);
         check(
             hives.Count == current.GetComputer().GetHives().Length && reads.Count == 0,
             "Breadcrumb children of the computer are its hives");
+    }
+
+    private static async Task DestinationSuggestionsAsync(Action<bool, string> check)
+    {
+        var current = RegistryLocation.Parse(@"HKCU\Software");
+        var run = current.Child("Run");
+        var remote = RegistryLocation.Parse(@"\\SERVER\HKLM\Run");
+        var history = new NavigationHistory(RegistryLocation.Parse(@"HKCU\SOFTWARE\RUN"));
+        history.Navigate(current);
+        history.Navigate(run.Child("Diagnostics"));
+        history.Navigate(current.Child("Runner"));
+        history.Navigate(run with { SubKey = @"Software\Run\" });
+        history.Navigate(remote with { Machine = "OTHER" });
+        history.MoveTo(1);
+        var favorites = new List<Favorite>
+        {
+            new("run backup", current.Child("Backup").Address),
+            new("Nightly run", current.Child("Nightly").Address),
+            new("32-bit run", run.Address, Is32Bit: true),
+            new("Remote run", remote.Address),
+            new("HKCU bookmark", "HKCU"),
+            new("HKCU tools", current.Child("Tools").Address),
+            new("Editor", current.Child("Editor").Address),
+            new("Spare", current.Child("Spare").Address),
+            new("Startup", run.Address),
+            new("Second name", run.Address)
+        };
+        var suggestions = new RegistryAddressSuggestions(_ => throw new InvalidOperationException("Unexpected registry read"), favorites, history);
+        var matches = await suggestions.SuggestAsync("rUn", current, CancellationToken.None);
+        check(matches.Select(item => item.Label).SequenceEqual(["Startup", "run backup", "Runner", "Nightly run", "Diagnostics"])
+              && matches[0].Detail == run.Address && matches.All(item => item.Command is null),
+            "Names and leaves outrank path matches, and a favorite and a differently cased history visit share one address row");
+        check(matches.Take(2).All(item => item is { Group: "Suggestions", IconGlyph: "\uE734" })
+              && matches.Where(item => item.Group == "Favorites").Select(item => item.Label).SequenceEqual(["Nightly run"])
+              && matches.Where(item => item.Group == "History").Select(item => item.Label).SequenceEqual(["Runner", "Diagnostics"]),
+            "A plain search promotes two distinct matches with their source icons and groups the remaining destinations by source");
+        var roots = await suggestions.SuggestAsync("HKCU", current, CancellationToken.None);
+        check(roots.Select(item => item.Label).SequenceEqual(["HKEY_CURRENT_USER", "HKCU tools"]),
+            "A hive alias wins over a bookmark to the same hive and favorites mentioning the alias");
+
+        var otherView = await suggestions.SuggestAsync("run", current with { View = RegistryView.Registry32 }, CancellationToken.None);
+        var remoteRun = await suggestions.SuggestAsync("run", remote with { Machine = "server" }, CancellationToken.None);
+        check(otherView is [{ Label: "32-bit run" }] && remoteRun is [{ Label: "Remote run" }] && remoteRun[0].Address == remote.Address,
+            "Ordinary suggestions preserve the active view and machine and omit other computers");
+        var remoteHives = await suggestions.SuggestAsync("HK", remote, CancellationToken.None);
+        check(remoteHives.Take(2).Select(item => item.Address).SequenceEqual(remote.GetHives().Select(hive => hive.Address)),
+            "Bare hive aliases on a remote computer offer its supported machine-qualified addresses");
+        var explicitRoot = await suggestions.SuggestAsync(@"Computer\HKCU", remote, CancellationToken.None);
+        check(explicitRoot is [{ Address: "HKEY_CURRENT_USER" }], "An explicit Computer path completes local hives");
+        var starting = await suggestions.SuggestAsync(string.Empty, current, CancellationToken.None);
+        var secondName = await suggestions.SuggestAsync("Second name", current, CancellationToken.None);
+        check(starting.Concat(matches).All(item => item.ActionsKey == favorites.FirstOrDefault(favorite => favorite.Name == item.Label)?.Id)
+              && secondName.Single().ActionsKey == favorites[^1].Id,
+            "Favorite actions follow the displayed bookmark ID through promotion, ranking and same-address duplicates");
+
+        var personal = starting.TakeWhile(item => item.Group != "Hives").ToArray();
+        check(personal.Select(item => item.Label).SequenceEqual(["Startup", "Diagnostics", "Runner", "run backup", "Nightly run",
+                  "HKCU bookmark", "HKCU tools", "Editor"])
+              && starting.All(item => item.Command is null),
+            "A bookmarked visit appears once with its first saved name, even beyond the five other favorites");
+        check(starting[0].Address == history.GetNearbyLocations().First().Address && starting[0].Detail == starting[0].Address
+              && personal.Take(3).Select(item => item.IconGlyph).SequenceEqual(["\uE734", "\uE81C", "\uE81C"])
+              && personal.Take(3).Select(item => item.Group).SequenceEqual(["Suggestions", "Suggestions", "History"])
+              && personal.Skip(3).All(item => item is { Group: "Favorites", IconGlyph: "\uE734" })
+              && starting.Take(5).All(item => item.RightText is null) && starting[5].RightText == "HKCU",
+            "Starting rows distinguish history and favorites and show hive aliases even for named bookmarks");
+        var remoteStart = await suggestions.SuggestAsync(string.Empty, remote, CancellationToken.None);
+        check(remoteStart.Select(item => item.Address).SequenceEqual(remote.GetHives().Select(root => root.Address))
+              && remoteStart.Select(item => item.RightText).SequenceEqual(["HKLM", "HKU"]),
+            "Starting suggestions exclude the current key and other machines, then fill remaining places with hives");
+        var viewStart = await suggestions.SuggestAsync(string.Empty, current with { View = RegistryView.Registry32 }, CancellationToken.None);
+        check(viewStart.Select(item => item.Label).SequenceEqual(new[] { "32-bit run" }.Concat(current.GetHives().Select(hive => hive.Name))),
+            "Only a favorite from the active registry view shares the starting list with its hives");
+
+        favorites.Add(new Favorite("HKC", current.Child("Settings").Address));
+        var exactFavorite = await suggestions.SuggestAsync("hkc", current, CancellationToken.None);
+        check(exactFavorite[0] is { Label: "HKC", Group: "Suggestions" }
+              && exactFavorite[1] is { RightText: "HKCR", Group: "Suggestions" }
+              && exactFavorite[2] is { RightText: "HKCU", Group: "Hives" },
+            "An exact favorite name outranks partial hive aliases, and equally ranked hives retain their navigation order");
+        favorites.AddRange(Enumerable.Range(0, 35).Select(index => new Favorite("Limit entry", current.Child($"Key{index:00}").Address)));
+        favorites.AddRange(Enumerable.Range(0, 31).Select(_ => new Favorite("Limit", current.Child("Winner").Address)));
+        var limited = await suggestions.SuggestAsync("limit", current, CancellationToken.None);
+        check(limited.Count == 30 && limited[0].Label == "Limit" && limited[^1].Address == current.Child("Key28").Address,
+            "The best bare-word matches survive the combined limit and equal labels are ordered by full address");
+
+        history.MoveTo(2);
+        var nearby = await suggestions.SuggestAsync(string.Empty, history.Current, CancellationToken.None);
+        check(nearby.Take(3).Select(item => item.Address).SequenceEqual([run.Address, current.Address, current.Child("Runner").Address],
+                  StringComparer.OrdinalIgnoreCase) && nearby.Take(3).Select(item => item.Group).SequenceEqual(["Suggestions", "Suggestions", "History"]),
+            "A bookmarked visit is promoted ahead of the other nearby visits, with Back first on a distance tie");
+
+        for (var index = 0; index < 7; index++)
+        {
+            history.Navigate(current.Child($"Visit{index}"));
+        }
+
+        var full = await suggestions.SuggestAsync(string.Empty, history.Current, CancellationToken.None);
+        check(full.Take(5).Select(item => item.Label).SequenceEqual(["Visit5", "Visit4", "Visit3", "Visit2", "Visit1"])
+              && full.Count(item => item.Group == "Favorites") == 5
+              && full.Where(item => item.Group == "Hives").Select(item => item.RightText).SequenceEqual(["HKCR", "HKLM", "HKU", "HKCC"])
+              && full.DistinctBy(item => item.Address, StringComparer.OrdinalIgnoreCase).Count() == full.Count,
+            "Five recent visits and five additional favorites leave every other hive available as a distinct starting destination");
     }
 
     private static async Task ApplicationMenuAsync(Action<bool, string> check)

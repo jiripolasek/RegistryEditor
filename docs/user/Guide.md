@@ -28,6 +28,8 @@ The address bar, launch arguments, and favorite locations also accept PowerShell
 
 **Settings > Registry view > Always show address as text** replaces breadcrumbs with the full registry path in every registry tab. Click the address or press Ctrl+L to edit it. The preference is remembered; turn it off to restore breadcrumbs.
 
+Hover over a favorite in the address suggestions or select it with the arrow keys to reveal **More actions**. Choose **Show in Favorites organizer** to select the bookmark in its folder, or **Remove favorite…** to remove it after confirmation. You can also open the menu with Shift+F10 on a selected favorite or by pressing and holding the row on a touchscreen.
+
 Committing an address successfully moves keyboard focus to the registry list, ready for arrow-key navigation. Invalid or inaccessible addresses keep focus in the address editor so you can correct the draft.
 
 Spaces at the end of a key name are significant, including in unquoted paths. A whitespace-only key name is also valid. Navigation, copied paths, favorites, and restored tabs preserve these names exactly. Padding outside explicit quotes or a registry file header is ignored.

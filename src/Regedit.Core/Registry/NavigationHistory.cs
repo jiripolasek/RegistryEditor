@@ -36,6 +36,22 @@ public sealed class NavigationHistory
         return (forward ? entries.Skip(this._index + 1) : entries.Take(this._index).Reverse()).ToArray();
     }
 
+    public IEnumerable<RegistryLocation> GetNearbyLocations()
+    {
+        for (int back = this._index - 1, forward = this._index + 1; back >= 0 || forward < this._items.Count; back--, forward++)
+        {
+            if (back >= 0)
+            {
+                yield return this._items[back].Location;
+            }
+
+            if (forward < this._items.Count)
+            {
+                yield return this._items[forward].Location;
+            }
+        }
+    }
+
     public RegistryLocation? GetTarget(int index)
     {
         return index >= 0 && index < this._items.Count ? this._items[index].Location : null;
