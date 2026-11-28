@@ -24,6 +24,11 @@ public sealed record OmniboxItem(string Label, string Address)
 
     public object? CommandParameter { get; init; }
 
+    /// <summary>Identifies this row to the host's suggestion action provider.</summary>
+    public string? ActionsKey { get; init; }
+
+    public bool HasActions => !string.IsNullOrEmpty(this.ActionsKey);
+
     internal OmniboxScope? Scope { get; init; }
     internal OmniboxItem? FirstHiddenResult { get; init; }
 
@@ -32,3 +37,5 @@ public sealed record OmniboxItem(string Label, string Address)
         return this.Label;
     }
 }
+
+public sealed record OmniboxAction(string Label, Func<Task> ExecuteAsync, bool CloseEditor = false);

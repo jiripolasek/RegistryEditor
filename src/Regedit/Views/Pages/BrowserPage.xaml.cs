@@ -184,7 +184,8 @@ public sealed partial class BrowserPage : Page
             this.FilterBox.SelectionStart = this.FilterBox.Text.Length;
         };
         viewModel.RegistryChanged += (_, _) => this._window.JournalHistory.RegistryActivityCompleted();
-        this.AddressBar.SuggestionProvider = (text, token) => viewModel.Addresses.SuggestAsync(text, viewModel.Location.View, token);
+        this.AddressBar.SuggestionProvider = (text, token) => viewModel.Addresses.SuggestAsync(text, viewModel.Location, token);
+        this.AddressBar.ShowSuggestionsOnOpen = true;
         this.AddressBar.ChildrenProvider = (address, token) => viewModel.Addresses.ChildrenAsync(address, viewModel.Location, token);
         this.InitializeOmniboxScopes();
         this.ApplyViewSettings();

@@ -74,6 +74,14 @@ function Navigate([string] $Address, [string] $Expected) {
     Expect-ListKeyboardNavigation
 }
 
+function Add-CurrentFavorite([string] $Name) {
+    Invoke-Ui @('click', 'FavoriteButton') | Out-Null
+    Invoke-Ui @('wait-for', 'NameInput', '--type', 'Edit', '-t', '5000') | Out-Null
+    Invoke-Ui @('set-value', 'NameInput', $Name) | Out-Null
+    Invoke-Ui @('invoke', 'PrimaryButton', '--action', 'invoke') | Out-Null
+    Wait-State { param($elements) $elements.name -contains 'Remove favorite' }
+}
+
 function Expect-ListKeyboardNavigation {
     Wait-State {
         param($elements)
@@ -115,9 +123,26 @@ function Expect-KeyboardFocus([string] $Selector) {
     if ($focus.properties.HasKeyboardFocus -ne 'True') { throw "Expected keyboard focus on $Selector." }
 }
 
+function Get-AddressTabTarget([string] $Key) {
+    Invoke-Ui @('send-keys', $Key, '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+    $id = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element.automationId
+    if (-not $id -or $id -eq 'EditAddressButton') { throw "Could not find the $Key target from Edit address." }
+    $id
+}
+
 function Expect-SuggestionSelection([string] $Selector, [bool] $Selected = $true) {
     $item = Invoke-Ui @('get-property', $Selector, '-p', 'IsSelected', '--json') | ConvertFrom-Json
     if ($item.properties.IsSelected -ne $Selected.ToString()) { throw "Expected $Selector selection to be $Selected." }
+}
+
+function Expect-SuggestionRows([string] $Draft, [string[]] $Names) {
+    Wait-State {
+        param($elements)
+        $editor = $elements | Where-Object automationId -eq 'OmniboxInput'
+        $list = $elements | Where-Object automationId -eq 'SuggestionsList'
+        $rows = @(Get-Elements $list.children | Where-Object type -eq 'ListItem')
+        $editor -and [string]$editor.value -ceq $Draft -and ($rows.name -join '|') -ceq ($Names -join '|')
+    }
 }
 
 function Test-Omnibox([string] $Name, [scriptblock] $Check) {
@@ -140,12 +165,134 @@ try {
     if ($appWindows.Count -ne 1) { throw 'Expected one registry editor window in the selected target.' }
     $script:mainWindow = $appWindows[0].hwnd
 
+    Test-Omnibox 'Clicking empty address space opens the editor beside the favorite button' {
+        $elements = @(Read-Ui)
+        $bar = $elements | Where-Object automationId -eq 'AddressBar'
+        $edit = $elements | Where-Object automationId -eq 'EditAddressButton'
+        $favorite = $elements | Where-Object automationId -eq 'FavoriteButton'
+        if (-not $edit.isInvokable -or [Math]::Abs($edit.x - $bar.x) -gt 1 -or
+            [Math]::Abs($edit.x + $edit.width - $favorite.x) -gt 1) {
+            throw 'Expected the edit action to span the address bar up to the favorite button.'
+        }
+        $x = [int]($edit.x + $edit.width - 4)
+        $y = [int]($edit.y + $edit.height / 2)
+        Invoke-Ui @('click', '--at', "$x,$y") | Out-Null
+        Invoke-Ui @('wait-for', 'OmniboxInput', '--type', 'Edit', '-t', '5000') | Out-Null
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-KeyboardFocus 'EditAddressButton'
+    }
+    Test-Omnibox 'Alt+D and one Down previews the first starting suggestion' {
+        $hives = 'HKEY_CLASSES_ROOT', 'HKEY_LOCAL_MACHINE', 'HKEY_USERS', 'HKEY_CURRENT_CONFIG'
+        Invoke-Ui @('send-keys', 'alt+d', '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+        Expect-SuggestionRows 'HKEY_CURRENT_USER' $hives
+        $list = Read-Ui | Where-Object automationId -eq 'SuggestionsList'
+        $rows = @(Get-Elements $list.children | Where-Object type -eq 'ListItem' | Select-Object -First 2)
+        if (@(Get-Elements $rows[0].children).name -notcontains 'HKCR') { throw 'The first hive did not show its HKCR alias.' }
+        Expect-SuggestionSelection $rows[0].selector $false
+        foreach ($row in $rows) {
+            Invoke-Ui @('send-keys', 'Down', '--via', 'send-input') | Out-Null
+            Expect-SuggestionSelection $row.selector
+            Expect-SuggestionRows $row.name $hives
+            Expect-KeyboardFocus 'OmniboxInput'
+        }
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-Location 'HKEY_CURRENT_USER'
+    }
+    Test-Omnibox 'Up and Down wrap across suggestion groups and preserve keyboard focus' {
+        $hives = 'HKEY_CLASSES_ROOT', 'HKEY_CURRENT_USER', 'HKEY_CURRENT_CONFIG'
+        Edit-Address
+        Invoke-Ui @('send-keys', 'hKc', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Expect-SuggestionRows 'hKc' $hives
+        $list = Read-Ui | Where-Object automationId -eq 'SuggestionsList'
+        $rows = @(Get-Elements $list.children | Where-Object type -eq 'ListItem')
+        foreach ($step in @(
+            @{ Key = 'Down'; Row = $rows[0] }
+            @{ Key = 'Up'; Row = $rows[-1] }
+            @{ Key = 'Down'; Row = $rows[0] }
+        )) {
+            Invoke-Ui @('send-keys', $step.Key, '--via', 'send-input') | Out-Null
+            Expect-SuggestionRows $step.Row.name $hives
+            Expect-SuggestionSelection $step.Row.selector
+            Expect-KeyboardFocus 'OmniboxInput'
+        }
+        Invoke-Ui @('send-keys', 'ctrl+z', '--via', 'send-input') | Out-Null
+        Expect-SuggestionRows 'hKc' $hives
+        Invoke-Ui @('send-keys', 'Up', '--via', 'send-input') | Out-Null
+        Expect-SuggestionRows $rows[-1].name $hives
+        Expect-SuggestionSelection $rows[-1].selector
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+    }
+    Test-Omnibox 'Starting suggestions preserve Ctrl+L copy, Down/Enter navigation and Escape' {
+        $currentUser = 'HKEY_CURRENT_USER'
+        $otherHives = 'HKEY_CLASSES_ROOT', 'HKEY_LOCAL_MACHINE', 'HKEY_USERS', 'HKEY_CURRENT_CONFIG'
+        Edit-Address
+        Invoke-Ui @('send-keys', 'clipboard sentinel', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Invoke-Ui @('send-keys', 'ctrl+a ctrl+c Escape', '--via', 'send-input') | Out-Null
+        Expect-Location $currentUser
+
+        Invoke-Ui @('send-keys', 'ctrl+l', '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+        Expect-SuggestionRows $currentUser $otherHives
+        $list = Read-Ui | Where-Object automationId -eq 'SuggestionsList'
+        foreach ($row in (Get-Elements $list.children | Where-Object type -eq 'ListItem')) {
+            Expect-SuggestionSelection $row.selector $false
+        }
+        Invoke-Ui @('send-keys', 'ctrl+c Backspace', '--via', 'send-input') | Out-Null
+        Expect-SuggestionRows '' $otherHives
+        Invoke-Ui @('send-keys', 'ctrl+v', '--via', 'send-input') | Out-Null
+        Wait-State { param($elements) @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -ceq $currentUser }).Count -eq 1 }
+        $clear = Read-Ui | Where-Object automationId -eq 'ClearInputButton' | Select-Object -First 1
+        Invoke-Ui @('invoke', $clear.selector, '--action', 'invoke') | Out-Null
+        Expect-SuggestionRows '' $otherHives
+        Invoke-Ui @('send-keys', 'Down', '--via', 'send-input') | Out-Null
+        Wait-State { param($elements) @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -ceq $otherHives[0] }).Count -eq 1 }
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-Location $currentUser
+        Expect-KeyboardFocus 'EditAddressButton'
+
+        Navigate 'HKCU\Software' 'HKEY_CURRENT_USER\Software'
+        Add-CurrentFavorite 'Keyboard favorite'
+        Invoke-Ui @('invoke', 'Back', '--action', 'invoke') | Out-Null
+        Expect-Location $currentUser
+        Invoke-Ui @('send-keys', 'ctrl+l', '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+        $bookmarkedVisit = @('Keyboard favorite') + $otherHives
+        Expect-SuggestionRows $currentUser $bookmarkedVisit
+        $list = Read-Ui | Where-Object automationId -eq 'SuggestionsList'
+        $headers = Get-Elements $list.children | Where-Object { $_.name -in 'Suggestions', 'Hives' } | Select-Object -ExpandProperty name -Unique
+        if (($headers -join '|') -cne 'Suggestions|Hives') { throw 'Expected the Suggestions heading above the remaining hives.' }
+        $first = Get-Elements $list.children | Where-Object type -eq 'ListItem' | Select-Object -First 1
+        if (-not (@(Get-Elements $first.children).name -like '*HKEY_CURRENT_USER\Software*')) {
+            throw 'The bookmarked visit did not show its full destination beside the saved name.'
+        }
+        Invoke-Ui @('send-keys', 'Down', '--via', 'send-input') | Out-Null
+        Expect-SuggestionRows 'HKEY_CURRENT_USER\Software' $bookmarkedVisit
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-Location $currentUser
+        Navigate 'HKLM' 'HKEY_LOCAL_MACHINE'
+        $expected = $currentUser, 'Keyboard favorite', 'HKEY_CLASSES_ROOT', 'HKEY_USERS', 'HKEY_CURRENT_CONFIG'
+        Invoke-Ui @('send-keys', 'ctrl+l', '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+        Expect-SuggestionRows 'HKEY_LOCAL_MACHINE' $expected
+        Invoke-Ui @('screenshot', 'SuggestionsList', '--output', (Join-Path $ArtifactDirectory 'starting-groups.png')) | Out-Null
+        Invoke-Ui @('send-keys', 'Backspace', '--via', 'send-input') | Out-Null
+        Expect-SuggestionRows '' $expected
+        Invoke-Ui @('send-keys', 'Down Enter', '--via', 'send-input') | Out-Null
+        Expect-Location $currentUser
+        Expect-ListKeyboardNavigation
+
+        Navigate 'HKCU\Software' 'HKEY_CURRENT_USER\Software'
+        Invoke-Ui @('invoke', 'FavoriteButton', '--action', 'invoke') | Out-Null
+        Wait-State { param($elements) $elements.name -contains 'Add favorite' }
+        Invoke-Ui @('invoke', 'Back', '--action', 'invoke') | Out-Null
+        Expect-Location $currentUser
+    }
+
     Test-Omnibox 'Typed aliases become clickable breadcrumbs and focus the list' {
         Navigate 'HKCU\Software' 'HKEY_CURRENT_USER\Software'
     }
     Test-Omnibox 'Ancestor navigation updates the current location' {
         $ancestor = Read-Ui | Where-Object { $_.automationId -eq 'Breadcrumb1' -and $_.name -eq 'HKEY_CURRENT_USER' }
-        Invoke-Ui @('invoke', $ancestor.selector, '--action', 'invoke') | Out-Null
+        Invoke-Ui @('click', $ancestor.selector) | Out-Null
         Expect-Location 'HKEY_CURRENT_USER'
     }
     Test-Omnibox 'Back and forward update the breadcrumbs' {
@@ -166,20 +313,34 @@ try {
     }
     Test-Omnibox 'Alt+D follows toolbar Tab order when suggestions are closed' {
         foreach ($key in @('Tab', 'shift+Tab')) {
-            Invoke-Ui @('send-keys', $key, '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
-            $expected = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element.automationId
-            if (-not $expected -or $expected -eq 'EditAddressButton') { throw "Could not find the $key target from Edit address." }
+            $expected = Get-AddressTabTarget $key
 
             Invoke-Ui @('send-keys', 'alt+d', '--via', 'send-input', '--target', 'EditAddressButton') | Out-Null
+            Invoke-Ui @('send-keys', 'NoSuchOmniboxDestination', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
             Wait-State {
                 param($elements)
-                $elements.automationId -contains 'OmniboxInput' -and $elements.automationId -notcontains 'OmniboxSuggestionFooter'
+                @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -eq 'NoSuchOmniboxDestination' }).Count -eq 1 -and
+                    $elements.automationId -notcontains 'OmniboxSuggestionFooter'
             }
             Expect-KeyboardFocus 'OmniboxInput'
             Invoke-Ui @('send-keys', $key, '--via', 'send-input') | Out-Null
             $actual = (Invoke-Ui @('get-focused', '--json') | ConvertFrom-Json).element.automationId
             if ($actual -ne $expected) { throw "$key from the omnibox focused '$actual'. Expected '$expected'." }
             Expect-Location 'HKEY_CURRENT_USER'
+        }
+    }
+
+    foreach ($key in 'Tab', 'Shift+Tab') {
+        Test-Omnibox "$key follows toolbar focus when a pending lookup returns no matches" {
+            $expected = Get-AddressTabTarget $key
+            Edit-Address
+            Invoke-Ui @('send-keys', 'hkcu', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+            Expect-SuggestionRows 'hkcu' @('HKEY_CURRENT_USER')
+
+            $missing = "__Omnibox_$([guid]::NewGuid().ToString('N'))"
+            Invoke-Ui @('send-keys', "text=\\$missing $key", '--via', 'send-input') | Out-Null
+            Wait-State { param($elements) $elements.automationId -notcontains 'OmniboxSuggestionFooter' }
+            Expect-KeyboardFocus $expected
         }
     }
 
@@ -210,8 +371,8 @@ try {
     Test-Omnibox 'Subkey suggestions can be chosen with the keyboard' {
         Edit-Address
         Invoke-Ui @('send-keys', 'HKCU\Softw', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
-        Wait-State { param($elements) $elements.automationId -contains 'OmniboxSuggestionFooter' }
-        foreach ($key in @('Tab', 'Down')) {
+        Expect-SuggestionRows 'HKCU\Softw' @('Software')
+        foreach ($key in @('Tab', 'Down', 'Up', 'Down')) {
             Invoke-Ui @('send-keys', $key, '--via', 'send-input') | Out-Null
             Wait-State {
                 param($elements)
@@ -231,6 +392,34 @@ try {
         Expect-ListKeyboardNavigation
         if (@((Read-Ui) | Where-Object { $_.automationId -like 'Notification_*' }).Count -gt 0) { throw 'Successful navigation did not clear the old error.' }
     }
+    Test-Omnibox 'A fast Tab completes the latest subkey draft and further typing cancels it' {
+        foreach ($case in @(
+            @{ Keys = 'text=\\soft Tab'; Expected = 'HKEY_CURRENT_USER\Software'; Undo = $true }
+            @{ Keys = 'text=\\soft Tab w'; Expected = 'hkcu\softw' }
+            @{ Keys = 'text=\\soft Tab w Backspace'; Expected = 'hkcu\soft' }
+        )) {
+            Edit-Address
+            Invoke-Ui @('send-keys', 'hkcu', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+            Expect-SuggestionRows 'hkcu' @('HKEY_CURRENT_USER')
+
+            Invoke-Ui @('send-keys', $case.Keys, '--via', 'send-input') | Out-Null
+            Expect-SuggestionRows $case.Expected @('Software')
+            Expect-KeyboardFocus 'OmniboxInput'
+            if ($case.Undo) {
+                Invoke-Ui @('send-keys', 'ctrl+z', '--via', 'send-input') | Out-Null
+                Expect-SuggestionRows 'hkcu\soft' @('Software')
+            }
+
+            Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        }
+    }
+    Test-Omnibox 'Enter submits the full typed address while the hive row is stale' {
+        Edit-Address
+        Invoke-Ui @('send-keys', 'hkcu', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Expect-SuggestionRows 'hkcu' @('HKEY_CURRENT_USER')
+        Invoke-Ui @('send-keys', 'text=\\Software Enter', '--via', 'send-input') | Out-Null
+        Expect-Location 'HKEY_CURRENT_USER\Software'
+    }
     Test-Omnibox 'Escape prevents delayed suggestions from reopening the editor' {
         Edit-Address
         Invoke-Ui @('send-keys', 'HKCR\', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
@@ -239,6 +428,42 @@ try {
         Expect-Location 'HKEY_CURRENT_USER\Software'
         $popups = @(& winapp ui list-windows -a $AppPid --json --on $Target | ConvertFrom-Json | Where-Object { $_.label -eq 'popup' })
         if ($LASTEXITCODE -ne 0 -or $popups.Count -gt 0) { throw 'A suggestion popup remained after cancelling.' }
+    }
+    Test-Omnibox 'Ctrl+Z restores the typed address after one or more Tab previews' {
+        function Expect-Draft([string] $Text) {
+            Wait-State {
+                param($elements)
+                @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -ceq $Text }).Count -eq 1
+            }
+        }
+
+        $hiveMatches = 'HKEY_CLASSES_ROOT', 'HKEY_CURRENT_USER', 'HKEY_CURRENT_CONFIG'
+        foreach ($case in @(
+            @{ Draft = 'HKCU\Softw'; Rows = @('Software'); Previews = @('HKEY_CURRENT_USER\Software') }
+            @{ Draft = 'hKc'; Rows = $hiveMatches; Previews = $hiveMatches }
+        )) {
+            Edit-Address
+            Invoke-Ui @('send-keys', $case.Draft, '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+            Expect-SuggestionRows $case.Draft $case.Rows
+            foreach ($preview in $case.Previews) {
+                Invoke-Ui @('send-keys', 'Tab', '--via', 'send-input') | Out-Null
+                Expect-Draft $preview
+            }
+            $list = Read-Ui | Where-Object automationId -eq 'SuggestionsList'
+            $rows = @(Get-Elements $list.children | Where-Object type -eq 'ListItem')
+            $row = $rows[$case.Previews.Count - 1]
+            Expect-SuggestionSelection $row.selector
+
+            Invoke-Ui @('send-keys', 'ctrl+z', '--via', 'send-input') | Out-Null
+            Expect-Draft $case.Draft
+            Expect-SuggestionSelection $row.selector $false
+            Expect-KeyboardFocus 'OmniboxInput'
+            Invoke-Ui @('send-keys', 'a', '--verbatim', '--via', 'send-input') | Out-Null
+            Expect-Draft ($case.Draft + 'a')
+            Invoke-Ui @('send-keys', 'ctrl+z', '--via', 'send-input') | Out-Null
+            Expect-Draft $case.Draft
+            Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        }
     }
     Test-Omnibox 'Tab previews contexts while the textbox keeps focus' {
         Edit-Address
@@ -324,8 +549,14 @@ try {
             param($elements)
             @($elements | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq 'Search the registry' }).Count -eq 1
         }
+        Invoke-Ui @('set-value', 'OmniboxInput', 'missing-command-xyz') | Out-Null
+        Expect-SuggestionRows 'missing-command-xyz' @('No matching commands')
+        Invoke-Ui @('send-keys', 'Up Down', '--via', 'send-input') | Out-Null
+        $statusRow = Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq 'No matching commands' }
+        Expect-SuggestionSelection $statusRow.selector $false
+        Expect-KeyboardFocus 'OmniboxInput'
         Invoke-Ui @('send-keys', 'ctrl+a Backspace', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
-        Invoke-Ui @('send-keys', 'Down Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Invoke-Ui @('send-keys', 'Up Down Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
         Wait-State { param($elements) @($elements | Where-Object type -eq 'TabItem').Count -eq $tabs + 1 }
         Expect-Location 'HKEY_CURRENT_USER\Software'
     }
@@ -405,13 +636,18 @@ try {
     Test-Omnibox 'Large hive children support scrolling and keyboard navigation' {
         Navigate 'HKCR' 'HKEY_CLASSES_ROOT'
         Invoke-Ui @('send-keys', 'Down', '--via', 'send-input', '--target', 'Breadcrumb1') | Out-Null
-        Wait-State { param($elements) $elements.automationId -contains 'FilteredMenuItems' }
-        $popup = & winapp ui list-windows -a $AppPid --json --on $Target | ConvertFrom-Json | Where-Object label -eq 'popup' | Select-Object -First 1
-        Invoke-Ui @('send-keys', 'Down End', '--via', 'send-input') | Out-Null
         Wait-State {
             param($elements)
             $menu = $elements | Where-Object automationId -eq 'FilteredMenuItems'
-            $visible = @(Get-Elements $menu.children | Where-Object type -eq 'MenuItem')
+            @(Get-Elements $menu.children | Where-Object type -eq 'MenuItem').Count -gt 0
+        }
+        $popup = & winapp ui list-windows -a $AppPid --json --on $Target | ConvertFrom-Json | Where-Object label -eq 'popup' | Select-Object -First 1
+        Invoke-Ui @('send-keys', 'Down', '--via', 'send-input') | Out-Null
+        Wait-State { (Invoke-Ui @('get-focused', '--json') $popup.hwnd | ConvertFrom-Json).element.type -eq 'MenuItem' }
+        Invoke-Ui @('send-keys', 'End', '--via', 'send-input') | Out-Null
+        Wait-State {
+            $menu = Invoke-Ui @('inspect', 'FilteredMenuItems', '-d', '4', '--hide-offscreen', '--json') $popup.hwnd | ConvertFrom-Json
+            $visible = @(Get-Elements $menu.windows[0].elements | Where-Object type -eq 'MenuItem')
             $focused = (Invoke-Ui @('get-focused', '--json') $popup.hwnd | ConvertFrom-Json).element
             $visible.Count -in 1..20 -and $focused.type -eq 'MenuItem' -and $focused.name -eq $visible[-1].name
         }
@@ -563,6 +799,219 @@ try {
     }
     Test-Omnibox 'Committing the current address returns keyboard focus to the list' {
         Navigate 'Computer' 'Computer'
+    }
+    Test-Omnibox 'A bare favorite name distinguishes literal Enter from choosing an address' {
+        Navigate 'Computer' 'Computer'
+        Navigate 'HKCU\Software' 'HKEY_CURRENT_USER\Software'
+        Add-CurrentFavorite 'Startup'
+        Navigate 'HKLM' 'HKEY_LOCAL_MACHINE'
+
+        $typeQuery = {
+            Edit-Address
+            Invoke-Ui @('send-keys', 'startup', '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+            Wait-State {
+                param($elements)
+                $list = $elements | Where-Object automationId -eq 'SuggestionsList'
+                $children = @(Get-Elements $list.children)
+                $children.name -contains 'Suggestions' -and @($children | Where-Object { $_.type -eq 'ListItem' -and $_.name -like 'Startup*' }).Count -eq 1
+            }
+        }
+        & $typeQuery
+        Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Wait-State { param($elements) $elements.automationId -like 'Notification_*' -and
+            @($elements | Where-Object { $_.automationId -eq 'OmniboxInput' -and $_.value -ceq 'startup' }).Count -eq 1 }
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-Location 'HKEY_LOCAL_MACHINE'
+
+        & $typeQuery
+        Invoke-Ui @('send-keys', 'Down Enter', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Expect-Location 'HKEY_CURRENT_USER\Software'
+        Expect-ListKeyboardNavigation
+        Invoke-Ui @('invoke', 'FavoriteButton', '--action', 'invoke') | Out-Null
+        Wait-State { param($elements) $elements.name -contains 'Add favorite' }
+        Invoke-Ui @('invoke', 'Back', '--action', 'invoke') | Out-Null
+        Expect-Location 'HKEY_LOCAL_MACHINE'
+    }
+    Test-Omnibox 'A populated address bar shows ten complete destinations across four groups' {
+        $bookmarks = [ordered]@{
+            'HKEY_CURRENT_USER\Control Panel\Desktop' = 'Desktop appearance'
+            'HKEY_CURRENT_USER\Environment' = 'User environment'
+        }
+        foreach ($entry in $bookmarks.GetEnumerator()) {
+            Navigate $entry.Key $entry.Key
+            Add-CurrentFavorite $entry.Value
+        }
+        foreach ($path in @('HKEY_CURRENT_USER\Control Panel\Colors', 'HKEY_CURRENT_USER\Keyboard Layout',
+                'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control', 'HKEY_CURRENT_USER\Control Panel\Mouse',
+                'HKEY_CURRENT_USER\Software\Microsoft', 'HKEY_CURRENT_USER\Software')) {
+            Navigate $path $path
+        }
+
+        Edit-Address
+        Wait-State {
+            param($elements)
+            $list = $elements | Where-Object automationId -eq 'SuggestionsList'
+            $children = @(Get-Elements $list.children)
+            $rows = @($children | Where-Object { $_.type -eq 'ListItem' -and $_.isEnabled })
+            $visible = @($rows | Where-Object {
+                $_.height -ge $rows[0].height - 1 -and $_.y -ge $list.y - 1 -and $_.y + $_.height -le $list.y + $list.height + 1
+            })
+            $visible.Count -ge 10 -and $children.name -contains 'Suggestions' -and $children.name -contains 'History' -and
+                $children.name -contains 'Favorites' -and $children.name -contains 'Hives'
+        }
+        Invoke-Ui @('screenshot', 'SuggestionsList', '--output', (Join-Path $ArtifactDirectory 'populated-address-list.png')) | Out-Null
+        foreach ($step in @(
+            @{ Keys = ('Down ' * 12).Trim(); Label = 'HKEY_CURRENT_CONFIG'; Address = 'HKEY_CURRENT_CONFIG' }
+            @{ Keys = 'Down'; Label = 'Microsoft'; Address = 'HKEY_CURRENT_USER\Software\Microsoft' }
+            @{ Keys = 'Up'; Label = 'HKEY_CURRENT_CONFIG'; Address = 'HKEY_CURRENT_CONFIG' }
+        )) {
+            Invoke-Ui @('send-keys', $step.Keys, '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+            Wait-State {
+                param($elements)
+                $list = $elements | Where-Object automationId -eq 'SuggestionsList'
+                $row = Get-Elements $list.children | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq $step.Label }
+                ($elements | Where-Object automationId -eq 'OmniboxInput').value -ceq $step.Address -and
+                    $row -and $row.y -ge $list.y - 1 -and $row.y + $row.height -le $list.y + $list.height + 1
+            }
+        }
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        foreach ($path in $bookmarks.Keys) {
+            Navigate $path $path
+            Invoke-Ui @('invoke', 'FavoriteButton', '--action', 'invoke') | Out-Null
+            Wait-State { param($elements) $elements.name -contains 'Add favorite' }
+        }
+    }
+    Test-Omnibox 'The address list opens above the textbox near the bottom of the work area' {
+        . (Join-Path $PSScriptRoot 'UiTestWindow.ps1')
+        Add-Type -AssemblyName System.Windows.Forms
+        $work = [System.Windows.Forms.Screen]::FromHandle([IntPtr]$mainWindow).WorkingArea
+        $window = Read-Ui | Where-Object { $_.type -eq 'Window' } | Select-Object -First 1
+        $button = Read-Ui | Where-Object automationId -eq 'EditAddressButton'
+        $targetY = $work.Bottom - 2 * $button.height - ($button.y - $window.y)
+        try {
+            if (-not [UxTestWindow]::SetWindowPos($mainWindow, 0, $window.x, $targetY, 0, 0, 0x15)) {
+                throw 'Could not move the test window near the bottom of the screen.'
+            }
+            Wait-State { param($elements) ($elements | Where-Object automationId -eq 'EditAddressButton').y -ge $work.Bottom - 2 * $button.height - 1 }
+            $anchor = Read-Ui | Where-Object automationId -eq 'EditAddressButton'
+            Edit-Address
+            Invoke-Ui @('set-value', 'OmniboxInput', 'HKLM\Software\') | Out-Null
+            Wait-State {
+                param($elements)
+                $inputBox = $elements | Where-Object automationId -eq 'OmniboxInput'
+                $list = $elements | Where-Object automationId -eq 'SuggestionsList'
+                $list -and @(Get-Elements $list.children | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq 'Classes' }).Count -eq 1 -and
+                    $list.height -gt $work.Bottom - $anchor.y -and $list.y -ge $work.Top - 1 -and
+                    $list.y + $list.height -le $inputBox.y + 1 -and [Math]::Abs($inputBox.y - $anchor.y) -le 1
+            }
+            Expect-KeyboardFocus 'OmniboxInput'
+            Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        }
+        finally { [UxTestWindow]::SetWindowPos($mainWindow, 0, $window.x, $window.y, 0, 0, 0x15) | Out-Null }
+    }
+    Test-Omnibox 'Favorite row actions reveal the bookmark and remove it without navigating' {
+        $name = 'Omnibox action bookmark'
+        $actions = "More actions for $name"
+        $favoriteRow = { Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -eq $name } }
+        $hiveHint = { param($row) Get-Elements $row.children | Where-Object { $_.type -eq 'Text' -and $_.name -eq 'HKCU' } }
+        Navigate 'HKCU' 'HKEY_CURRENT_USER'
+        Add-CurrentFavorite $name
+        Navigate 'HKLM' 'HKEY_LOCAL_MACHINE'
+
+        Edit-Address
+        Invoke-Ui @('hover', 'OmniboxInput', '--dwell-time', '0') | Out-Null
+        Wait-State { param($elements) $elements.name -contains $name -and $elements.name -notcontains $actions }
+        $row = & $favoriteRow
+        $caption = Get-Elements $row.children | Where-Object { $_.type -eq 'Text' -and $_.name -like "*$name*" } | Select-Object -First 1
+        $hint = & $hiveHint $row
+        $otherHint = Read-Ui | Where-Object { $_.type -eq 'Text' -and $_.name -eq 'HKCR' }
+        $rightEdge = $otherHint.x + $otherHint.width
+        if (-not $hint -or -not $otherHint -or [Math]::Abs($hint.x + $hint.width - $rightEdge) -gt 1) {
+            throw 'The hidden favorite action offset the hive alias.'
+        }
+        Invoke-Ui @('hover', $row.selector, '--dwell-time', '0') | Out-Null
+        Invoke-Ui @('wait-for', $actions, '--type', 'Button', '-t', '5000') | Out-Null
+        $elements = Read-Ui
+        $hoveredRow = $elements | Where-Object selector -eq $row.selector
+        $afterHover = $elements | Where-Object selector -eq $caption.selector
+        $hoveredHint = & $hiveHint $hoveredRow
+        $button = $elements | Where-Object { $_.type -eq 'Button' -and $_.name -eq $actions }
+        if (-not $afterHover -or $afterHover.x -ne $caption.x -or -not $hoveredHint -or
+            [Math]::Abs($hoveredHint.x + $hoveredHint.width - $rightEdge) -gt 1 -or $button.x + $button.width -gt $hoveredHint.x + 1) {
+            throw 'Revealing the favorite action moved or covered the label or hive alias.'
+        }
+        if ($hoveredRow.y -ne $row.y -or $hoveredRow.height -ne $row.height -or
+            $afterHover.y -ne $caption.y -or $hoveredHint.y -ne $hint.y) {
+            throw 'Hovering the favorite changed the row height or shifted its text vertically.'
+        }
+        Expect-SuggestionSelection $row.selector $false
+        Invoke-Ui @('hover', 'OmniboxInput', '--dwell-time', '0') | Out-Null
+        Wait-State { param($elements) $elements.name -contains $name -and $elements.name -notcontains $actions }
+        Invoke-Ui @('hover', $row.selector, '--dwell-time', '0') | Out-Null
+        Invoke-Ui @('click', $actions) | Out-Null
+        Invoke-Ui @('wait-for', 'Show in Favorites organizer', '--type', 'MenuItem', '-t', '5000') | Out-Null
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-KeyboardFocus 'OmniboxInput'
+
+        Invoke-Ui @('hover', 'OmniboxInput', '--dwell-time', '0') | Out-Null
+        Invoke-Ui @('send-keys', $name, '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        Expect-SuggestionRows $name @($name)
+        $hint = & $hiveHint (& $favoriteRow)
+        Invoke-Ui @('send-keys', 'Down', '--via', 'send-input') | Out-Null
+        Invoke-Ui @('wait-for', $actions, '--type', 'Button', '-t', '5000') | Out-Null
+        $selectedHint = & $hiveHint (& $favoriteRow)
+        if (-not $hint -or -not $selectedHint -or $selectedHint.y -ne $hint.y) {
+            throw 'Selecting the favorite with the keyboard shifted its hive alias.'
+        }
+        Expect-KeyboardFocus 'OmniboxInput'
+        Invoke-Ui @('send-keys', 'shift+F10', '--via', 'send-input') | Out-Null
+        Invoke-Ui @('wait-for', 'Show in Favorites organizer', '--type', 'MenuItem', '-t', '5000') | Out-Null
+        Invoke-Ui @('send-keys', 'Enter', '--via', 'send-input') | Out-Null
+        Wait-State {
+            param($elements)
+            @($elements | Where-Object { $_.type -eq 'ListItem' -and $_.name -like "$name, HKEY_CURRENT_USER*" }).Count -eq 1
+        }
+        $bookmark = Read-Ui | Where-Object { $_.type -eq 'ListItem' -and $_.name -like "$name, HKEY_CURRENT_USER*" }
+        Expect-SuggestionSelection $bookmark.selector
+        Invoke-Ui @('send-keys', 'ctrl+w', '--via', 'send-input') | Out-Null
+        Expect-Location 'HKEY_LOCAL_MACHINE'
+
+        Enter-Scope '*' '' 'Favorites' 'Find favorites'
+        Invoke-Ui @('send-keys', $name, '--verbatim', '--via', 'send-input', '--target', 'OmniboxInput') | Out-Null
+        foreach ($confirmation in 'Cancel', 'Remove') {
+            Expect-SuggestionRows $name @($name)
+            $row = & $favoriteRow
+            if ($confirmation -eq 'Cancel') {
+                Invoke-Ui @('touch', $row.selector, '--gesture', 'long-press', '--hold-ms', '900') | Out-Null
+            }
+            else {
+                Invoke-Ui @('hover', $row.selector, '--dwell-time', '0') | Out-Null
+                Invoke-Ui @('click', $actions) | Out-Null
+            }
+            Invoke-Ui @('wait-for', 'Remove favorite…', '--type', 'MenuItem', '-t', '5000') | Out-Null
+            $remove = Read-Ui | Where-Object { $_.type -eq 'MenuItem' -and $_.name -eq 'Remove favorite…' }
+            Invoke-Ui @('hover', $remove.selector, '--dwell-time', '0') | Out-Null
+            Invoke-Ui @('click', $remove.selector) | Out-Null
+            Invoke-Ui @('wait-for', 'PrimaryButton', '--type', 'Button', '-t', '5000') | Out-Null
+            $dialog = Read-Ui
+            if ($dialog.automationId -contains 'OmniboxInput' -or $dialog.automationId -contains 'SuggestionsList') {
+                throw 'The address popup is still visible over the removal confirmation.'
+            }
+            $choice = $dialog | Where-Object {
+                $_.type -eq 'Button' -and $_.name -eq $confirmation -and $_.automationId -in 'CloseButton', 'PrimaryButton'
+            }
+            Invoke-Ui @('click', $choice.selector) | Out-Null
+            Wait-State {
+                param($elements)
+                $elements.automationId -notcontains 'PrimaryButton' -and $elements.automationId -contains 'OmniboxInput'
+            }
+            Expect-KeyboardFocus 'OmniboxInput'
+        }
+        Expect-SuggestionRows $name @('No results found')
+        Invoke-Ui @('send-keys', 'Escape', '--via', 'send-input') | Out-Null
+        Expect-Location 'HKEY_LOCAL_MACHINE'
     }
     if ($results.Count -eq 0) { throw "No UI test matched '$TestFilter'." }
     Invoke-Ui @('screenshot', '--output', (Join-Path $ArtifactDirectory 'completed.png')) | Out-Null

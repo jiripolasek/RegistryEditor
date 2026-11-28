@@ -53,15 +53,20 @@ internal static class ComponentChecks
                 && freshInput.SelectedText == fresh.Address,
                 "Editing before the first layout focuses the textbox and selects the full address");
             parent.Children.Remove(fresh);
-            foreach (var entry in new[] { "shortcut", "button", "context menu" })
+            foreach (var entry in new[] { "shortcut", "edit action", "context menu" })
             {
                 if (entry == "shortcut")
                 {
                     first.BeginEdit();
                 }
-                else if (entry == "button")
+                else if (entry == "edit action")
                 {
                     var editButton = Button(first, "EditAddressButton");
+                    var breadcrumbs = (Grid)first.FindName("TrailViewport");
+                    var left = breadcrumbs.TransformToVisual(editButton).TransformPoint(default).X;
+                    Check(editButton.Content is null && AutomationProperties.GetName(editButton) == "Edit address" &&
+                          left >= 0 && Math.Abs(left + breadcrumbs.ActualWidth - editButton.ActualWidth) < 1,
+                        "Breadcrumbs use the full width of the named edit surface without a separate icon");
                     editButton.Focus(FocusState.Keyboard);
                     Invoke(editButton);
                 }
@@ -358,6 +363,7 @@ internal static class ComponentChecks
             await Task.Delay(50);
             var editor = (AutoSuggestBox)first.FindName("Editor");
             var input = (TextBox)FocusManager.GetFocusedElement(first.XamlRoot);
+            Check(suggestionRequests.Count == 0 && !editor.IsSuggestionListOpen, "Opening an address picker requests suggestions only when enabled");
             input.Text = "p";
             await WaitAsync(() => suggestionRequests.Count == 1);
             suggestionRequests[0].Result.SetResult((OmniboxItem[])[App.Projects, App.Notes]);
@@ -417,6 +423,8 @@ internal static class ComponentChecks
             Check(
                 !dismissed && editor.Items.OfType<OmniboxItem>().SequenceEqual((OmniboxItem[])[App.Projects, App.Notes]),
                 "Typing preserves the open suggestion list during debounce and loading");
+            Check(addressList.SelectionMode == ListViewSelectionMode.None && !addressList.IsItemClickEnabled && input.Text == "pr",
+                "An earlier typed query stays visible without offering its rows for completion");
             input.Text = "pro";
             await WaitAsync(() => suggestionRequests.Count == 3);
             Check(suggestionRequests[1].Token.IsCancellationRequested, "Typing cancels the previous suggestion request");
@@ -451,6 +459,95 @@ internal static class ComponentChecks
             Check(
                 suggestionRequests[5].Token.IsCancellationRequested && !editor.IsSuggestionListOpen && editor.Items.Count == 0,
                 "Leaving edit mode cancels suggestions and prevents delayed reopening");
+
+            first.ShowSuggestionsOnOpen = true;
+            first.BeginEdit();
+            await WaitAsync(() => suggestionRequests.Count == 7);
+            var opening = suggestionRequests[6];
+            Check(opening.Text.Length == 0 && input.SelectedText == first.Address, "Starting suggestions preserve the selected address");
+            input.Text = "typed";
+            await WaitAsync(() => suggestionRequests.Count == 8);
+            suggestionRequests[7].Result.SetResult((OmniboxItem[])[App.Projects]);
+            await WaitAsync(() => editor.Items.Count == 1);
+            opening.Result.SetResult((OmniboxItem[])[App.Notes]);
+            await Task.Delay(50);
+            Check(opening.Token.IsCancellationRequested && Equals(editor.Items[0], App.Projects) && input.Text == "typed",
+                "A late starting list cannot replace results for typed text");
+
+            var originalScopes = first.Scopes;
+            var advancedSearch = new OmniboxItem("Advanced search…", string.Empty) { Command = new XamlUICommand() };
+            first.Scopes = (OmniboxScope[])[new("@search", "Search", "Search here", _ => new[] { advancedSearch }, "?")];
+            // Both drafts are empty once Search consumes the alias, so the editor text alone cannot identify a stale result.
+            first.SetLocation(string.Empty, []);
+            first.BeginEdit();
+            await WaitAsync(() => suggestionRequests.Count == 9);
+            var pendingStart = suggestionRequests[^1];
+            input.Text = "?";
+
+            bool SearchRowVisibleWithFocus() =>
+                editorPopup.IsOpen && suggestionPanel.Visibility == Visibility.Visible && addressList.Items.Count == 1 &&
+                addressList.ContainerFromItem(advancedSearch) is ListViewItem { Visibility: Visibility.Visible, ActualHeight: > 0 } &&
+                ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input);
+
+            await WaitAsync(SearchRowVisibleWithFocus, () => "Search did not open with its row visible and the textbox focused.");
+            pendingStart.Result.SetResult((OmniboxItem[])[App.Notes]);
+            await Task.Yield();
+            Check(SearchRowVisibleWithFocus(), "Typing ? keeps Advanced search visible and the textbox focused after a late starting list");
+
+            first.Scopes = originalScopes;
+            first.SetLocation(App.Workspace.Address, App.Paths[App.Workspace.Address]);
+
+            suggestionRequests.Clear();
+            first.BeginEdit();
+            await WaitAsync(() => suggestionRequests.Count == 1);
+            suggestionRequests[0].Result.SetResult((OmniboxItem[])[App.Notes]);
+            bool RowVisible(OmniboxItem item) => editorPopup.IsOpen && suggestionPanel.Visibility == Visibility.Visible &&
+                addressList.ContainerFromItem(item) is ListViewItem { Visibility: Visibility.Visible, ActualHeight: > 0 };
+            await WaitAsync(() => RowVisible(App.Notes));
+
+            var hiddenDuringRefresh = false;
+            var popupVisibility = editorPopup.RegisterPropertyChangedCallback(Popup.IsOpenProperty,
+                (_, _) => hiddenDuringRefresh |= !editorPopup.IsOpen);
+            var panelVisibility = suggestionPanel.RegisterPropertyChangedCallback(UIElement.VisibilityProperty,
+                (_, _) => hiddenDuringRefresh |= suggestionPanel.Visibility != Visibility.Visible);
+            input.Text = "p";
+            await WaitAsync(() => suggestionRequests.Count == 2);
+            Check(!hiddenDuringRefresh && RowVisible(App.Notes) && ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input),
+                "The popup keeps its starting rows and textbox focus while the first typed request is pending");
+            Check(addressList.SelectionMode == ListViewSelectionMode.None && !addressList.IsItemClickEnabled,
+                "Starting rows cannot be chosen while typed matches are loading");
+            suggestionRequests[1].Result.SetResult((OmniboxItem[])[App.Projects]);
+            await WaitAsync(() => RowVisible(App.Projects));
+            Check(addressList.SelectionMode == ListViewSelectionMode.Single && addressList.IsItemClickEnabled,
+                "Typed matches can be chosen as soon as they appear");
+
+            input.Text = string.Empty;
+            await WaitAsync(() => suggestionRequests.Count == 3);
+            Check(!hiddenDuringRefresh && RowVisible(App.Projects),
+                "Clearing the draft keeps the typed rows visible until starting suggestions arrive");
+            suggestionRequests[2].Result.SetResult((OmniboxItem[])[App.Notes]);
+            await WaitAsync(() => RowVisible(App.Notes));
+            Check(!hiddenDuringRefresh && ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input),
+                "Replacing disjoint starting and typed rows never dismisses the popup");
+
+            var suggestedNote = App.Notes with { Group = "Suggestions" };
+            var suggestedProject = App.Projects with { Group = "Suggestions" };
+            input.Text = "o";
+            await WaitAsync(() => suggestionRequests.Count == 4);
+            suggestionRequests[3].Result.SetResult((OmniboxItem[])[suggestedNote, App.Workspace with { Group = "Places" },
+                App.Component with { Group = "Places" }, App.Projects with { Group = "Places" }]);
+            await WaitAsync(() => RowVisible(suggestedNote) && ContainsText(addressList, "Places"));
+            input.Text = "pro";
+            await WaitAsync(() => suggestionRequests.Count == 5);
+            suggestionRequests[4].Result.SetResult((OmniboxItem[])[suggestedProject]);
+            await WaitAsync(() => addressList.Items.Count == 1 && RowVisible(suggestedProject));
+            Check(!hiddenDuringRefresh && ReferenceEquals(FocusManager.GetFocusedElement(first.XamlRoot), input),
+                "Narrowing two populated groups to one top match keeps the result visible and the textbox focused");
+            editorPopup.UnregisterPropertyChangedCallback(Popup.IsOpenProperty, popupVisibility);
+            suggestionPanel.UnregisterPropertyChangedCallback(UIElement.VisibilityProperty, panelVisibility);
+
+            first.SetLocation(App.Workspace.Address, App.Paths[App.Workspace.Address]);
+            first.ShowSuggestionsOnOpen = false;
             first.SuggestionProvider = originalProvider;
 
             first.BeginEdit();
@@ -506,9 +603,9 @@ internal static class ComponentChecks
             Check(AutomationProperties.GetName(showMore) == "Show more from Work" &&
                   !editor.Items.OfType<OmniboxItem>().Any(item => item.Address == App.Component.Address),
                 "Only a group with hidden results has a Show more action");
-            Check(resultRow.ActualHeight >= 38 && Math.Abs(plainHeader.ActualHeight - resultRow.ActualHeight) < 0.5 &&
+            Check(resultRow.ActualHeight >= 38 && plainHeader.ActualHeight is > 0 and <= 26 &&
                   Math.Abs(showMore.ActualHeight - resultRow.ActualHeight) < 0.5,
-                $"Group header heights match result rows (plain {plainHeader.ActualHeight}, action {showMore.ActualHeight}, result {resultRow.ActualHeight})");
+                $"Group labels are compact and actions keep their target size (label {plainHeader.ActualHeight}, action {showMore.ActualHeight}, result {resultRow.ActualHeight})");
             popupDismissed = false;
             panelToken = suggestionPanel.RegisterPropertyChangedCallback(
                 UIElement.VisibilityProperty, (_, _) => popupDismissed |= suggestionPanel.Visibility == Visibility.Collapsed);
